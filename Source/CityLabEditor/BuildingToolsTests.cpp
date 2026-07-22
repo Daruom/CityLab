@@ -1,7 +1,9 @@
 #include "BuildingTools.h"
 
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Editor.h"
 #include "Engine/StaticMesh.h"
+#include "GameFramework/Actor.h"
 #include "Misc/AutomationTest.h"
 
 BEGIN_DEFINE_SPEC(
@@ -69,6 +71,41 @@ void FBuildingToolsSpec::Define()
 			FBuildingSpec Spec;
 			Spec.WallMaterialPath = TEXT("/Game/DoesNotExist/M_Nope.M_Nope");
 			UBuildingTools::GenerateBuilding(TEXT("/Game/Dev/Test/SM_TestBad"), Spec, false, FVector::ZeroVector, 0.f);
+		});
+	});
+
+	Describe("SpawnBuildingInstances", [this]()
+	{
+		It("spawns an actor with the requested instance count", [this]()
+		{
+			FBuildingSpec Spec;
+			UBuildingTools::GenerateBuilding(
+				TEXT("/Game/Dev/Test/SM_TestRow"), Spec, false, FVector::ZeroVector, 0.f);
+			AActor* Actor = UBuildingTools::SpawnBuildingInstances(
+				TEXT("/Game/Dev/Test/SM_TestRow"), 3, 20.f, FVector::ZeroVector, 0.f);
+			TestNotNull(TEXT("Actor spawned"), Actor);
+			if (Actor)
+			{
+				auto* Hism = Actor->FindComponentByClass<UHierarchicalInstancedStaticMeshComponent>();
+				TestNotNull(TEXT("HISM present"), Hism);
+				if (Hism)
+				{
+					TestEqual(TEXT("Instance count"), Hism->GetInstanceCount(), 3);
+				}
+				Actor->GetWorld()->DestroyActor(Actor);
+			}
+		});
+
+		It("raises when the mesh does not exist", [this]()
+		{
+			AddExpectedError(TEXT("not found"), EAutomationExpectedErrorFlags::Contains);
+			UBuildingTools::SpawnBuildingInstances(TEXT("/Game/DoesNotExist/SM_Nope"), 1, 20.f, FVector::ZeroVector, 0.f);
+		});
+
+		It("raises when Count is below 1", [this]()
+		{
+			AddExpectedError(TEXT("Count must be at least 1"), EAutomationExpectedErrorFlags::Contains);
+			UBuildingTools::SpawnBuildingInstances(TEXT("/Game/Dev/Test/SM_TestRow"), 0, 20.f, FVector::ZeroVector, 0.f);
 		});
 	});
 

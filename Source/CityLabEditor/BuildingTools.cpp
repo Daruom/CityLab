@@ -1,6 +1,7 @@
 #include "BuildingTools.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Editor.h"
 #include "Engine/StaticMesh.h"
@@ -83,7 +84,10 @@ namespace
 				const FVertexInstanceID InstanceID = MeshDesc.CreateVertexInstance(VertexID);
 				Normals[InstanceID] = Outward;
 				UV0.Set(InstanceID, 0, UVs[c]);
-				const float L = FMath::Clamp(Lums[c], 0.f, 1.f);
+				// Compensation gamma : le build encode les couleurs en sRGB (ToFColor(true))
+				// mais le shader lit les octets bruts sans decodage -> stocker L^2.2 pour
+				// que le node VertexColor restitue ~L.
+				const float L = FMath::Pow(FMath::Clamp(Lums[c], 0.f, 1.f), 2.2f);
 				Colors[InstanceID] = FVector4f(L, L, L, 1.f);
 				InstanceIDs.Add(InstanceID);
 			}
@@ -422,6 +426,20 @@ UStaticMesh* UBuildingTools::GenerateBuilding(const FString& AssetPath, const FB
 	// Piege F.39 : sans attente de compilation, crash intermittent sur les petits meshes.
 	FStaticMeshCompilingManager::Get().FinishAllCompilation();
 
+	// Diagnostic : verifier que les couleurs de sommets ont survecu au build.
+	if (const FStaticMeshRenderData* RenderData = Mesh->GetRenderData())
+	{
+		const FColorVertexBuffer& ColorBuffer = RenderData->LODResources[0].VertexBuffers.ColorVertexBuffer;
+		FString Sample;
+		if (ColorBuffer.GetNumVertices() > 0)
+		{
+			const FColor C0 = ColorBuffer.VertexColor(0);
+			Sample = FString::Printf(TEXT(", premiere couleur (%d,%d,%d)"), C0.R, C0.G, C0.B);
+		}
+		UE_LOG(LogBuildingTools, Display, TEXT("%s : %d sommets, ColorVertexBuffer %d entrees%s"),
+			*ObjectName, Mesh->GetNumVertices(0), ColorBuffer.GetNumVertices(), *Sample);
+	}
+
 	if (bSpawnActor)
 	{
 		UWorld* World = GetEditorWorldChecked();
@@ -439,4 +457,61 @@ UStaticMesh* UBuildingTools::GenerateBuilding(const FString& AssetPath, const FB
 		Actor->SetActorLabel(ObjectName);
 	}
 	return Mesh;
+}
+
+AActor* UBuildingTools::SpawnBuildingInstances(const FString& MeshAssetPath, int32 Count, float SpacingM,
+	FVector Location, float YawDegrees)
+{
+	if (Count < 1)
+	{
+		RaiseError(TEXT("Count must be at least 1."));
+		return nullptr;
+	}
+	const FString ObjectName = FPackageName::GetLongPackageAssetName(MeshAssetPath);
+	UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *(MeshAssetPath + TEXT(".") + ObjectName));
+	if (!Mesh)
+	{
+		RaiseError(FString::Printf(TEXT("Static mesh '%s' not found."), *MeshAssetPath));
+		return nullptr;
+	}
+	UWorld* World = GetEditorWorldChecked();
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	// Piege F.39 : sans l'usage InstancedStaticMeshes persiste sur le materiau de BASE,
+	// les instances retombent sur le DefaultMaterial dans le build cooke.
+	for (const FStaticMaterial& Slot : Mesh->GetStaticMaterials())
+	{
+		if (Slot.MaterialInterface)
+		{
+			Slot.MaterialInterface->CheckMaterialUsage(MATUSAGE_InstancedStaticMeshes);
+		}
+	}
+
+	AActor* Actor = World->SpawnActor<AActor>(Location, FRotator(0.f, YawDegrees, 0.f));
+	if (!Actor)
+	{
+		RaiseError(TEXT("Failed to spawn the instance actor."));
+		return nullptr;
+	}
+	USceneComponent* Root = NewObject<USceneComponent>(Actor, TEXT("Root"), RF_Transactional);
+	Actor->SetRootComponent(Root);
+	Actor->AddInstanceComponent(Root);
+	Root->RegisterComponent();
+	Root->SetWorldLocationAndRotation(Location, FRotator(0.f, YawDegrees, 0.f));
+
+	UHierarchicalInstancedStaticMeshComponent* Instances =
+		NewObject<UHierarchicalInstancedStaticMeshComponent>(Actor, TEXT("Instances"), RF_Transactional);
+	Instances->SetStaticMesh(Mesh);
+	Instances->SetupAttachment(Root);
+	Actor->AddInstanceComponent(Instances);
+	Instances->RegisterComponent();
+	for (int32 i = 0; i < Count; ++i)
+	{
+		Instances->AddInstance(FTransform(FVector(i * SpacingM * 100.f, 0.f, 0.f)));
+	}
+	Actor->SetActorLabel(FString::Printf(TEXT("%s_x%d"), *ObjectName, Count));
+	return Actor;
 }

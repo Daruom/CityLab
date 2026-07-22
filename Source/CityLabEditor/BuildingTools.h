@@ -125,6 +125,20 @@ public:
 	static UStaticMesh* GenerateBuilding(const FString& AssetPath, const FBuildingSpec& Spec,
 		bool bSpawnActor, FVector Location, float YawDegrees);
 
+	/**
+	 * Places instances of a building mesh with a HierarchicalInstancedStaticMeshComponent,
+	 * the rendering path the game uses. Instances are laid out along the actor's local X.
+	 * @param MeshAssetPath Package path of the mesh, e.g. "/Game/Dev/SM_Bldg01".
+	 * @param Count Number of instances.
+	 * @param SpacingM Distance between consecutive instance origins, meters.
+	 * @param Location World position of the first instance.
+	 * @param YawDegrees Rotation of the whole row around Z.
+	 * @return The actor holding the instances.
+	 */
+	UFUNCTION(meta = (AICallable), Category = "BuildingTools")
+	static AActor* SpawnBuildingInstances(const FString& MeshAssetPath, int32 Count, float SpacingM,
+		FVector Location, float YawDegrees);
+
 private:
 	static class UWorld* GetEditorWorldChecked();
 };
