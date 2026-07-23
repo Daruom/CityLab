@@ -47,4 +47,33 @@ void FCityImportToolsSpec::Define()
 			UCityImportTools::ImportCityDistrict(Path, TEXT("not-a-path"), FString(), FString(), 100.f, FVector::ZeroVector);
 		});
 	});
+
+	Describe("ImportCityMarkers", [this]()
+	{
+		It("places markers of known kinds and skips unknown ones", [this]()
+		{
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_markers.json"));
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"markers":[{"x":0,"y":0,"k":"metro","n":"Test"},{"x":10,"y":0,"k":"metro_e","n":""},{"x":20,"y":0,"k":"inconnu","n":""}]})"),
+				*Path);
+			const int32 Placed = UCityImportTools::ImportCityMarkers(
+				Path, TEXT("/Game/Dev/Test/City"), FString(), FVector::ZeroVector);
+			TestEqual(TEXT("Marqueurs places"), Placed, 2);
+		});
+
+		It("raises when the file does not exist", [this]()
+		{
+			AddExpectedError(TEXT("Cannot read markers file"), EAutomationExpectedErrorFlags::Contains);
+			UCityImportTools::ImportCityMarkers(TEXT("Z:/nope.json"), TEXT("/Game/Dev/Test/City"),
+				FString(), FVector::ZeroVector);
+		});
+
+		It("raises when the markers array is missing", [this]()
+		{
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_markers2.json"));
+			FFileHelper::SaveStringToFile(TEXT("{}"), *Path);
+			AddExpectedError(TEXT("no 'markers' array"), EAutomationExpectedErrorFlags::Contains);
+			UCityImportTools::ImportCityMarkers(Path, TEXT("/Game/Dev/Test/City"), FString(), FVector::ZeroVector);
+		});
+	});
 }

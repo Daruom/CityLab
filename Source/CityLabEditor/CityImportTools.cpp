@@ -5,8 +5,11 @@
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "Editor.h"
+#include "EngineUtils.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
+#include "Engine/TextRenderActor.h"
+#include "Components/TextRenderComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInterface.h"
@@ -662,4 +665,168 @@ FCityImportSummary UCityImportTools::ImportCityDistrict(const FString& JsonFileP
 	UE_LOG(LogCityImport, Display, TEXT("District importe : %d batiments, %d routes, %d arbres, %d meshes."),
 		Summary.Buildings, Summary.Roads, Summary.Trees, Summary.Meshes);
 	return Summary;
+}
+
+namespace
+{
+	struct FMarkerKind
+	{
+		float HeightCm;
+		FVector3f Color;
+		bool bLabel;
+	};
+
+	const TMap<FString, FMarkerKind>& MarkerKinds()
+	{
+		static const TMap<FString, FMarkerKind> Kinds = {
+			{ TEXT("metro"),    { 900.f,  FVector3f(0.90f, 0.10f, 0.10f), true } },
+			{ TEXT("metro_e"),  { 400.f,  FVector3f(0.90f, 0.10f, 0.10f), false } },
+			{ TEXT("church"),   { 1500.f, FVector3f(0.55f, 0.30f, 0.85f), true } },
+			{ TEXT("townhall"), { 1900.f, FVector3f(0.95f, 0.72f, 0.15f), true } },
+		};
+		return Kinds;
+	}
+
+	// Totem : socle + mat sombre + tete cubique de la couleur du type.
+	void BuildTotem(FCityMeshBuilder& QM, const FMarkerKind& Kind)
+	{
+		auto Box = [&](float HalfX, float HalfY, float Z0, float Z1, const FVector3f& C)
+		{
+			const FVector3f Mn(-HalfX, -HalfY, Z0), Mx(HalfX, HalfY, Z1);
+			const FVector3f v000(Mn.X, Mn.Y, Mn.Z), v100(Mx.X, Mn.Y, Mn.Z), v010(Mn.X, Mx.Y, Mn.Z),
+				v110(Mx.X, Mx.Y, Mn.Z), v001(Mn.X, Mn.Y, Mx.Z), v101(Mx.X, Mn.Y, Mx.Z),
+				v011(Mn.X, Mx.Y, Mx.Z), v111(Mx.X, Mx.Y, Mx.Z);
+			QM.AddQuad(QM.WallGroup, v000, v100, v101, v001, FVector3f(0, -1, 0), Shade(C, FVector3f(0, -1, 0), Z1));
+			QM.AddQuad(QM.WallGroup, v110, v010, v011, v111, FVector3f(0, 1, 0), Shade(C, FVector3f(0, 1, 0), Z1));
+			QM.AddQuad(QM.WallGroup, v010, v000, v001, v011, FVector3f(-1, 0, 0), Shade(C, FVector3f(-1, 0, 0), Z1));
+			QM.AddQuad(QM.WallGroup, v100, v110, v111, v101, FVector3f(1, 0, 0), Shade(C, FVector3f(1, 0, 0), Z1));
+			QM.AddQuad(QM.WallGroup, v001, v101, v111, v011, FVector3f(0, 0, 1), Shade(C, FVector3f(0, 0, 1), Z1));
+			QM.AddQuad(QM.WallGroup, v010, v110, v100, v000, FVector3f(0, 0, -1), C * 0.4f);
+		};
+		const float HeadHalf = FMath::Clamp(Kind.HeightCm * 0.12f, 80.f, 180.f);
+		Box(70.f, 70.f, 0.f, 25.f, FVector3f(0.22f, 0.22f, 0.24f));
+		Box(20.f, 20.f, 25.f, Kind.HeightCm - HeadHalf * 2.f, Kind.Color * 0.55f);
+		Box(HeadHalf, HeadHalf, Kind.HeightCm - HeadHalf * 2.f, Kind.HeightCm, Kind.Color);
+	}
+}
+
+int32 UCityImportTools::ImportCityMarkers(const FString& JsonFilePath, const FString& AssetFolder,
+	const FString& WallMaterialPath, FVector Location)
+{
+	FString Json;
+	if (!FFileHelper::LoadFileToString(Json, *JsonFilePath))
+	{
+		RaiseError(FString::Printf(TEXT("Cannot read markers file '%s'."), *JsonFilePath));
+		return 0;
+	}
+	TSharedPtr<FJsonObject> Root;
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) || !Root.IsValid())
+	{
+		RaiseError(TEXT("Markers file is not valid JSON."));
+		return 0;
+	}
+	const TArray<TSharedPtr<FJsonValue>>* MarkersJson = nullptr;
+	if (!Root->TryGetArrayField(TEXT("markers"), MarkersJson) || MarkersJson->Num() == 0)
+	{
+		RaiseError(TEXT("Markers file has no 'markers' array."));
+		return 0;
+	}
+	if (AssetFolder.IsEmpty() || !AssetFolder.StartsWith(TEXT("/")))
+	{
+		RaiseError(TEXT("AssetFolder must be a package path such as /Game/City/Capitole."));
+		return 0;
+	}
+	UMaterialInterface* WallMat = LoadMaterialOrDefault(WallMaterialPath);
+	UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+	if (!WallMat || !World)
+	{
+		if (!World)
+		{
+			RaiseError(TEXT("No editor world is loaded."));
+		}
+		return 0;
+	}
+	WallMat->CheckMaterialUsage(MATUSAGE_InstancedStaticMeshes);
+
+	// Idempotence : un re-import remplace les marqueurs existants.
+	TArray<AActor*> ToDestroy;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		const FString L = It->GetActorLabel();
+		if (L == TEXT("CityMarkers") || L.StartsWith(TEXT("Label_")))
+		{
+			ToDestroy.Add(*It);
+		}
+	}
+	for (AActor* A : ToDestroy)
+	{
+		World->DestroyActor(A);
+	}
+
+	// Un mesh + un HISM par type present dans le fichier.
+	TMap<FString, UHierarchicalInstancedStaticMeshComponent*> HismByKind;
+	AActor* MarkerActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
+	USceneComponent* Root2 = NewObject<USceneComponent>(MarkerActor, TEXT("Root"), RF_Transactional);
+	MarkerActor->SetRootComponent(Root2);
+	MarkerActor->AddInstanceComponent(Root2);
+	Root2->RegisterComponent();
+	Root2->SetWorldLocation(Location);
+	MarkerActor->SetActorLabel(TEXT("CityMarkers"));
+
+	int32 Placed = 0;
+	for (const TSharedPtr<FJsonValue>& V : *MarkersJson)
+	{
+		const TSharedPtr<FJsonObject>& O = V->AsObject();
+		const FString KindName = O->GetStringField(TEXT("k"));
+		const FMarkerKind* Kind = MarkerKinds().Find(KindName);
+		if (!Kind)
+		{
+			continue;
+		}
+		const FVector Pos = Location + FVector(O->GetNumberField(TEXT("x")) * 100.0,
+			O->GetNumberField(TEXT("y")) * 100.0, 0.0);
+
+		UHierarchicalInstancedStaticMeshComponent*& Hism = HismByKind.FindOrAdd(KindName);
+		if (!Hism)
+		{
+			FCityMeshBuilder Builder;
+			BuildTotem(Builder, *Kind);
+			UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / (TEXT("SM_Marker_") + KindName), Builder,
+				WallMat, WallMat);
+			Hism = NewObject<UHierarchicalInstancedStaticMeshComponent>(MarkerActor,
+				*(TEXT("Markers_") + KindName), RF_Transactional);
+			Hism->SetStaticMesh(Mesh);
+			Hism->SetupAttachment(Root2);
+			MarkerActor->AddInstanceComponent(Hism);
+			Hism->RegisterComponent();
+		}
+		Hism->AddInstance(FTransform(Pos - Location));
+
+		// Nom flottant : deux axes perpendiculaires EMPILES verticalement (le materiau
+		// texte est double-face : superposes, les glyphes se melangent ; empiles, il y a
+		// toujours un exemplaire lisible quel que soit l'angle).
+		const FString Label = O->GetStringField(TEXT("n"));
+		if (Kind->bLabel && !Label.IsEmpty())
+		{
+			for (int32 i = 0; i < 2; ++i)
+			{
+				const FRotator Rot(0.f, i * 90.f, 0.f);
+				ATextRenderActor* Text = World->SpawnActor<ATextRenderActor>(
+					Pos + FVector(0, 0, Kind->HeightCm + 180.0 + i * 360.0), Rot);
+				UTextRenderComponent* Comp = Text->GetTextRender();
+				Comp->SetText(FText::FromString(Label));
+				Comp->SetWorldSize(320.f);
+				Comp->SetHorizontalAlignment(EHTA_Center);
+				Comp->SetTextRenderColor(FColor(
+					FMath::RoundToInt(Kind->Color.X * 255.f),
+					FMath::RoundToInt(Kind->Color.Y * 255.f),
+					FMath::RoundToInt(Kind->Color.Z * 255.f)));
+				Text->SetActorLabel(FString::Printf(TEXT("Label_%s_%d"), *Label, i));
+			}
+		}
+		++Placed;
+	}
+	FStaticMeshCompilingManager::Get().FinishAllCompilation();
+	UE_LOG(LogCityImport, Display, TEXT("%d marqueurs places."), Placed);
+	return Placed;
 }

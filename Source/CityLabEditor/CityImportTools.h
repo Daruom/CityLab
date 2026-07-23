@@ -52,4 +52,19 @@ public:
 	UFUNCTION(meta = (AICallable), Category = "CityImportTools")
 	static FCityImportSummary ImportCityDistrict(const FString& JsonFilePath, const FString& AssetFolder,
 		const FString& WallMaterialPath, const FString& GlassMaterialPath, float CellSizeM, FVector Location);
+
+	/**
+	 * Places orientation markers from a JSON file with a "markers" array of
+	 * {x, y (meters), k (kind: "metro", "metro_e", "church", "townhall"), n (label)}.
+	 * Each kind gets a colored totem (instanced); named markers also get a floating
+	 * cross of text labels. Marker meshes are written under AssetFolder.
+	 * @param JsonFilePath Absolute path to the markers JSON.
+	 * @param AssetFolder Package folder for the totem meshes, e.g. "/Game/City/Capitole".
+	 * @param WallMaterialPath Opaque vertex-color material for the totems.
+	 * @param Location World position of the district origin.
+	 * @return Number of markers placed.
+	 */
+	UFUNCTION(meta = (AICallable), Category = "CityImportTools")
+	static int32 ImportCityMarkers(const FString& JsonFilePath, const FString& AssetFolder,
+		const FString& WallMaterialPath, FVector Location);
 };
