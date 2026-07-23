@@ -1,6 +1,7 @@
 #include "Modules/ModuleManager.h"
 #include "ToolsetRegistry/UToolsetRegistry.h"
 #include "BuildingTools.h"
+#include "CityImportTools.h"
 
 class FCityLabEditorModule : public IModuleInterface
 {
@@ -12,6 +13,7 @@ public:
 		if (!IsRunningCommandlet())
 		{
 			UToolsetRegistry::RegisterToolsetClass(UBuildingTools::StaticClass());
+			UToolsetRegistry::RegisterToolsetClass(UCityImportTools::StaticClass());
 		}
 	}
 
@@ -20,6 +22,7 @@ public:
 		if (UObjectInitialized())
 		{
 			UToolsetRegistry::UnregisterToolsetClass(UBuildingTools::StaticClass());
+			UToolsetRegistry::UnregisterToolsetClass(UCityImportTools::StaticClass());
 		}
 	}
 };

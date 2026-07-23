@@ -47,6 +47,10 @@ puis capture Redmi. Si KO → pivot plan B (Blender headless blosm+Buildify + d�
 - Toolsets MCP moteur : noms de paramètres incohérents entre outils (mesh vs
   static_mesh, asset_path vs asset, material vs material_or_function) — toujours
   vérifier le schéma via describe_toolset avant d'appeler.
+- **Cohabitation des deux sessions Claude** : toute fermeture d'éditeur doit filtrer
+  par titre de fenêtre (`MainWindowTitle -match 'CityLab'` ou `'DroneFPV'`) — le
+  2026-07-22, la session DroneFPV a fermé TOUS les UnrealEditor pour son rebuild et
+  a embarqué l'éditeur CityLab (fermeture propre, rien perdu, mais séance interrompue).
 
 ## Fait
 
@@ -54,6 +58,25 @@ puis capture Redmi. Si KO → pivot plan B (Blender headless blosm+Buildify + d�
 - 2026-07-22 : pipeline de bout en bout PROUVÉ : GenerateBuilding (façades, fenêtres
   en creux, corniche, parapet, vitrines RDC) + matériaux unlit créés par MCP +
   captures/mesures pixel automatisées. Reste le verdict visuel en ES3.1.
+- 2026-07-23 : **quartier Capitole (Toulouse) importé** — `L_Capitole`, 1 015 bâtiments
+  (BD TOPO IGN, hauteurs réelles au mètre), 514 routes OSM (rubans + trottoirs +
+  marquages), 315 arbres réels (HISM), 37 meshes (fusion par cellules de 150 m).
+  Toolset `CityImportTools.ImportCityDistrict` + fetch `SourceData/capitole.json`
+  (script Overpass + WFS Géoplateforme). Place du Capitole reconnaissable en vue
+  aérienne, canyons de rue volables. Teintes par usage (brique/enduit) + ombrage
+  cuits en vertex colors — qui S'AFFICHENT dans le level (le mystère « murs blancs »
+  du 22/07 ne se reproduit pas sur ce contenu ; à re-caractériser avant de fermer).
+  14/14 tests PASS. Licences données : © OpenStreetMap contributors (ODbL) +
+  IGN BD TOPO (Licence Ouverte 2.0) — mentions à prévoir dans l'app.
+
+## Prochaines étapes ville
+
+1. Verdict utilisateur sur les captures / vol éditeur dans L_Capitole.
+2. Budget : compter les tris par cellule, LODs (générer LOD grossier par cellule),
+   puis APK device (profil GPU Redmi — l'étape qui tranche tout).
+3. Qualité : tableaux de fenêtres (réactiver sur les grands bâtiments), portes/RDC
+   commerçants, landmark Capitole (traitement dédié), textures façades atlas.
+4. Consolider FCityMeshBuilder avec le builder de BuildingTools (duplication assumée).
 
 ## Reste / prochaines étapes
 

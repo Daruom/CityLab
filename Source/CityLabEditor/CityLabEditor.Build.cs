@@ -19,6 +19,7 @@ public class CityLabEditor : ModuleRules
 			"LevelEditor",
 			"ToolsetRegistry",
 			"AssetRegistry",
+			"Json",
 			"MeshDescription",
 			"StaticMeshDescription"
 		});
