@@ -15,6 +15,7 @@
 #include "Materials/MaterialInterface.h"
 #include "MeshDescription.h"
 #include "Misc/FileHelper.h"
+#include "PhysicsEngine/BodySetup.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "StaticMeshAttributes.h"
@@ -470,6 +471,14 @@ namespace
 		Mesh->CreateMeshDescription(0, MoveTemp(QM.MeshDesc));
 		Mesh->CommitMeshDescription(0);
 		Mesh->SetImportVersion(EImportStaticMeshVersion::LastVersion);
+		// Collision : le maillage de rendu sert de collision (drone vs ville). Pas de
+		// primitives simples generees ; les meshes sont statiques, cout memoire accepte.
+		Mesh->CreateBodySetup();
+		if (UBodySetup* Body = Mesh->GetBodySetup())
+		{
+			Body->CollisionTraceFlag = CTF_UseComplexAsSimple;
+			Body->InvalidatePhysicsData();
+		}
 		Mesh->Build(false);
 		Mesh->PostEditChange();
 		Mesh->MarkPackageDirty();
@@ -516,6 +525,21 @@ FCityImportSummary UCityImportTools::ImportCityDistrict(const FString& JsonFileP
 	{
 		RaiseError(TEXT("No editor world is loaded."));
 		return Summary;
+	}
+
+	// Idempotence : un re-import remplace la ville existante (memes labels d'acteurs).
+	TArray<AActor*> ToDestroy;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		const FString L = It->GetActorLabel();
+		if (L.StartsWith(TEXT("SM_City_")) || L == TEXT("CityTrees"))
+		{
+			ToDestroy.Add(*It);
+		}
+	}
+	for (AActor* A : ToDestroy)
+	{
+		World->DestroyActor(A);
 	}
 
 	const float Cell = CellSizeM * 100.f;
