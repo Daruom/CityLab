@@ -147,6 +147,9 @@ public:
 	 * Trees stay resident (single HISM). Re-running replaces previous layers and
 	 * refills existing sublevels; legacy "SM_City_*" actors are removed.
 	 * @param JsonFilePath Absolute path to the district JSON (see SourceData/*.json).
+	 * @param SurfacesJsonFilePath Optional surfaces JSON: slab grid vertices are tinted
+	 *        by sampling its water/green polygons — the always-resident painted ground
+	 *        that carries the map's look beyond the 3D films' cull distance. Empty = plain.
 	 * @param AssetFolder Package folder for generated meshes, e.g. "/Game/City/Toulouse10".
 	 * @param BlocksFolder Package folder for streaming sublevels, e.g. "/Game/Maps/T10Blocks".
 	 * @param WallMaterialPath Opaque vertex-color material for walls, roads, ground, trees.
@@ -158,7 +161,8 @@ public:
 	 * @return Counts of generated content.
 	 */
 	UFUNCTION(meta = (AICallable), Category = "CityImportTools")
-	static FCityStreamedSummary ImportCityStreamed(const FString& JsonFilePath, const FString& AssetFolder,
+	static FCityStreamedSummary ImportCityStreamed(const FString& JsonFilePath,
+		const FString& SurfacesJsonFilePath, const FString& AssetFolder,
 		const FString& BlocksFolder, const FString& WallMaterialPath, const FString& GlassMaterialPath,
 		float CellSizeM, float BlockSizeM, float ProxyCellSizeM, FVector Location);
 };

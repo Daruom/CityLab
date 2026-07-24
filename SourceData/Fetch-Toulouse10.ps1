@@ -15,7 +15,9 @@ $S = $Lat0 - $DLat; $N = $Lat0 + $DLat; $W = $Lon0 - $DLon; $E = $Lon0 + $DLon
 
 function F([double]$V) { return $V.ToString('0.##', $Inv) }
 function ToLocalX([double]$Lon) { return [Math]::Round(($Lon - $Lon0) * $MPerLon, 2) }
-function ToLocalY([double]$Lat) { return [Math]::Round(($Lat - $Lat0) * $MPerLat, 2) }
+# NORD = -Y : Unreal est main GAUCHE — garder nord=+Y refletait toute la ville en
+# miroir (chiralite inversee, constatee en vol). Convention Cesium/geo standard.
+function ToLocalY([double]$Lat) { return [Math]::Round(($Lat0 - $Lat) * $MPerLat, 2) }
 
 # ---------- Batiments : BD TOPO via WFS (pagine) ----------
 Write-Host "BD TOPO : telechargement des batiments ($([Math]::Round(2*$HalfM/1000,1)) km de cote)..."
@@ -96,7 +98,7 @@ for ($Ty = 0; $Ty -lt $Tiles; $Ty++) {
 		$TW = $W + ($E - $W) * $Tx / $Tiles; $TE = $W + ($E - $W) * ($Tx + 1) / $Tiles
 		$Q = @"
 [out:json][timeout:120];
-(way["highway"]($TS,$TW,$TN,$TE););out geom;
+(way["highway"]["tunnel"!="yes"]["covered"!="yes"]($TS,$TW,$TN,$TE););out geom;
 node["natural"="tree"]($TS,$TW,$TN,$TE);out;
 "@
 		$Body = 'data=' + [Uri]::EscapeDataString($Q)

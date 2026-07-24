@@ -42,7 +42,8 @@ foreach ($El in $R.elements) {
 	$Lat = if ($El.center) { $El.center.lat } else { $El.lat }
 	$Lon = if ($El.center) { $El.center.lon } else { $El.lon }
 	$X = [Math]::Round(($Lon - $Lon0) * $MPerLon, 1)
-	$Y = [Math]::Round(($Lat - $Lat0) * $MPerLat, 1)
+	# NORD = -Y (chiralite Unreal main gauche — cf. Fetch-Toulouse10.ps1).
+	$Y = [Math]::Round(($Lat0 - $Lat) * $MPerLat, 1)
 	$Place = "$($El.tags.place)"
 	$Kind = if ($El.tags.station -eq 'subway') { 'metro' }
 		elseif ($El.tags.railway -eq 'subway_entrance') { 'metro_e' }

@@ -16,23 +16,25 @@ $S = $Lat0 - $DLat; $N = $Lat0 + $DLat; $W = $Lon0 - $DLon; $E = $Lon0 + $DLon
 
 function F([double]$V) { return $V.ToString('0.##', $Inv) }
 function ToLocalX([double]$Lon) { return [Math]::Round(($Lon - $Lon0) * $MPerLon, 2) }
-function ToLocalY([double]$Lat) { return [Math]::Round(($Lat - $Lat0) * $MPerLat, 2) }
+# NORD = -Y (chiralite Unreal main gauche — cf. Fetch-Toulouse10.ps1).
+function ToLocalY([double]$Lat) { return [Math]::Round(($Lat0 - $Lat) * $MPerLat, 2) }
 
-# Amincit un anneau : points a >= 4 m d'ecart, plafond 600 points, retire le doublon final.
+# Amincit un anneau : points a >= 8 m d'ecart, plafond 400 points (une ondulation de
+# bord de 8 m est invisible a toute distance de vol ; ~/2 sur les tris de surfaces).
 function ThinRing($Ring) {
 	$Pts = New-Object System.Collections.Generic.List[object]
 	$Prev = $null
 	foreach ($C in $Ring) {
 		$P = @((ToLocalX $C[0]), (ToLocalY $C[1]))
-		if ($Prev -and ([Math]::Abs($P[0]-$Prev[0]) + [Math]::Abs($P[1]-$Prev[1])) -lt 4.0) { continue }
+		if ($Prev -and ([Math]::Abs($P[0]-$Prev[0]) + [Math]::Abs($P[1]-$Prev[1])) -lt 8.0) { continue }
 		$Pts.Add($P); $Prev = $P
 	}
 	if ($Pts.Count -gt 1) {
 		$A = $Pts[0]; $B = $Pts[$Pts.Count-1]
-		if (([Math]::Abs($A[0]-$B[0]) + [Math]::Abs($A[1]-$B[1])) -lt 4.0) { $Pts.RemoveAt($Pts.Count-1) }
+		if (([Math]::Abs($A[0]-$B[0]) + [Math]::Abs($A[1]-$B[1])) -lt 8.0) { $Pts.RemoveAt($Pts.Count-1) }
 	}
-	if ($Pts.Count -gt 600) {
-		$Step = [Math]::Ceiling($Pts.Count / 600.0)
+	if ($Pts.Count -gt 400) {
+		$Step = [Math]::Ceiling($Pts.Count / 400.0)
 		$Thin = New-Object System.Collections.Generic.List[object]
 		for ($i = 0; $i -lt $Pts.Count; $i += $Step) { $Thin.Add($Pts[$i]) }
 		$Pts = $Thin

@@ -67,6 +67,34 @@ namespace
 				FMath::Pow(FMath::Clamp(C.Z, 0.f, 1.f), 2.2f), 1.f);
 		}
 
+		// Variante avec UNE couleur PAR SOMMET (grille de sol peinte).
+		void AddPolyPerVertexColors(FPolygonGroupID Group, const FVector3f* Corners, int32 Num,
+			const FVector3f& Outward, const FVector2f* UVs, const FVector3f* VertexColors)
+		{
+			const FVector3f RenderedNormal =
+				FVector3f::CrossProduct(Corners[2] - Corners[0], Corners[1] - Corners[0]).GetSafeNormal();
+			const bool bFlip = FVector3f::DotProduct(RenderedNormal, Outward) < 0.f;
+			TVertexAttributesRef<FVector3f> Positions = Attributes.GetVertexPositions();
+			TVertexInstanceAttributesRef<FVector3f> Normals = Attributes.GetVertexInstanceNormals();
+			TVertexInstanceAttributesRef<FVector2f> UV0 = Attributes.GetVertexInstanceUVs();
+			TVertexInstanceAttributesRef<FVector4f> Colors = Attributes.GetVertexInstanceColors();
+			TArray<FVertexInstanceID> InstanceIDs;
+			InstanceIDs.Reserve(Num);
+			for (int32 i = 0; i < Num; ++i)
+			{
+				const int32 c = bFlip ? (Num - 1 - i) % Num : i;
+				const FVertexID VertexID = MeshDesc.CreateVertex();
+				Positions[VertexID] = Corners[c];
+				const FVertexInstanceID InstanceID = MeshDesc.CreateVertexInstance(VertexID);
+				Normals[InstanceID] = Outward;
+				UV0.Set(InstanceID, 0, UVs[c]);
+				Colors[InstanceID] = Encode(VertexColors[c]);
+				InstanceIDs.Add(InstanceID);
+			}
+			MeshDesc.CreatePolygon(Group, InstanceIDs);
+			++QuadCount;
+		}
+
 		void AddPoly(FPolygonGroupID Group, const FVector3f* Corners, int32 Num, const FVector3f& Outward,
 			const FVector2f* UVs, const FVector3f& Color)
 		{
@@ -331,7 +359,14 @@ namespace
 		}
 	}
 
-	// Ruban de route : asphalte, trottoirs, marquage central.
+	// Ruban de route TEXTURE : UN SEUL quad par segment (chaussee + trottoirs + bordures
+	// + marquage peints dans T_RoadStrip, slot Glass des cellules de sol). L'ancienne
+	// version geometrique (asphalte + 2 trottoirs + tirets, ~500-700 k tris de tirets
+	// sub-pixel au-dela de 300 m) plafonnait le panorama a 45 fps. En prime : plus de
+	// z-fight de marquage (aucune geometrie superposee). Les sentiers pietons restent
+	// un ruban uni sur le slot Wall (ils n'avaient deja ni trottoir ni marquage).
+	// Empilement decimetrique (Adreno/GLES sans reversed-Z) : dalle 0 < parc < eau <
+	// rail < route 55+.
 	void BuildRoad(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float WidthCm,
 		const FString& Type, int32 RoadIndex)
 	{
@@ -340,17 +375,20 @@ namespace
 		{
 			return;
 		}
-		// Leger decalage vertical par route pour eviter le z-fight aux croisements.
-		const float ZRoad = 4.f + (RoadIndex % 7) * 0.6f;
-		const float ZMark = ZRoad + 4.f;
-		const float ZWalk = 20.f;
+		// Jitter x4 : a 0,8 cm de pas, deux routes qui se croisent scintillaient au-dela
+		// de ~1 km (precision depth GLES). 4 cm de pas repousse le seuil vers 2 km,
+		// au-dela duquel les rubans sont de toute facon culles (sol peint derriere).
+		const float ZRoad = 55.f + (RoadIndex % 7) * 4.f;
 		const bool bWalkway = Type == TEXT("footway") || Type == TEXT("path") || Type == TEXT("cycleway");
 		const bool bMarking = !bWalkway && WidthCm >= 550.f;
+		const bool bSolid = Type == TEXT("primary") || Type == TEXT("secondary");
 		const float WalkW = bWalkway ? 0.f : 170.f;
-		const FVector3f Asphalt = bWalkway ? FVector3f(0.48f, 0.45f, 0.42f) : FVector3f(0.17f, 0.17f, 0.18f);
-		const FVector3f Walk = FVector3f(0.50f, 0.48f, 0.46f);
-		const FVector3f Mark = FVector3f(0.85f, 0.85f, 0.80f);
-		const FVector3f Up = FVector3f(0, 0, 1);
+		const float Half = WidthCm * 0.5f + WalkW;
+		const FVector3f Up(0, 0, 1);
+		// Teinte de base CLAIRE : les bandes de la texture assombrissent (asphalte 0,2x,
+		// trottoir 0,59x, marquage 1x) pour retrouver les couleurs historiques.
+		const FVector3f Base = bWalkway ? FVector3f(0.48f, 0.45f, 0.42f) : FVector3f(0.85f, 0.85f, 0.80f);
+		const FVector3f Shaded = Shade(Base, Up, ZRoad);
 
 		// Normales par sommet (moyenne des segments adjacents).
 		TArray<FVector2D> Nrm;
@@ -364,54 +402,32 @@ namespace
 			Nrm[i] = FVector2D(-D.Y, D.X);
 		}
 
-		const float Half = WidthCm * 0.5f;
 		float Arc = 0.f;
 		for (int32 i = 0; i + 1 < N; ++i)
 		{
 			const FVector2D A = PtsCm[i], B = PtsCm[i + 1];
 			const FVector2D NA = Nrm[i] * Half, NB = Nrm[i + 1] * Half;
-			// Asphalte
-			QM.AddQuad(QM.WallGroup,
+			const float SegLen = (B - A).Size();
+			const FVector3f P[4] = {
 				FVector3f(A.X - NA.X, A.Y - NA.Y, ZRoad), FVector3f(B.X - NB.X, B.Y - NB.Y, ZRoad),
-				FVector3f(B.X + NB.X, B.Y + NB.Y, ZRoad), FVector3f(A.X + NA.X, A.Y + NA.Y, ZRoad),
-				Up, Asphalt);
-			// Trottoirs
-			if (WalkW > 0.f)
+				FVector3f(B.X + NB.X, B.Y + NB.Y, ZRoad), FVector3f(A.X + NA.X, A.Y + NA.Y, ZRoad) };
+			if (bWalkway)
 			{
-				const FVector2D WA = Nrm[i] * (Half + WalkW), WB = Nrm[i + 1] * (Half + WalkW);
-				QM.AddQuad(QM.WallGroup,
-					FVector3f(A.X + NA.X, A.Y + NA.Y, ZWalk), FVector3f(B.X + NB.X, B.Y + NB.Y, ZWalk),
-					FVector3f(B.X + WB.X, B.Y + WB.Y, ZWalk), FVector3f(A.X + WA.X, A.Y + WA.Y, ZWalk),
-					Up, Walk);
-				QM.AddQuad(QM.WallGroup,
-					FVector3f(A.X - WA.X, A.Y - WA.Y, ZWalk), FVector3f(B.X - WB.X, B.Y - WB.Y, ZWalk),
-					FVector3f(B.X - NB.X, B.Y - NB.Y, ZWalk), FVector3f(A.X - NA.X, A.Y - NA.Y, ZWalk),
-					Up, Walk);
+				QM.AddQuad(QM.WallGroup, P[0], P[1], P[2], P[3], Up, Shaded);
 			}
-			// Marquage central : tirets 300 cm pleins / 300 cm vides (plein si voie majeure).
-			if (bMarking)
+			else
 			{
-				const bool bSolid = Type == TEXT("primary") || Type == TEXT("secondary");
-				const float SegLen = (B - A).Size();
-				const FVector2D Dir = (B - A) / FMath::Max(SegLen, 1.f);
-				const FVector2D Side(-Dir.Y * 8.f, Dir.X * 8.f);
-				float S = 0.f;
-				while (S < SegLen)
-				{
-					const float E = FMath::Min(S + 300.f, SegLen);
-					const bool bDash = bSolid || FMath::Fmod(Arc + S, 600.f) < 300.f;
-					if (bDash)
-					{
-						const FVector2D P0 = A + Dir * S, P1 = A + Dir * E;
-						QM.AddQuad(QM.WallGroup,
-							FVector3f(P0.X - Side.X, P0.Y - Side.Y, ZMark), FVector3f(P1.X - Side.X, P1.Y - Side.Y, ZMark),
-							FVector3f(P1.X + Side.X, P1.Y + Side.Y, ZMark), FVector3f(P0.X + Side.X, P0.Y + Side.Y, ZMark),
-							Up, Mark);
-					}
-					S = E;
-				}
-				Arc += SegLen;
+				// V : tirets qui defilent avec l'abscisse ; ligne continue = V fixe en
+				// zone peinte ; pas de marquage = V fixe en zone vide de la texture.
+				float V0, V1;
+				if (!bMarking) { V0 = V1 = 0.75f; }
+				else if (bSolid) { V0 = V1 = 0.25f; }
+				else { V0 = Arc / 600.f; V1 = (Arc + SegLen) / 600.f; }
+				const FVector2f UV[4] = {
+					FVector2f(0, V0), FVector2f(0, V1), FVector2f(1, V1), FVector2f(1, V0) };
+				QM.AddPoly(QM.GlassGroup, P, 4, Up, UV, Shaded);
 			}
+			Arc += SegLen;
 		}
 	}
 
@@ -455,7 +471,7 @@ namespace
 
 	UStaticMesh* CreateMeshAsset(const FString& AssetPath, FCityMeshBuilder& QM,
 		UMaterialInterface* WallMat, UMaterialInterface* GlassMat, bool bWithCollision = true,
-		bool bBoxCollision = false)
+		bool bBoxCollision = false, float BoxTopCm = 0.f)
 	{
 		// bBoxCollision : une simple boite englobante remplace le trimesh — reserve aux
 		// cellules de sol PLATES (dalles+routes), ou le trimesh coutait ~90 Mo de RAM
@@ -502,9 +518,14 @@ namespace
 				? CTF_UseComplexAsSimple : CTF_UseSimpleAsComplex;
 			if (bWithCollision && bBoxCollision && SimpleBox.IsValid)
 			{
-				FKBoxElem BoxElem(SimpleBox.GetSize().X, SimpleBox.GetSize().Y,
-					FMath::Max<float>(SimpleBox.GetSize().Z, 8.f));
-				BoxElem.Center = SimpleBox.GetCenter();
+				// BoxTopCm > 0 : plafond de boite force (ex. dalles de sol dont la boite
+				// doit englober les rubans de route poses au-dessus, ~55-80 cm).
+				const float ZSize = BoxTopCm > 0.f
+					? BoxTopCm : FMath::Max<float>(SimpleBox.GetSize().Z, 8.f);
+				FKBoxElem BoxElem(SimpleBox.GetSize().X, SimpleBox.GetSize().Y, ZSize);
+				BoxElem.Center = BoxTopCm > 0.f
+					? FVector(SimpleBox.GetCenter().X, SimpleBox.GetCenter().Y, ZSize * 0.5)
+					: SimpleBox.GetCenter();
 				Body->AggGeom.BoxElems.Add(BoxElem);
 			}
 			Body->InvalidatePhysicsData();
@@ -861,27 +882,38 @@ int32 UCityImportTools::ImportCityMarkers(const FString& JsonFilePath, const FSt
 		}
 		Hism->AddInstance(FTransform(Pos - Location));
 
-		// Nom flottant : deux axes perpendiculaires EMPILES verticalement (le materiau
-		// texte est double-face : superposes, les glyphes se melangent ; empiles, il y a
-		// toujours un exemplaire lisible quel que soit l'angle).
+		// Nom flottant : QUATRE orientations empilees (0/90/180/270 — le materiau texte
+		// est double-face avec revers en miroir : superposes les glyphes se melangent,
+		// empiles il y a toujours un exemplaire lisible NON-miroir de n'importe quelle
+		// direction au sol) + UN exemplaire A PLAT au sommet pour la vue aerienne.
 		const FString Label = O->GetStringField(TEXT("n"));
 		if (Kind->bLabel && !Label.IsEmpty())
 		{
-			for (int32 i = 0; i < 2; ++i)
+			const FColor LabelColor(
+				FMath::RoundToInt(Kind->Color.X * 255.f),
+				FMath::RoundToInt(Kind->Color.Y * 255.f),
+				FMath::RoundToInt(Kind->Color.Z * 255.f));
+			auto MakeText = [&](const FVector& P, const FRotator& Rot, int32 Idx)
 			{
-				const FRotator Rot(0.f, i * 90.f, 0.f);
-				ATextRenderActor* Text = World->SpawnActor<ATextRenderActor>(
-					Pos + FVector(0, 0, Kind->HeightCm + Kind->LabelSizeCm * (0.5625 + i * 1.125)), Rot);
+				ATextRenderActor* Text = World->SpawnActor<ATextRenderActor>(P, Rot);
 				UTextRenderComponent* Comp = Text->GetTextRender();
 				Comp->SetText(FText::FromString(Label));
 				Comp->SetWorldSize(Kind->LabelSizeCm);
 				Comp->SetHorizontalAlignment(EHTA_Center);
-				Comp->SetTextRenderColor(FColor(
-					FMath::RoundToInt(Kind->Color.X * 255.f),
-					FMath::RoundToInt(Kind->Color.Y * 255.f),
-					FMath::RoundToInt(Kind->Color.Z * 255.f)));
-				Text->SetActorLabel(FString::Printf(TEXT("Label_%s_%d"), *Label, i));
+				Comp->SetTextRenderColor(LabelColor);
+				Text->SetActorLabel(FString::Printf(TEXT("Label_%s_%d"), *Label, Idx));
+			};
+			for (int32 i = 0; i < 4; ++i)
+			{
+				MakeText(Pos + FVector(0, 0, Kind->HeightCm + Kind->LabelSizeCm * (0.5625 + i * 1.125)),
+					FRotator(0.f, i * 90.f, 0.f), i);
 			}
+			// Paire A PLAT dos-a-dos (30 cm d'ecart) : le materiau texte double-face a un
+			// revers en miroir — une copie seule se lisait a l'envers vue du ciel.
+			MakeText(Pos + FVector(0, 0, Kind->HeightCm + Kind->LabelSizeCm * 5.2),
+				FRotator(-90.f, 0.f, 0.f), 4);
+			MakeText(Pos + FVector(0, 0, Kind->HeightCm + Kind->LabelSizeCm * 5.2 + 30.0),
+				FRotator(90.f, 180.f, 0.f), 5);
 		}
 		++Placed;
 	}
@@ -917,8 +949,8 @@ namespace
 		{
 			return;
 		}
-		// Leger decalage vertical par voie pour eviter le z-fight aux croisements.
-		const float Z = 3.0f + (RailIndex % 4) * 0.3f;
+		// Empilement decimetrique (cf. BuildRoad) + decalage par voie aux croisements.
+		const float Z = 45.f + (RailIndex % 4) * 2.f;
 		const FVector3f Ballast(0.24f, 0.22f, 0.21f);
 		const FVector3f Up(0, 0, 1);
 		TArray<FVector2D> Nrm;
@@ -942,6 +974,15 @@ namespace
 				Up, Ballast);
 		}
 	}
+
+	// Polygone de peinture du sol (echantillonnage des dalles).
+	struct FPaintPoly
+	{
+		FBox2D Bounds;
+		TArray<FVector2D> Pts;
+		FVector3f Tint;
+		int32 Priority = 0;
+	};
 
 	bool PointInRing(const TArray<FVector2D>& P, const FVector2D& Q)
 	{
@@ -1041,7 +1082,8 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 		return C / Pts.Num();
 	};
 
-	// Hauteurs empilees sous les routes (4+) : parc 1,0 < bois 1,6 < eau 2,4 < rail 3,0+.
+	// Empilement decimetrique sous les routes (55+) : parc 15 < bois 20 < eau 30 <
+	// rail 45 (cf. BuildRoad — ecarts centimetriques = z-fight garanti a 2 km en GLES).
 	const FVector3f WaterTint(0.16f, 0.30f, 0.38f);
 	const FVector3f ForestTint(0.20f, 0.34f, 0.16f);
 	const FVector3f ParkTint(0.35f, 0.48f, 0.22f);
@@ -1062,7 +1104,7 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 			{
 				Algo::Reverse(Pts);
 			}
-			BuildFlatPolygon(GetCell(Centroid(Pts)), Pts, 2.4f, WaterTint);
+			BuildFlatPolygon(GetCell(Centroid(Pts)), Pts, 30.f, WaterTint);
 			++Summary.Water;
 		}
 	}
@@ -1070,6 +1112,7 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 	const TArray<TSharedPtr<FJsonValue>>* GreenJson = nullptr;
 	if (Root->TryGetArrayField(TEXT("green"), GreenJson))
 	{
+		int32 GreenIndex = 0;
 		for (const TSharedPtr<FJsonValue>& V : *GreenJson)
 		{
 			const TSharedPtr<FJsonObject>& O = V->AsObject();
@@ -1084,8 +1127,12 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 				Algo::Reverse(Pts);
 			}
 			const bool bForest = O->GetStringField(TEXT("k")) == TEXT("forest");
-			BuildFlatPolygon(GetCell(Centroid(Pts)), Pts, bForest ? 1.6f : 1.0f,
+			// Etagement PAR POLYGONE : les verts se chevauchent entre eux (parc sur
+			// pelouse, bois sur parc) — a hauteur egale ils z-fightaient encore.
+			const float ZJitter = (GreenIndex % 5) * 1.5f;
+			BuildFlatPolygon(GetCell(Centroid(Pts)), Pts, (bForest ? 20.f : 12.f) + ZJitter,
 				bForest ? ForestTint : ParkTint);
+			++GreenIndex;
 			++Summary.Green;
 
 			// Bois : arbres proceduraux disperses sur une grille de 28 m avec jitter,
@@ -1277,6 +1324,78 @@ namespace
 		return M;
 	}
 
+	// Texture de ruban routier : U = travers (trottoir|bordure|asphalte|marquage|...),
+	// V = longueur (tirets 3 m peints sur V<0,5, periode 6 m). Multipliee par la
+	// teinte claire du vertex color : asphalte 0.2x, trottoir 0.59x, marquage 1x.
+	UTexture2D* GetOrCreateRoadTexture(const FString& AssetFolder)
+	{
+		const FString AssetPath = AssetFolder / TEXT("T_RoadStrip");
+		const FString ObjectName = FPackageName::GetLongPackageAssetName(AssetPath);
+		if (UTexture2D* Existing = LoadObject<UTexture2D>(nullptr,
+			*(AssetPath + TEXT(".") + ObjectName), nullptr, LOAD_NoWarn | LOAD_Quiet))
+		{
+			return Existing;
+		}
+		constexpr int32 Size = 128;
+		TArray<FColor> Pixels;
+		Pixels.SetNumUninitialized(Size * Size);
+		for (int32 Y = 0; Y < Size; ++Y)
+		{
+			for (int32 X = 0; X < Size; ++X)
+			{
+				uint8 V = 50;                                    // asphalte
+				if (X < 15 || X >= 113) { V = 150; }             // trottoirs
+				else if (X < 17 || X >= 111) { V = 35; }         // bordures (lisibilite)
+				else if (X >= 58 && X < 70 && Y < 64) { V = 255; } // marquage central (tiret)
+				Pixels[Y * Size + X] = FColor(V, V, V);
+			}
+		}
+		UPackage* Package = CreatePackage(*AssetPath);
+		UTexture2D* Tex = NewObject<UTexture2D>(Package, *ObjectName, RF_Public | RF_Standalone);
+		Tex->Source.Init(Size, Size, 1, 1, TSF_BGRA8, (const uint8*)Pixels.GetData());
+		Tex->SRGB = true;
+		Tex->LODGroup = TEXTUREGROUP_World;
+		Tex->AddressX = TA_Clamp;
+		Tex->AddressY = TA_Wrap;
+		Tex->UpdateResource();
+		Tex->PostEditChange();
+		Tex->MarkPackageDirty();
+		FAssetRegistryModule::AssetCreated(Tex);
+		return Tex;
+	}
+
+	// Materiau ruban routier : unlit, texture x vertex color (meme patron que la facade).
+	UMaterialInterface* GetOrCreateRoadMaterial(const FString& AssetFolder)
+	{
+		const FString AssetPath = AssetFolder / TEXT("M_RoadStrip");
+		const FString ObjectName = FPackageName::GetLongPackageAssetName(AssetPath);
+		if (UMaterialInterface* Existing = LoadObject<UMaterialInterface>(nullptr,
+			*(AssetPath + TEXT(".") + ObjectName), nullptr, LOAD_NoWarn | LOAD_Quiet))
+		{
+			return Existing;
+		}
+		UTexture2D* Tex = GetOrCreateRoadTexture(AssetFolder);
+		UPackage* Package = CreatePackage(*AssetPath);
+		UMaterial* M = NewObject<UMaterial>(Package, *ObjectName, RF_Public | RF_Standalone);
+		M->MaterialDomain = MD_Surface;
+		M->SetShadingModel(MSM_Unlit);
+		UMaterialExpressionTextureSample* Sample = NewObject<UMaterialExpressionTextureSample>(M);
+		Sample->Texture = Tex;
+		Sample->SamplerType = SAMPLERTYPE_Color;
+		M->GetExpressionCollection().AddExpression(Sample);
+		UMaterialExpressionVertexColor* VColor = NewObject<UMaterialExpressionVertexColor>(M);
+		M->GetExpressionCollection().AddExpression(VColor);
+		UMaterialExpressionMultiply* Mul = NewObject<UMaterialExpressionMultiply>(M);
+		Mul->A.Connect(0, Sample);
+		Mul->B.Connect(0, VColor);
+		M->GetExpressionCollection().AddExpression(Mul);
+		M->GetEditorOnlyData()->EmissiveColor.Connect(0, Mul);
+		M->PostEditChange();
+		M->MarkPackageDirty();
+		FAssetRegistryModule::AssetCreated(M);
+		return M;
+	}
+
 	// Batiment a facades TEXTUREES : un seul quad par mur, la grille de fenetres est
 	// dans la texture (UV = travees x etages). ~x8-10 moins de triangles que la
 	// version geometrique — budget Adreno 512 ~1,5 M tris/image. Les toits vont sur
@@ -1333,51 +1452,99 @@ namespace
 	}
 
 	// Boite proxy : contour simplifie (>= 3 m entre points, plafond 12) et retracte de
-	// 30 cm vers le centroide, murs pleins + toit plat abaisse de 30 cm. La version
-	// detaillee du batiment recouvre exactement le proxy -> il disparait dedans quand
-	// le bloc de detail est charge, sans z-fight ni logique runtime.
+	// 2 m vers le centroide, murs pleins + toit plat abaisse de 2,5 m. La version
+	// detaillee du batiment recouvre le proxy -> il disparait dedans quand le bloc de
+	// detail est charge. Retrait 30 cm au depart : z-fight VISIBLE sur device (toits
+	// qui clignotent vus d'altitude a 1-2 km, la precision depth ne separe plus 30 cm).
 	void BuildProxyBuilding(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float Hcm,
 		const FVector3f& Tint)
 	{
+		// RECTANGLE ORIENTE (10 tris par batiment contre ~28 pour le contour simplifie,
+		// « tout garder, moins cher ») : axe = plus longue arete de l'emprise,
+		// projection min/max sur (axe, perpendiculaire), puis retrait de 2 m.
+		if (PtsCm.Num() < 3)
+		{
+			return;
+		}
+		FVector2D Axis(1, 0);
+		float BestLen = 0.f;
+		for (int32 i = 0; i < PtsCm.Num(); ++i)
+		{
+			const FVector2D E = PtsCm[(i + 1) % PtsCm.Num()] - PtsCm[i];
+			const float L = E.SquaredLength();
+			if (L > BestLen)
+			{
+				BestLen = L;
+				Axis = E.GetSafeNormal();
+			}
+		}
+		const FVector2D Perp(-Axis.Y, Axis.X);
+		float MinU = FLT_MAX, MaxU = -FLT_MAX, MinV = FLT_MAX, MaxV = -FLT_MAX;
+		for (const FVector2D& Q : PtsCm)
+		{
+			const float U = FVector2D::DotProduct(Q, Axis);
+			const float V = FVector2D::DotProduct(Q, Perp);
+			MinU = FMath::Min(MinU, U); MaxU = FMath::Max(MaxU, U);
+			MinV = FMath::Min(MinV, V); MaxV = FMath::Max(MaxV, V);
+		}
 		TArray<FVector2D> P;
-		for (const FVector2D& Pt : PtsCm)
+		const float BoxArea = (MaxU - MinU) * (MaxV - MinV);
+		const float FootprintArea = FMath::Abs(float(SignedArea(PtsCm)));
+		if (BoxArea < 1.f || FootprintArea / BoxArea >= 0.68f)
 		{
-			if (P.Num() == 0 || FVector2D::Distance(P.Last(), Pt) >= 300.f)
-			{
-				P.Add(Pt);
-			}
+			// Emprise compacte : rectangle oriente, retrait 2 m par cote (plafonne au
+			// tiers de la dimension pour les petites emprises).
+			const float InsetU = FMath::Min(200.f, (MaxU - MinU) / 3.f);
+			const float InsetV = FMath::Min(200.f, (MaxV - MinV) / 3.f);
+			P.Add(Axis * (MinU + InsetU) + Perp * (MinV + InsetV));
+			P.Add(Axis * (MaxU - InsetU) + Perp * (MinV + InsetV));
+			P.Add(Axis * (MaxU - InsetU) + Perp * (MaxV - InsetV));
+			P.Add(Axis * (MinU + InsetU) + Perp * (MaxV - InsetV));
 		}
-		if (P.Num() > 12)
+		else
 		{
-			TArray<FVector2D> Thin;
-			const int32 Step = FMath::DivideAndRoundUp(P.Num(), 12);
-			for (int32 i = 0; i < P.Num(); i += Step)
+			// Emprise concave/composite (< 68 % de sa boite) : le rectangle creait des
+			// DALLES GEANTES qui debordaient et clignotaient contre le detail (vu en
+			// v12) -> contour simplifie (>= 3 m, plafond 12 pts) retracte de 2 m.
+			for (const FVector2D& Pt : PtsCm)
 			{
-				Thin.Add(P[i]);
+				if (P.Num() == 0 || FVector2D::Distance(P.Last(), Pt) >= 300.f)
+				{
+					P.Add(Pt);
+				}
 			}
-			P = MoveTemp(Thin);
-		}
-		if (P.Num() < 3)
-		{
-			P = PtsCm;
+			if (P.Num() > 12)
+			{
+				TArray<FVector2D> Thin;
+				const int32 Step = FMath::DivideAndRoundUp(P.Num(), 12);
+				for (int32 i = 0; i < P.Num(); i += Step)
+				{
+					Thin.Add(P[i]);
+				}
+				P = MoveTemp(Thin);
+			}
 			if (P.Num() < 3)
 			{
-				return;
+				P = PtsCm;
 			}
-		}
-		FVector2D Ctr(0, 0);
-		for (const FVector2D& Q : P) { Ctr += Q; }
-		Ctr /= P.Num();
-		for (FVector2D& Q : P)
-		{
-			const FVector2D D = Ctr - Q;
-			const float L = D.Size();
-			if (L > 60.f)
+			FVector2D Ctr(0, 0);
+			for (const FVector2D& Q : P) { Ctr += Q; }
+			Ctr /= P.Num();
+			for (FVector2D& Q : P)
 			{
-				Q += D / L * 30.f;
+				const FVector2D D = Ctr - Q;
+				const float L = D.Size();
+				if (L > 60.f)
+				{
+					Q += D / L * FMath::Min(200.f, L * 0.5f);
+				}
 			}
 		}
-		const float H = FMath::Max(Hcm - 30.f, 100.f);
+		if (SignedArea(P) < 0)
+		{
+			Algo::Reverse(P);
+		}
+		const float H = FMath::Max(Hcm - 250.f, 100.f);
 		const int32 N = P.Num();
 		for (int32 e = 0; e < N; ++e)
 		{
@@ -1408,9 +1575,9 @@ namespace
 }
 
 FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFilePath,
-	const FString& AssetFolder, const FString& BlocksFolder, const FString& WallMaterialPath,
-	const FString& GlassMaterialPath, float CellSizeM, float BlockSizeM, float ProxyCellSizeM,
-	FVector Location)
+	const FString& SurfacesJsonFilePath, const FString& AssetFolder, const FString& BlocksFolder,
+	const FString& WallMaterialPath, const FString& GlassMaterialPath, float CellSizeM,
+	float BlockSizeM, float ProxyCellSizeM, FVector Location)
 {
 	FCityStreamedSummary Summary;
 
@@ -1455,7 +1622,8 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	for (TActorIterator<AActor> It(World); It; ++It)
 	{
 		const FString L = It->GetActorLabel();
-		if (L.StartsWith(TEXT("SM_Ground_")) || L.StartsWith(TEXT("SM_Proxy_")) ||
+		if (L.StartsWith(TEXT("SM_Ground_")) || L.StartsWith(TEXT("SM_Slab_")) ||
+			L.StartsWith(TEXT("SM_Proxy_")) ||
 			L.StartsWith(TEXT("SM_City_")) || L.StartsWith(TEXT("SM_Bldg_")) || L == TEXT("CityTrees"))
 		{
 			ToDestroy.Add(*It);
@@ -1565,24 +1733,112 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		}
 	}
 
-	// --- Dalles de sol : toute cellule touchee par un batiment ou une route ---
+	// --- Dalles de sol PEINTES : grilles 12x12 par cellule, sommets teintes par
+	// echantillonnage des surfaces (eau > bois > parc). Toujours residentes, elles
+	// portent l'apparence de la map au-dela des distances de cull des films 3D —
+	// une seule couche au loin = zero z-fight possible (precision depth GLES).
+	TArray<FPaintPoly> PaintPolys;
+	if (!SurfacesJsonFilePath.IsEmpty())
+	{
+		FString SurfJson;
+		if (FFileHelper::LoadFileToString(SurfJson, *SurfacesJsonFilePath))
+		{
+			TSharedPtr<FJsonObject> SurfRoot;
+			if (FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(SurfJson), SurfRoot) &&
+				SurfRoot.IsValid())
+			{
+				auto LoadPolys = [&](const TCHAR* Field, auto TintForKind)
+				{
+					const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+					if (!SurfRoot->TryGetArrayField(Field, Arr))
+					{
+						return;
+					}
+					for (const TSharedPtr<FJsonValue>& V : *Arr)
+					{
+						const TSharedPtr<FJsonObject>& O = V->AsObject();
+						FPaintPoly Poly;
+						ReadPts(O->GetArrayField(TEXT("pts")), Poly.Pts);
+						if (Poly.Pts.Num() < 3)
+						{
+							continue;
+						}
+						Poly.Bounds = FBox2D(ForceInit);
+						for (const FVector2D& P : Poly.Pts) { Poly.Bounds += P; }
+						TintForKind(O, Poly);
+						PaintPolys.Add(MoveTemp(Poly));
+					}
+				};
+				LoadPolys(TEXT("water"), [](const TSharedPtr<FJsonObject>&, FPaintPoly& P)
+					{ P.Tint = FVector3f(0.16f, 0.30f, 0.38f); P.Priority = 3; });
+				LoadPolys(TEXT("green"), [](const TSharedPtr<FJsonObject>& O, FPaintPoly& P)
+					{
+						const bool bForest = O->GetStringField(TEXT("k")) == TEXT("forest");
+						P.Tint = bForest ? FVector3f(0.20f, 0.34f, 0.16f) : FVector3f(0.35f, 0.48f, 0.22f);
+						P.Priority = bForest ? 2 : 1;
+					});
+			}
+		}
+	}
+	const FVector3f SlabBase(0.33f, 0.31f, 0.28f);
+	auto SampleGround = [&](const FVector2D& P) -> FVector3f
+	{
+		int32 BestPrio = 0;
+		FVector3f Tint = SlabBase;
+		for (const FPaintPoly& Poly : PaintPolys)
+		{
+			if (Poly.Priority > BestPrio && Poly.Bounds.IsInside(P) && PointInRing(Poly.Pts, P))
+			{
+				BestPrio = Poly.Priority;
+				Tint = Poly.Tint;
+			}
+		}
+		return Tint;
+	};
+	UMaterialInterface* RoadMat = GetOrCreateRoadMaterial(AssetFolder);
+	constexpr int32 SlabGrid = 12;
 	for (const FIntPoint& Key : SlabKeys)
 	{
-		FCityMeshBuilder& B = GetIn(GroundCells, FVector2D((Key.X + 0.5f) * Cell, (Key.Y + 0.5f) * Cell), Cell);
-		B.AddQuad(B.WallGroup,
-			FVector3f(Key.X * Cell, Key.Y * Cell, 0), FVector3f((Key.X + 1) * Cell, Key.Y * Cell, 0),
-			FVector3f((Key.X + 1) * Cell, (Key.Y + 1) * Cell, 0), FVector3f(Key.X * Cell, (Key.Y + 1) * Cell, 0),
-			FVector3f(0, 0, 1), FVector3f(0.33f, 0.31f, 0.28f));
+		FCityMeshBuilder SlabBuilder;
+		const float Step = Cell / SlabGrid;
+		for (int32 GY = 0; GY < SlabGrid; ++GY)
+		{
+			for (int32 GX = 0; GX < SlabGrid; ++GX)
+			{
+				const float X0 = Key.X * Cell + GX * Step, Y0 = Key.Y * Cell + GY * Step;
+				const FVector3f C[4] = {
+					FVector3f(X0, Y0, 0), FVector3f(X0 + Step, Y0, 0),
+					FVector3f(X0 + Step, Y0 + Step, 0), FVector3f(X0, Y0 + Step, 0) };
+				const FVector2f UV[4] = { FVector2f(0, 0), FVector2f(1, 0), FVector2f(1, 1), FVector2f(0, 1) };
+				FVector3f Cols[4];
+				for (int32 c = 0; c < 4; ++c)
+				{
+					Cols[c] = Shade(SampleGround(FVector2D(C[c].X, C[c].Y)), FVector3f(0, 0, 1), 0.f);
+				}
+				SlabBuilder.AddPolyPerVertexColors(SlabBuilder.WallGroup, C, 4,
+					FVector3f(0, 0, 1), UV, Cols);
+			}
+		}
+		const FString SlabName = FString::Printf(TEXT("SM_Slab_%d_%d"), Key.X, Key.Y);
+		UStaticMesh* SlabMesh = CreateMeshAsset(AssetFolder / SlabName, SlabBuilder, WallMat, WallMat,
+			true, true, 60.f);
+		++Summary.GroundMeshes;
+		AStaticMeshActor* SlabActor = World->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
+		SlabActor->GetStaticMeshComponent()->SetStaticMesh(SlabMesh);
+		SlabActor->SetActorLabel(SlabName);
 	}
 
-	// --- Acteurs residents : sol (collision) + proxy (sans collision) ---
+	// --- Rubans routiers : SANS collision (films visuels 55-80 cm au-dessus de la
+	// dalle porteuse, dont la boite monte a 60 cm) et cullables a ~2 km cote runtime.
+	// Slot Wall = sentiers (vertex color) ; slot Glass = rubans textures.
 	for (auto& Pair : GroundCells)
 	{
 		const FString Name = FString::Printf(TEXT("SM_Ground_%d_%d"), Pair.Key.X, Pair.Key.Y);
-		UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *Pair.Value, WallMat, GlassMat, true, true);
+		UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *Pair.Value, WallMat, RoadMat, false);
 		++Summary.GroundMeshes;
 		AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
 		Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
+		Actor->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Actor->SetActorLabel(Name);
 	}
 	for (auto& Pair : ProxyCells)

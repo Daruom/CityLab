@@ -60,7 +60,7 @@ void FCityImportToolsSpec::Define()
 			FFileHelper::SaveStringToFile(Json, *Path);
 
 			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
-				Path, TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
 				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector);
 			TestEqual(TEXT("Buildings"), Summary.Buildings, 2);
 			TestEqual(TEXT("Roads"), Summary.Roads, 1);
@@ -74,7 +74,7 @@ void FCityImportToolsSpec::Define()
 		It("raises when the file does not exist", [this]()
 		{
 			AddExpectedError(TEXT("Cannot read district file"), EAutomationExpectedErrorFlags::Contains);
-			UCityImportTools::ImportCityStreamed(TEXT("Z:/nope.json"), TEXT("/Game/Dev/Test/City"),
+			UCityImportTools::ImportCityStreamed(TEXT("Z:/nope.json"), FString(), TEXT("/Game/Dev/Test/City"),
 				TEXT("/Game/Dev/Test/Blocks"), FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector);
 		});
 	});
