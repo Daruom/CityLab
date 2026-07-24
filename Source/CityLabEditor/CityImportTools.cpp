@@ -5,7 +5,10 @@
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Dom/JsonObject.h"
 #include "Editor.h"
+#include "EditorLevelUtils.h"
+#include "Engine/LevelStreamingDynamic.h"
 #include "EngineUtils.h"
+#include "FileHelpers.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/TextRenderActor.h"
@@ -447,8 +450,21 @@ namespace
 	}
 
 	UStaticMesh* CreateMeshAsset(const FString& AssetPath, FCityMeshBuilder& QM,
-		UMaterialInterface* WallMat, UMaterialInterface* GlassMat)
+		UMaterialInterface* WallMat, UMaterialInterface* GlassMat, bool bWithCollision = true,
+		bool bBoxCollision = false)
 	{
+		// bBoxCollision : une simple boite englobante remplace le trimesh — reserve aux
+		// cellules de sol PLATES (dalles+routes), ou le trimesh coutait ~90 Mo de RAM
+		// device pour un gain de precision negligeable (< 20 cm en Z).
+		FBox SimpleBox(ForceInit);
+		if (bWithCollision && bBoxCollision)
+		{
+			TVertexAttributesRef<FVector3f> Pos = FStaticMeshAttributes(QM.MeshDesc).GetVertexPositions();
+			for (const FVertexID V : QM.MeshDesc.Vertices().GetElementIDs())
+			{
+				SimpleBox += FVector(Pos[V]);
+			}
+		}
 		const FString ObjectName = FPackageName::GetLongPackageAssetName(AssetPath);
 		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *(AssetPath + TEXT(".") + ObjectName), nullptr,
 			LOAD_NoWarn | LOAD_Quiet);
@@ -473,10 +489,20 @@ namespace
 		Mesh->SetImportVersion(EImportStaticMeshVersion::LastVersion);
 		// Collision : le maillage de rendu sert de collision (drone vs ville). Pas de
 		// primitives simples generees ; les meshes sont statiques, cout memoire accepte.
+		// bWithCollision=false (proxy lointain) : UseSimpleAsComplex sans primitive
+		// simple = aucun trimesh cuit, zero data de collision dans l'APK.
 		Mesh->CreateBodySetup();
 		if (UBodySetup* Body = Mesh->GetBodySetup())
 		{
-			Body->CollisionTraceFlag = CTF_UseComplexAsSimple;
+			Body->CollisionTraceFlag = (bWithCollision && !bBoxCollision)
+				? CTF_UseComplexAsSimple : CTF_UseSimpleAsComplex;
+			if (bWithCollision && bBoxCollision && SimpleBox.IsValid)
+			{
+				FKBoxElem BoxElem(SimpleBox.GetSize().X, SimpleBox.GetSize().Y,
+					FMath::Max<float>(SimpleBox.GetSize().Z, 8.f));
+				BoxElem.Center = SimpleBox.GetCenter();
+				Body->AggGeom.BoxElems.Add(BoxElem);
+			}
 			Body->InvalidatePhysicsData();
 		}
 		Mesh->Build(false);
@@ -698,6 +724,7 @@ namespace
 		float HeightCm;
 		FVector3f Color;
 		bool bLabel;
+		float LabelSizeCm = 320.f;
 	};
 
 	const TMap<FString, FMarkerKind>& MarkerKinds()
@@ -707,6 +734,10 @@ namespace
 			{ TEXT("metro_e"),  { 400.f,  FVector3f(0.90f, 0.10f, 0.10f), false } },
 			{ TEXT("church"),   { 1500.f, FVector3f(0.55f, 0.30f, 0.85f), true } },
 			{ TEXT("townhall"), { 1900.f, FVector3f(0.95f, 0.72f, 0.15f), true } },
+			// Indications de zones (place=suburb) et quartiers (place=quarter|neighbourhood) :
+			// totems hauts et noms geants, lisibles en vol a l'echelle de la ville.
+			{ TEXT("district"), { 3500.f, FVector3f(0.10f, 0.80f, 0.75f), true, 1100.f } },
+			{ TEXT("quarter"),  { 2200.f, FVector3f(0.25f, 0.50f, 0.95f), true, 650.f } },
 		};
 		return Kinds;
 	}
@@ -836,10 +867,10 @@ int32 UCityImportTools::ImportCityMarkers(const FString& JsonFilePath, const FSt
 			{
 				const FRotator Rot(0.f, i * 90.f, 0.f);
 				ATextRenderActor* Text = World->SpawnActor<ATextRenderActor>(
-					Pos + FVector(0, 0, Kind->HeightCm + 180.0 + i * 360.0), Rot);
+					Pos + FVector(0, 0, Kind->HeightCm + Kind->LabelSizeCm * (0.5625 + i * 1.125)), Rot);
 				UTextRenderComponent* Comp = Text->GetTextRender();
 				Comp->SetText(FText::FromString(Label));
-				Comp->SetWorldSize(320.f);
+				Comp->SetWorldSize(Kind->LabelSizeCm);
 				Comp->SetHorizontalAlignment(EHTA_Center);
 				Comp->SetTextRenderColor(FColor(
 					FMath::RoundToInt(Kind->Color.X * 255.f),
@@ -853,4 +884,697 @@ int32 UCityImportTools::ImportCityMarkers(const FString& JsonFilePath, const FSt
 	FStaticMeshCompilingManager::Get().FinishAllCompilation();
 	UE_LOG(LogCityImport, Display, TEXT("%d marqueurs places."), Placed);
 	return Placed;
+}
+
+namespace
+{
+	// Polygone plat de reperage (eau, parc, bois) : triangulation de l'anneau, teinte cuite.
+	void BuildFlatPolygon(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float Zcm,
+		const FVector3f& Tint)
+	{
+		TArray<int32> Tris;
+		TriangulateRing(PtsCm, Tris);
+		const FVector3f Shaded = Shade(Tint, FVector3f(0, 0, 1), Zcm);
+		for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
+		{
+			QM.AddTri(QM.WallGroup,
+				FVector3f(PtsCm[Tris[t]].X, PtsCm[Tris[t]].Y, Zcm),
+				FVector3f(PtsCm[Tris[t + 1]].X, PtsCm[Tris[t + 1]].Y, Zcm),
+				FVector3f(PtsCm[Tris[t + 2]].X, PtsCm[Tris[t + 2]].Y, Zcm),
+				FVector3f(0, 0, 1), Shaded);
+		}
+	}
+
+	// Ruban de voie ferree : ballast sombre, sans trottoir ni marquage.
+	void BuildRail(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float WidthCm, int32 RailIndex)
+	{
+		const int32 N = PtsCm.Num();
+		if (N < 2)
+		{
+			return;
+		}
+		// Leger decalage vertical par voie pour eviter le z-fight aux croisements.
+		const float Z = 3.0f + (RailIndex % 4) * 0.3f;
+		const FVector3f Ballast(0.24f, 0.22f, 0.21f);
+		const FVector3f Up(0, 0, 1);
+		TArray<FVector2D> Nrm;
+		Nrm.SetNum(N);
+		for (int32 i = 0; i < N; ++i)
+		{
+			FVector2D D(0, 0);
+			if (i > 0) { D += (PtsCm[i] - PtsCm[i - 1]).GetSafeNormal(); }
+			if (i < N - 1) { D += (PtsCm[i + 1] - PtsCm[i]).GetSafeNormal(); }
+			D = D.GetSafeNormal();
+			Nrm[i] = FVector2D(-D.Y, D.X);
+		}
+		const float Half = WidthCm * 0.5f;
+		for (int32 i = 0; i + 1 < N; ++i)
+		{
+			const FVector2D A = PtsCm[i], B = PtsCm[i + 1];
+			const FVector2D NA = Nrm[i] * Half, NB = Nrm[i + 1] * Half;
+			QM.AddQuad(QM.WallGroup,
+				FVector3f(A.X - NA.X, A.Y - NA.Y, Z), FVector3f(B.X - NB.X, B.Y - NB.Y, Z),
+				FVector3f(B.X + NB.X, B.Y + NB.Y, Z), FVector3f(A.X + NA.X, A.Y + NA.Y, Z),
+				Up, Ballast);
+		}
+	}
+
+	bool PointInRing(const TArray<FVector2D>& P, const FVector2D& Q)
+	{
+		bool bIn = false;
+		for (int32 i = 0, j = P.Num() - 1; i < P.Num(); j = i++)
+		{
+			if (((P[i].Y > Q.Y) != (P[j].Y > Q.Y)) &&
+				(Q.X < (P[j].X - P[i].X) * (Q.Y - P[i].Y) / (P[j].Y - P[i].Y) + P[i].X))
+			{
+				bIn = !bIn;
+			}
+		}
+		return bIn;
+	}
+}
+
+FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFilePath,
+	const FString& AssetFolder, const FString& WallMaterialPath, float CellSizeM, FVector Location)
+{
+	FCitySurfacesSummary Summary;
+
+	FString Json;
+	if (!FFileHelper::LoadFileToString(Json, *JsonFilePath))
+	{
+		RaiseError(FString::Printf(TEXT("Cannot read surfaces file '%s'."), *JsonFilePath));
+		return Summary;
+	}
+	TSharedPtr<FJsonObject> Root;
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) || !Root.IsValid())
+	{
+		RaiseError(TEXT("Surfaces file is not valid JSON."));
+		return Summary;
+	}
+	if (AssetFolder.IsEmpty() || !AssetFolder.StartsWith(TEXT("/")))
+	{
+		RaiseError(TEXT("AssetFolder must be a package path such as /Game/City/Capitole."));
+		return Summary;
+	}
+	if (CellSizeM < 20.f)
+	{
+		RaiseError(TEXT("CellSizeM must be at least 20."));
+		return Summary;
+	}
+	UMaterialInterface* WallMat = LoadMaterialOrDefault(WallMaterialPath);
+	UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+	if (!WallMat || !World)
+	{
+		if (!World)
+		{
+			RaiseError(TEXT("No editor world is loaded."));
+		}
+		return Summary;
+	}
+
+	// Idempotence : un re-import remplace les surfaces existantes.
+	TArray<AActor*> ToDestroy;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		const FString L = It->GetActorLabel();
+		if (L.StartsWith(TEXT("SM_Surface_")) || L == TEXT("CitySurfaceTrees"))
+		{
+			ToDestroy.Add(*It);
+		}
+	}
+	for (AActor* A : ToDestroy)
+	{
+		World->DestroyActor(A);
+	}
+
+	const float Cell = CellSizeM * 100.f;
+	TMap<FIntPoint, TUniquePtr<FCityMeshBuilder>> Cells;
+	auto GetCell = [&](const FVector2D& P) -> FCityMeshBuilder&
+	{
+		const FIntPoint Key(FMath::FloorToInt(P.X / Cell), FMath::FloorToInt(P.Y / Cell));
+		TUniquePtr<FCityMeshBuilder>& B = Cells.FindOrAdd(Key);
+		if (!B)
+		{
+			B = MakeUnique<FCityMeshBuilder>();
+		}
+		return *B;
+	};
+	auto ReadPts = [](const TArray<TSharedPtr<FJsonValue>>& In, TArray<FVector2D>& Out)
+	{
+		for (const TSharedPtr<FJsonValue>& V : In)
+		{
+			const TArray<TSharedPtr<FJsonValue>>& C = V->AsArray();
+			if (C.Num() >= 2)
+			{
+				Out.Add(FVector2D(C[0]->AsNumber() * 100.0, C[1]->AsNumber() * 100.0));
+			}
+		}
+	};
+	auto Centroid = [](const TArray<FVector2D>& Pts)
+	{
+		FVector2D C(0, 0);
+		for (const FVector2D& P : Pts) { C += P; }
+		return C / Pts.Num();
+	};
+
+	// Hauteurs empilees sous les routes (4+) : parc 1,0 < bois 1,6 < eau 2,4 < rail 3,0+.
+	const FVector3f WaterTint(0.16f, 0.30f, 0.38f);
+	const FVector3f ForestTint(0.20f, 0.34f, 0.16f);
+	const FVector3f ParkTint(0.35f, 0.48f, 0.22f);
+	TArray<FTransform> ScatterXf;
+
+	const TArray<TSharedPtr<FJsonValue>>* WaterJson = nullptr;
+	if (Root->TryGetArrayField(TEXT("water"), WaterJson))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *WaterJson)
+		{
+			TArray<FVector2D> Pts;
+			ReadPts(V->AsObject()->GetArrayField(TEXT("pts")), Pts);
+			if (Pts.Num() < 3)
+			{
+				continue;
+			}
+			if (SignedArea(Pts) < 0)
+			{
+				Algo::Reverse(Pts);
+			}
+			BuildFlatPolygon(GetCell(Centroid(Pts)), Pts, 2.4f, WaterTint);
+			++Summary.Water;
+		}
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* GreenJson = nullptr;
+	if (Root->TryGetArrayField(TEXT("green"), GreenJson))
+	{
+		for (const TSharedPtr<FJsonValue>& V : *GreenJson)
+		{
+			const TSharedPtr<FJsonObject>& O = V->AsObject();
+			TArray<FVector2D> Pts;
+			ReadPts(O->GetArrayField(TEXT("pts")), Pts);
+			if (Pts.Num() < 3)
+			{
+				continue;
+			}
+			if (SignedArea(Pts) < 0)
+			{
+				Algo::Reverse(Pts);
+			}
+			const bool bForest = O->GetStringField(TEXT("k")) == TEXT("forest");
+			BuildFlatPolygon(GetCell(Centroid(Pts)), Pts, bForest ? 1.6f : 1.0f,
+				bForest ? ForestTint : ParkTint);
+			++Summary.Green;
+
+			// Bois : arbres proceduraux disperses sur une grille de 28 m avec jitter,
+			// plafond global — reperage leger, pas une foret dense.
+			if (bForest && ScatterXf.Num() < 80000)
+			{
+				FBox2D Box(ForceInit);
+				for (const FVector2D& P : Pts) { Box += P; }
+				constexpr float Step = 2800.f;
+				for (float Y = Box.Min.Y; Y <= Box.Max.Y; Y += Step)
+				{
+					for (float X = Box.Min.X; X <= Box.Max.X; X += Step)
+					{
+						const int32 Seed = FMath::RoundToInt32(X * 0.001f + Y * 0.017f);
+						const float Jx = (FMath::Frac(FMath::Sin(Seed * 12.9898f) * 43758.5453f) - 0.5f) * Step * 0.6f;
+						const float Jy = (FMath::Frac(FMath::Sin(Seed * 78.233f) * 12543.21f) - 0.5f) * Step * 0.6f;
+						const FVector2D Q(X + Jx, Y + Jy);
+						if (!PointInRing(Pts, Q))
+						{
+							continue;
+						}
+						const float Yaw = FMath::Frac(FMath::Sin(Seed * 39.11f) * 6543.87f) * 360.f;
+						const float Scale = 0.9f + 0.6f * FMath::Frac(FMath::Sin(Seed * 3.7f) * 971.3f);
+						ScatterXf.Emplace(FRotator(0, Yaw, 0), FVector(Q.X, Q.Y, 0), FVector(Scale));
+						++Summary.ScatterTrees;
+						if (ScatterXf.Num() >= 80000)
+						{
+							break;
+						}
+					}
+					if (ScatterXf.Num() >= 80000)
+					{
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* RailsJson = nullptr;
+	if (Root->TryGetArrayField(TEXT("rails"), RailsJson))
+	{
+		int32 Index = 0;
+		for (const TSharedPtr<FJsonValue>& V : *RailsJson)
+		{
+			TArray<FVector2D> Pts;
+			ReadPts(V->AsObject()->GetArrayField(TEXT("pts")), Pts);
+			if (Pts.Num() < 2)
+			{
+				continue;
+			}
+			BuildRail(GetCell(Pts[0]), Pts, 400.f, Index);
+			++Summary.Rails;
+			++Index;
+		}
+	}
+
+	// --- Assets + acteurs par cellule ---
+	// SANS collision : ces surfaces sont des films de 1-3 cm poses sur la dalle de sol
+	// qui porte deja la collision — le trimesh cuit etait ~200 Mo de RAM device pour rien.
+	for (auto& Pair : Cells)
+	{
+		const FString Name = FString::Printf(TEXT("SM_Surface_%d_%d"), Pair.Key.X, Pair.Key.Y);
+		UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *Pair.Value, WallMat, WallMat, false);
+		++Summary.Meshes;
+		AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
+		Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
+		Actor->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Actor->SetActorLabel(Name);
+	}
+
+	// --- Arbres disperses : HISM dedie, mesh SM_CityTree reutilise s'il existe ---
+	if (ScatterXf.Num() > 0)
+	{
+		const FString TreePath = AssetFolder / TEXT("SM_CityTree");
+		UStaticMesh* TreeMesh = LoadObject<UStaticMesh>(nullptr,
+			*(TreePath + TEXT(".SM_CityTree")), nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (!TreeMesh)
+		{
+			FCityMeshBuilder TreeBuilder;
+			BuildTree(TreeBuilder);
+			TreeMesh = CreateMeshAsset(TreePath, TreeBuilder, WallMat, WallMat);
+			++Summary.Meshes;
+		}
+		WallMat->CheckMaterialUsage(MATUSAGE_InstancedStaticMeshes);
+
+		AActor* TreeActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
+		USceneComponent* Root2 = NewObject<USceneComponent>(TreeActor, TEXT("Root"), RF_Transactional);
+		TreeActor->SetRootComponent(Root2);
+		TreeActor->AddInstanceComponent(Root2);
+		Root2->RegisterComponent();
+		Root2->SetWorldLocation(Location);
+		UHierarchicalInstancedStaticMeshComponent* Hism =
+			NewObject<UHierarchicalInstancedStaticMeshComponent>(TreeActor, TEXT("Trees"), RF_Transactional);
+		Hism->SetStaticMesh(TreeMesh);
+		Hism->SetupAttachment(Root2);
+		TreeActor->AddInstanceComponent(Hism);
+		Hism->RegisterComponent();
+		for (const FTransform& Xf : ScatterXf)
+		{
+			Hism->AddInstance(Xf);
+		}
+		TreeActor->SetActorLabel(TEXT("CitySurfaceTrees"));
+	}
+
+	FStaticMeshCompilingManager::Get().FinishAllCompilation();
+	UE_LOG(LogCityImport, Display,
+		TEXT("Surfaces importees : %d eau, %d vert, %d rails, %d arbres disperses, %d meshes."),
+		Summary.Water, Summary.Green, Summary.Rails, Summary.ScatterTrees, Summary.Meshes);
+	return Summary;
+}
+
+namespace
+{
+	// Boite proxy : contour simplifie (>= 3 m entre points, plafond 12) et retracte de
+	// 30 cm vers le centroide, murs pleins + toit plat abaisse de 30 cm. La version
+	// detaillee du batiment recouvre exactement le proxy -> il disparait dedans quand
+	// le bloc de detail est charge, sans z-fight ni logique runtime.
+	void BuildProxyBuilding(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float Hcm,
+		const FVector3f& Tint)
+	{
+		TArray<FVector2D> P;
+		for (const FVector2D& Pt : PtsCm)
+		{
+			if (P.Num() == 0 || FVector2D::Distance(P.Last(), Pt) >= 300.f)
+			{
+				P.Add(Pt);
+			}
+		}
+		if (P.Num() > 12)
+		{
+			TArray<FVector2D> Thin;
+			const int32 Step = FMath::DivideAndRoundUp(P.Num(), 12);
+			for (int32 i = 0; i < P.Num(); i += Step)
+			{
+				Thin.Add(P[i]);
+			}
+			P = MoveTemp(Thin);
+		}
+		if (P.Num() < 3)
+		{
+			P = PtsCm;
+			if (P.Num() < 3)
+			{
+				return;
+			}
+		}
+		FVector2D Ctr(0, 0);
+		for (const FVector2D& Q : P) { Ctr += Q; }
+		Ctr /= P.Num();
+		for (FVector2D& Q : P)
+		{
+			const FVector2D D = Ctr - Q;
+			const float L = D.Size();
+			if (L > 60.f)
+			{
+				Q += D / L * 30.f;
+			}
+		}
+		const float H = FMath::Max(Hcm - 30.f, 100.f);
+		const int32 N = P.Num();
+		for (int32 e = 0; e < N; ++e)
+		{
+			const FVector2D A2 = P[e], B2 = P[(e + 1) % N];
+			const FVector2D Dir2 = B2 - A2;
+			const float Len = Dir2.Size();
+			if (Len < 30.f)
+			{
+				continue;
+			}
+			const FVector2D T2 = Dir2 / Len;
+			const FVector3f Nout(T2.Y, -T2.X, 0.f);
+			QM.AddQuad(QM.WallGroup, FVector3f(A2.X, A2.Y, 0), FVector3f(B2.X, B2.Y, 0),
+				FVector3f(B2.X, B2.Y, H), FVector3f(A2.X, A2.Y, H), Nout, Shade(Tint, Nout, H * 0.5f));
+		}
+		TArray<int32> Tris;
+		TriangulateRing(P, Tris);
+		const FVector3f RoofShaded = Shade(FVector3f(0.42f, 0.40f, 0.38f), FVector3f(0, 0, 1), H);
+		for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
+		{
+			QM.AddTri(QM.WallGroup,
+				FVector3f(P[Tris[t]].X, P[Tris[t]].Y, H),
+				FVector3f(P[Tris[t + 1]].X, P[Tris[t + 1]].Y, H),
+				FVector3f(P[Tris[t + 2]].X, P[Tris[t + 2]].Y, H),
+				FVector3f(0, 0, 1), RoofShaded);
+		}
+	}
+}
+
+FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFilePath,
+	const FString& AssetFolder, const FString& BlocksFolder, const FString& WallMaterialPath,
+	const FString& GlassMaterialPath, float CellSizeM, float BlockSizeM, float ProxyCellSizeM,
+	FVector Location)
+{
+	FCityStreamedSummary Summary;
+
+	FString Json;
+	if (!FFileHelper::LoadFileToString(Json, *JsonFilePath))
+	{
+		RaiseError(FString::Printf(TEXT("Cannot read district file '%s'."), *JsonFilePath));
+		return Summary;
+	}
+	TSharedPtr<FJsonObject> Root;
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) || !Root.IsValid())
+	{
+		RaiseError(TEXT("District file is not valid JSON."));
+		return Summary;
+	}
+	if (AssetFolder.IsEmpty() || !AssetFolder.StartsWith(TEXT("/")) ||
+		BlocksFolder.IsEmpty() || !BlocksFolder.StartsWith(TEXT("/")))
+	{
+		RaiseError(TEXT("AssetFolder and BlocksFolder must be package paths such as /Game/City."));
+		return Summary;
+	}
+	if (CellSizeM < 20.f || ProxyCellSizeM < 20.f || BlockSizeM < CellSizeM)
+	{
+		RaiseError(TEXT("Cell sizes must be >= 20 and BlockSizeM >= CellSizeM."));
+		return Summary;
+	}
+	UMaterialInterface* WallMat = LoadMaterialOrDefault(WallMaterialPath);
+	UMaterialInterface* GlassMat = LoadMaterialOrDefault(GlassMaterialPath);
+	UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+	if (!WallMat || !GlassMat || !World)
+	{
+		if (!World)
+		{
+			RaiseError(TEXT("No editor world is loaded."));
+		}
+		return Summary;
+	}
+	UEditorLevelUtils::MakeLevelCurrent(World->PersistentLevel, true);
+
+	// Idempotence : couches precedentes + heritage monolithique SM_City_*.
+	TArray<AActor*> ToDestroy;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		const FString L = It->GetActorLabel();
+		if (L.StartsWith(TEXT("SM_Ground_")) || L.StartsWith(TEXT("SM_Proxy_")) ||
+			L.StartsWith(TEXT("SM_City_")) || L.StartsWith(TEXT("SM_Bldg_")) || L == TEXT("CityTrees"))
+		{
+			ToDestroy.Add(*It);
+		}
+	}
+	for (AActor* A : ToDestroy)
+	{
+		World->DestroyActor(A);
+	}
+
+	// Sous-niveaux existants du dossier : reutilises (vides par la purge ci-dessus si
+	// charges — les acteurs SM_Bldg_* d'un niveau charge sont vus par TActorIterator).
+	TMap<FIntPoint, ULevelStreaming*> Blocks;
+	for (ULevelStreaming* S : World->GetStreamingLevels())
+	{
+		const FString Pkg = S->GetWorldAssetPackageName();
+		if (!Pkg.StartsWith(BlocksFolder))
+		{
+			continue;
+		}
+		FString Tail = FPackageName::GetShortName(Pkg);
+		FString Sx, Sy;
+		if (Tail.RemoveFromStart(TEXT("L_T10_B_")) && Tail.Split(TEXT("_"), &Sx, &Sy))
+		{
+			Blocks.Add(FIntPoint(FCString::Atoi(*Sx), FCString::Atoi(*Sy)), S);
+		}
+	}
+
+	const float Cell = CellSizeM * 100.f;
+	const float ProxyCell = ProxyCellSizeM * 100.f;
+	const float Block = BlockSizeM * 100.f;
+	TMap<FIntPoint, TUniquePtr<FCityMeshBuilder>> BldgCells, GroundCells, ProxyCells;
+	TSet<FIntPoint> SlabKeys;
+	auto GetIn = [](TMap<FIntPoint, TUniquePtr<FCityMeshBuilder>>& Map, const FVector2D& P,
+		float Size) -> FCityMeshBuilder&
+	{
+		const FIntPoint Key(FMath::FloorToInt(P.X / Size), FMath::FloorToInt(P.Y / Size));
+		TUniquePtr<FCityMeshBuilder>& B = Map.FindOrAdd(Key);
+		if (!B)
+		{
+			B = MakeUnique<FCityMeshBuilder>();
+		}
+		return *B;
+	};
+	auto ReadPts = [](const TArray<TSharedPtr<FJsonValue>>& In, TArray<FVector2D>& Out)
+	{
+		for (const TSharedPtr<FJsonValue>& V : In)
+		{
+			const TArray<TSharedPtr<FJsonValue>>& C = V->AsArray();
+			if (C.Num() >= 2)
+			{
+				Out.Add(FVector2D(C[0]->AsNumber() * 100.0, C[1]->AsNumber() * 100.0));
+			}
+		}
+	};
+
+	// --- Batiments : detail (cellules) + proxy (grandes cellules), meme teinte ---
+	const TArray<TSharedPtr<FJsonValue>>* BuildingsJson = nullptr;
+	if (Root->TryGetArrayField(TEXT("buildings"), BuildingsJson))
+	{
+		int32 Index = 0;
+		for (const TSharedPtr<FJsonValue>& V : *BuildingsJson)
+		{
+			const TSharedPtr<FJsonObject>& O = V->AsObject();
+			TArray<FVector2D> Pts;
+			ReadPts(O->GetArrayField(TEXT("pts")), Pts);
+			if (Pts.Num() < 3)
+			{
+				continue;
+			}
+			if (SignedArea(Pts) < 0)
+			{
+				Algo::Reverse(Pts);
+			}
+			FVector2D Centroid(0, 0);
+			for (const FVector2D& P : Pts) { Centroid += P; }
+			Centroid /= Pts.Num();
+			const float Hcm = O->GetNumberField(TEXT("h")) * 100.f;
+			const FVector3f Tint = UsageTint(O->GetStringField(TEXT("u")), Index);
+			BuildPolygonBuilding(GetIn(BldgCells, Centroid, Cell), Pts, Hcm, Tint);
+			BuildProxyBuilding(GetIn(ProxyCells, Centroid, ProxyCell), Pts, Hcm, Tint);
+			SlabKeys.Add(FIntPoint(FMath::FloorToInt(Centroid.X / Cell), FMath::FloorToInt(Centroid.Y / Cell)));
+			++Summary.Buildings;
+			++Index;
+		}
+	}
+
+	// --- Routes : couche sol residente ---
+	const TArray<TSharedPtr<FJsonValue>>* RoadsJson = nullptr;
+	if (Root->TryGetArrayField(TEXT("roads"), RoadsJson))
+	{
+		int32 Index = 0;
+		for (const TSharedPtr<FJsonValue>& V : *RoadsJson)
+		{
+			const TSharedPtr<FJsonObject>& O = V->AsObject();
+			TArray<FVector2D> Pts;
+			ReadPts(O->GetArrayField(TEXT("pts")), Pts);
+			if (Pts.Num() < 2)
+			{
+				continue;
+			}
+			BuildRoad(GetIn(GroundCells, Pts[0], Cell), Pts, O->GetNumberField(TEXT("w")) * 100.f,
+				O->GetStringField(TEXT("t")), Index);
+			SlabKeys.Add(FIntPoint(FMath::FloorToInt(Pts[0].X / Cell), FMath::FloorToInt(Pts[0].Y / Cell)));
+			++Summary.Roads;
+			++Index;
+		}
+	}
+
+	// --- Dalles de sol : toute cellule touchee par un batiment ou une route ---
+	for (const FIntPoint& Key : SlabKeys)
+	{
+		FCityMeshBuilder& B = GetIn(GroundCells, FVector2D((Key.X + 0.5f) * Cell, (Key.Y + 0.5f) * Cell), Cell);
+		B.AddQuad(B.WallGroup,
+			FVector3f(Key.X * Cell, Key.Y * Cell, 0), FVector3f((Key.X + 1) * Cell, Key.Y * Cell, 0),
+			FVector3f((Key.X + 1) * Cell, (Key.Y + 1) * Cell, 0), FVector3f(Key.X * Cell, (Key.Y + 1) * Cell, 0),
+			FVector3f(0, 0, 1), FVector3f(0.33f, 0.31f, 0.28f));
+	}
+
+	// --- Acteurs residents : sol (collision) + proxy (sans collision) ---
+	for (auto& Pair : GroundCells)
+	{
+		const FString Name = FString::Printf(TEXT("SM_Ground_%d_%d"), Pair.Key.X, Pair.Key.Y);
+		UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *Pair.Value, WallMat, GlassMat, true, true);
+		++Summary.GroundMeshes;
+		AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
+		Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
+		Actor->SetActorLabel(Name);
+	}
+	for (auto& Pair : ProxyCells)
+	{
+		const FString Name = FString::Printf(TEXT("SM_Proxy_%d_%d"), Pair.Key.X, Pair.Key.Y);
+		UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *Pair.Value, WallMat, GlassMat, false);
+		++Summary.ProxyMeshes;
+		AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
+		Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
+		Actor->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Actor->SetActorLabel(Name);
+	}
+
+	// --- Blocs de streaming : un sous-niveau par BlockSizeM, batiments detailles ---
+	TMap<FIntPoint, TArray<FIntPoint>> CellsByBlock;
+	for (auto& Pair : BldgCells)
+	{
+		const FIntPoint BlockKey(
+			FMath::FloorToInt(Pair.Key.X * Cell / Block),
+			FMath::FloorToInt(Pair.Key.Y * Cell / Block));
+		CellsByBlock.FindOrAdd(BlockKey).Add(Pair.Key);
+	}
+	for (auto& Pair : CellsByBlock)
+	{
+		ULevelStreaming* Streaming = Blocks.FindRef(Pair.Key);
+		if (!Streaming)
+		{
+			// CreateNewStreamingLevel attend un chemin de PACKAGE (il convertit lui-meme
+			// en nom de fichier) — lui passer un fichier deja converti echoue en silence.
+			const FString Pkg = FString::Printf(TEXT("%s/L_T10_B_%d_%d"), *BlocksFolder, Pair.Key.X, Pair.Key.Y);
+			Streaming = UEditorLevelUtils::CreateNewStreamingLevel(
+				ULevelStreamingDynamic::StaticClass(), Pkg, false);
+			if (!Streaming)
+			{
+				RaiseError(FString::Printf(TEXT("Cannot create streaming level '%s'."), *Pkg));
+				return Summary;
+			}
+			Blocks.Add(Pair.Key, Streaming);
+		}
+		if (ULevelStreamingDynamic* Dyn = Cast<ULevelStreamingDynamic>(Streaming))
+		{
+			Dyn->bInitiallyLoaded = false;
+			Dyn->bInitiallyVisible = false;
+		}
+		ULevel* BlockLevel = Streaming->GetLoadedLevel();
+		if (!BlockLevel)
+		{
+			World->FlushLevelStreaming(EFlushLevelStreamingType::Full);
+			BlockLevel = Streaming->GetLoadedLevel();
+		}
+		if (!BlockLevel)
+		{
+			RaiseError(FString::Printf(TEXT("Streaming level '%s' is not loaded in editor — open the map with all sublevels loaded and retry."),
+				*Streaming->GetWorldAssetPackageName()));
+			return Summary;
+		}
+		for (const FIntPoint& CellKey : Pair.Value)
+		{
+			const FString Name = FString::Printf(TEXT("SM_Bldg_%d_%d"), CellKey.X, CellKey.Y);
+			UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *BldgCells[CellKey], WallMat, GlassMat, true);
+			++Summary.BuildingMeshes;
+			FActorSpawnParameters SpawnParams;
+			SpawnParams.OverrideLevel = BlockLevel;
+			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(
+				AStaticMeshActor::StaticClass(), Location, FRotator::ZeroRotator, SpawnParams);
+			Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
+			Actor->SetActorLabel(Name);
+		}
+		BlockLevel->MarkPackageDirty();
+		// Sauver le bloc TOUT DE SUITE puis le masquer : l'editeur ne cumule jamais la
+		// ville entiere en VRAM (2 crashs GPU TerminateOnGPUCrash payes juste apres
+		// l'import, fenetre minimisee comprise — l'upload des ressources + le premier
+		// tick rendu suffisaient a tuer le device D3D12).
+		FEditorFileUtils::SaveLevel(BlockLevel);
+		UEditorLevelUtils::SetLevelVisibility(BlockLevel, false, false, ELevelVisibilityDirtyMode::DontModify);
+		++Summary.StreamingBlocks;
+	}
+	UEditorLevelUtils::MakeLevelCurrent(World->PersistentLevel, true);
+
+	// --- Arbres : residents, un mesh + un HISM (identique a ImportCityDistrict) ---
+	const TArray<TSharedPtr<FJsonValue>>* TreesJson = nullptr;
+	if (Root->TryGetArrayField(TEXT("trees"), TreesJson) && TreesJson->Num() > 0)
+	{
+		FCityMeshBuilder TreeBuilder;
+		BuildTree(TreeBuilder);
+		UStaticMesh* TreeMesh = CreateMeshAsset(AssetFolder / TEXT("SM_CityTree"), TreeBuilder, WallMat, GlassMat);
+		WallMat->CheckMaterialUsage(MATUSAGE_InstancedStaticMeshes);
+		GlassMat->CheckMaterialUsage(MATUSAGE_InstancedStaticMeshes);
+
+		AActor* TreeActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
+		USceneComponent* Root2 = NewObject<USceneComponent>(TreeActor, TEXT("Root"), RF_Transactional);
+		TreeActor->SetRootComponent(Root2);
+		TreeActor->AddInstanceComponent(Root2);
+		Root2->RegisterComponent();
+		Root2->SetWorldLocation(Location);
+		UHierarchicalInstancedStaticMeshComponent* Hism =
+			NewObject<UHierarchicalInstancedStaticMeshComponent>(TreeActor, TEXT("Trees"), RF_Transactional);
+		Hism->SetStaticMesh(TreeMesh);
+		Hism->SetupAttachment(Root2);
+		TreeActor->AddInstanceComponent(Hism);
+		Hism->RegisterComponent();
+		int32 Index = 0;
+		for (const TSharedPtr<FJsonValue>& V : *TreesJson)
+		{
+			const TArray<TSharedPtr<FJsonValue>>& C = V->AsArray();
+			if (C.Num() < 2)
+			{
+				continue;
+			}
+			const float Yaw = FMath::Frac(FMath::Sin(Index * 78.233f) * 12543.21f) * 360.f;
+			const float Scale = 0.8f + 0.5f * FMath::Frac(FMath::Sin(Index * 39.11f) * 6543.87f);
+			Hism->AddInstance(FTransform(FRotator(0, Yaw, 0),
+				FVector(C[0]->AsNumber() * 100.0, C[1]->AsNumber() * 100.0, 0), FVector(Scale)));
+			++Summary.Trees;
+			++Index;
+		}
+		TreeActor->SetActorLabel(TEXT("CityTrees"));
+	}
+
+	FStaticMeshCompilingManager::Get().FinishAllCompilation();
+	// Sauvegarde generale AVANT de rendre la main : si l'editeur crashe au premier
+	// tick rendu apres l'outil, tout est deja sur disque.
+	FEditorFileUtils::SaveDirtyPackages(/*bPromptUserToSave=*/false, /*bSaveMapPackages=*/true,
+		/*bSaveContentPackages=*/true);
+	UE_LOG(LogCityImport, Display,
+		TEXT("Ville streamee : %d batiments, %d routes, %d arbres — %d sols, %d proxys, %d meshes detail, %d blocs. Tout est sauve."),
+		Summary.Buildings, Summary.Roads, Summary.Trees, Summary.GroundMeshes, Summary.ProxyMeshes,
+		Summary.BuildingMeshes, Summary.StreamingBlocks);
+	return Summary;
 }
