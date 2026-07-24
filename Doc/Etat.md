@@ -122,6 +122,11 @@ puis capture Redmi. Si KO → pivot plan B (Blender headless blosm+Buildify + d�
   ~90 Mo pour <20 cm de précision), rayons streaming 500/800 m → plateau stable
   1,61-1,65 Go pendant 5 min sur Redmi (pic transitoire 1,94 au chargement initial).
 
+- **Chronologie complète, mesures device et procédures de reprise : voir
+  `../DroneCity/Doc/Journal-Toulouse10.md`** (LE document de référence de la
+  campagne Toulouse 10 km, v1→v14b : RAM, GPU, miroir nord=-Y, routes texturées,
+  sol peint, bisection bench en cours).
+
 ## Prochaines étapes ville
 
 1. Verdict utilisateur sur les captures / vol éditeur dans L_Capitole.
