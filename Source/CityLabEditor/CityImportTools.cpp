@@ -14,7 +14,11 @@
 #include "Engine/TextRenderActor.h"
 #include "Components/TextRenderComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Engine/Texture2D.h"
 #include "Materials/Material.h"
+#include "Materials/MaterialExpressionMultiply.h"
+#include "Materials/MaterialExpressionTextureSample.h"
+#include "Materials/MaterialExpressionVertexColor.h"
 #include "Materials/MaterialInterface.h"
 #include "MeshDescription.h"
 #include "Misc/FileHelper.h"
@@ -1196,6 +1200,138 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 
 namespace
 {
+	// Texture de fenetres tuilee (1 tuile = 1 fenetre centree sur fond mur blanc, le
+	// blanc etant teinte par les vertex colors de la facade dans le materiau).
+	UTexture2D* GetOrCreateFacadeTexture(const FString& AssetFolder)
+	{
+		const FString AssetPath = AssetFolder / TEXT("T_FacadeWindow");
+		const FString ObjectName = FPackageName::GetLongPackageAssetName(AssetPath);
+		if (UTexture2D* Existing = LoadObject<UTexture2D>(nullptr,
+			*(AssetPath + TEXT(".") + ObjectName), nullptr, LOAD_NoWarn | LOAD_Quiet))
+		{
+			return Existing;
+		}
+		constexpr int32 Size = 128;
+		TArray<FColor> Pixels;
+		Pixels.SetNumUninitialized(Size * Size);
+		// Fenetre : 50 % de largeur, 45 % de hauteur, centree (52 % vertical — appui bas).
+		constexpr int32 X0 = 32, X1 = 96, Y0 = 33, Y1 = 91;
+		for (int32 Y = 0; Y < Size; ++Y)
+		{
+			for (int32 X = 0; X < Size; ++X)
+			{
+				const bool bIn = X >= X0 && X < X1 && Y >= Y0 && Y < Y1;
+				const bool bFrame = bIn && (X < X0 + 3 || X >= X1 - 3 || Y < Y0 + 3 || Y >= Y1 - 3);
+				FColor C(255, 255, 255);                       // mur : blanc -> teinte facade
+				if (bFrame) { C = FColor(210, 208, 200); }     // cadre clair
+				else if (bIn) { C = FColor(58, 64, 74); }      // vitre sombre bleutee
+				// Croisillon central vertical (2 px) pour casser l'aplat.
+				if (bIn && !bFrame && FMath::Abs(X - (X0 + X1) / 2) < 1) { C = FColor(96, 100, 106); }
+				Pixels[Y * Size + X] = C;
+			}
+		}
+		UPackage* Package = CreatePackage(*AssetPath);
+		UTexture2D* Tex = NewObject<UTexture2D>(Package, *ObjectName, RF_Public | RF_Standalone);
+		Tex->Source.Init(Size, Size, 1, 1, TSF_BGRA8, (const uint8*)Pixels.GetData());
+		Tex->SRGB = true;
+		Tex->LODGroup = TEXTUREGROUP_World;
+		Tex->AddressX = TA_Wrap;
+		Tex->AddressY = TA_Wrap;
+		Tex->UpdateResource();
+		Tex->PostEditChange();
+		Tex->MarkPackageDirty();
+		FAssetRegistryModule::AssetCreated(Tex);
+		return Tex;
+	}
+
+	// Materiau facade : unlit, Emissive = texture fenetres x vertex color (meme
+	// convention que M_BldgWall : les vertex colors sont deja compensees pow 2.2).
+	UMaterialInterface* GetOrCreateFacadeMaterial(const FString& AssetFolder)
+	{
+		const FString AssetPath = AssetFolder / TEXT("M_BldgFacade");
+		const FString ObjectName = FPackageName::GetLongPackageAssetName(AssetPath);
+		if (UMaterialInterface* Existing = LoadObject<UMaterialInterface>(nullptr,
+			*(AssetPath + TEXT(".") + ObjectName), nullptr, LOAD_NoWarn | LOAD_Quiet))
+		{
+			return Existing;
+		}
+		UTexture2D* Tex = GetOrCreateFacadeTexture(AssetFolder);
+		UPackage* Package = CreatePackage(*AssetPath);
+		UMaterial* M = NewObject<UMaterial>(Package, *ObjectName, RF_Public | RF_Standalone);
+		M->MaterialDomain = MD_Surface;
+		M->SetShadingModel(MSM_Unlit);
+		UMaterialExpressionTextureSample* Sample = NewObject<UMaterialExpressionTextureSample>(M);
+		Sample->Texture = Tex;
+		Sample->SamplerType = SAMPLERTYPE_Color;
+		M->GetExpressionCollection().AddExpression(Sample);
+		UMaterialExpressionVertexColor* VColor = NewObject<UMaterialExpressionVertexColor>(M);
+		M->GetExpressionCollection().AddExpression(VColor);
+		UMaterialExpressionMultiply* Mul = NewObject<UMaterialExpressionMultiply>(M);
+		Mul->A.Connect(0, Sample);
+		Mul->B.Connect(0, VColor);
+		M->GetExpressionCollection().AddExpression(Mul);
+		M->GetEditorOnlyData()->EmissiveColor.Connect(0, Mul);
+		M->PostEditChange();
+		M->MarkPackageDirty();
+		FAssetRegistryModule::AssetCreated(M);
+		return M;
+	}
+
+	// Batiment a facades TEXTUREES : un seul quad par mur, la grille de fenetres est
+	// dans la texture (UV = travees x etages). ~x8-10 moins de triangles que la
+	// version geometrique — budget Adreno 512 ~1,5 M tris/image. Les toits vont sur
+	// le slot Glass (materiau uni) pour ne pas recevoir la texture de fenetres.
+	void BuildPolygonBuildingTextured(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm,
+		float Hcm, const FVector3f& Tint)
+	{
+		const int32 Floors = FMath::Clamp(FMath::RoundToInt32(Hcm / 290.f), 1, 40);
+		const float FloorH = Hcm / Floors;
+		const int32 N = PtsCm.Num();
+		for (int32 e = 0; e < N; ++e)
+		{
+			const FVector2D A2 = PtsCm[e];
+			const FVector2D B2 = PtsCm[(e + 1) % N];
+			const FVector2D Dir2 = B2 - A2;
+			const float Len = Dir2.Size();
+			if (Len < 30.f)
+			{
+				continue;
+			}
+			const FVector2D T2 = Dir2 / Len;
+			const FVector3f Nout(T2.Y, -T2.X, 0.f);
+			const float Usable = Len - 80.f;
+			const int32 Bays = (Usable > 200.f && FloorH >= 220.f)
+				? FMath::Max(1, FMath::RoundToInt32(Usable / 280.f)) : 0;
+			const FVector3f P[4] = {
+				FVector3f(A2.X, A2.Y, 0), FVector3f(B2.X, B2.Y, 0),
+				FVector3f(B2.X, B2.Y, Hcm), FVector3f(A2.X, A2.Y, Hcm) };
+			// Mur aveugle : UV constante dans un coin 100 % mur de la tuile.
+			FVector2f UV[4] = { FVector2f(0.03f, 0.03f), FVector2f(0.03f, 0.03f),
+				FVector2f(0.03f, 0.03f), FVector2f(0.03f, 0.03f) };
+			if (Bays > 0)
+			{
+				UV[0] = FVector2f(0, 0);
+				UV[1] = FVector2f(Bays, 0);
+				UV[2] = FVector2f(Bays, Floors);
+				UV[3] = FVector2f(0, Floors);
+			}
+			QM.AddPoly(QM.WallGroup, P, 4, Nout, UV, Shade(Tint, Nout, Hcm * 0.5f));
+		}
+		// Toit plat : slot Glass = materiau uni (M_BldgWall), pas de texture fenetres.
+		TArray<int32> Tris;
+		TriangulateRing(PtsCm, Tris);
+		const FVector3f RoofShaded = Shade(FVector3f(0.42f, 0.40f, 0.38f), FVector3f(0, 0, 1), Hcm);
+		for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
+		{
+			const FVector3f R[3] = {
+				FVector3f(PtsCm[Tris[t]].X, PtsCm[Tris[t]].Y, Hcm),
+				FVector3f(PtsCm[Tris[t + 1]].X, PtsCm[Tris[t + 1]].Y, Hcm),
+				FVector3f(PtsCm[Tris[t + 2]].X, PtsCm[Tris[t + 2]].Y, Hcm) };
+			const FVector2f RUV[3] = { FVector2f(0, 0), FVector2f(1, 0), FVector2f(1, 1) };
+			QM.AddPoly(QM.GlassGroup, R, 3, FVector3f(0, 0, 1), RUV, RoofShaded);
+		}
+	}
+
 	// Boite proxy : contour simplifie (>= 3 m entre points, plafond 12) et retracte de
 	// 30 cm vers le centroide, murs pleins + toit plat abaisse de 30 cm. La version
 	// detaillee du batiment recouvre exactement le proxy -> il disparait dedans quand
@@ -1399,7 +1535,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			Centroid /= Pts.Num();
 			const float Hcm = O->GetNumberField(TEXT("h")) * 100.f;
 			const FVector3f Tint = UsageTint(O->GetStringField(TEXT("u")), Index);
-			BuildPolygonBuilding(GetIn(BldgCells, Centroid, Cell), Pts, Hcm, Tint);
+			BuildPolygonBuildingTextured(GetIn(BldgCells, Centroid, Cell), Pts, Hcm, Tint);
 			BuildProxyBuilding(GetIn(ProxyCells, Centroid, ProxyCell), Pts, Hcm, Tint);
 			SlabKeys.Add(FIntPoint(FMath::FloorToInt(Centroid.X / Cell), FMath::FloorToInt(Centroid.Y / Cell)));
 			++Summary.Buildings;
@@ -1506,7 +1642,9 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		for (const FIntPoint& CellKey : Pair.Value)
 		{
 			const FString Name = FString::Printf(TEXT("SM_Bldg_%d_%d"), CellKey.X, CellKey.Y);
-			UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *BldgCells[CellKey], WallMat, GlassMat, true);
+			// Facades texturees (slot Wall) + toits unis en vertex color (slot Glass).
+			UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *BldgCells[CellKey],
+				GetOrCreateFacadeMaterial(AssetFolder), WallMat, true);
 			++Summary.BuildingMeshes;
 			FActorSpawnParameters SpawnParams;
 			SpawnParams.OverrideLevel = BlockLevel;
