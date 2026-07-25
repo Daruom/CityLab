@@ -17,6 +17,8 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Engine/Texture2D.h"
 #include "Materials/Material.h"
+#include "Materials/MaterialExpressionConstant.h"
+#include "Materials/MaterialExpressionConstant3Vector.h"
 #include "Materials/MaterialExpressionMultiply.h"
 #include "Materials/MaterialExpressionTextureSample.h"
 #include "Materials/MaterialExpressionVertexColor.h"
@@ -169,6 +171,14 @@ namespace
 		FPolygonGroupID GlassGroup;
 		int32 QuadCount = 0;
 
+		// Lot B (desktop PBR) : vertex colors encodees LINEAIRE (le pow 2.2 est un
+		// hack de lecture brute en unlit — faux pour un materiau lit, spec Q10).
+		bool bLinearColors = false;
+
+		// Lot B (desktop) : UV1 = (x,y) monde normalise sur la dalle 10 km
+		// (coin NW a -5000 m -> [0,1]), prete pour l'ortho BD ORTHO (J3).
+		bool bWorldUV1 = false;
+
 		FCityMeshBuilder()
 			: Attributes(MeshDesc)
 		{
@@ -179,9 +189,30 @@ namespace
 			Attributes.GetPolygonGroupMaterialSlotNames()[GlassGroup] = FName(TEXT("Glass"));
 		}
 
-		// Compensation gamma : le build encode en sRGB, le shader lit brut (cf. BuildingTools).
-		static FVector4f Encode(const FVector3f& C)
+		void EnableWorldUV1()
 		{
+			if (!bWorldUV1)
+			{
+				bWorldUV1 = true;
+				MeshDesc.VertexInstanceAttributes().SetAttributeChannelCount(
+					MeshAttribute::VertexInstance::TextureCoordinate, 2);
+			}
+		}
+
+		static FVector2f WorldUV(const FVector3f& P)
+		{
+			return FVector2f((P.X + 500000.f) / 1000000.f, (P.Y + 500000.f) / 1000000.f);
+		}
+
+		// Compensation gamma : le build encode en sRGB, le shader lit brut (cf. BuildingTools).
+		// bLinearColors (desktop PBR) : encodage lineaire, le shader lit VertexColor en lineaire.
+		FVector4f Encode(const FVector3f& C) const
+		{
+			if (bLinearColors)
+			{
+				return FVector4f(FMath::Clamp(C.X, 0.f, 1.f), FMath::Clamp(C.Y, 0.f, 1.f),
+					FMath::Clamp(C.Z, 0.f, 1.f), 1.f);
+			}
 			return FVector4f(FMath::Pow(FMath::Clamp(C.X, 0.f, 1.f), 2.2f),
 				FMath::Pow(FMath::Clamp(C.Y, 0.f, 1.f), 2.2f),
 				FMath::Pow(FMath::Clamp(C.Z, 0.f, 1.f), 2.2f), 1.f);
@@ -208,6 +239,10 @@ namespace
 				const FVertexInstanceID InstanceID = MeshDesc.CreateVertexInstance(VertexID);
 				Normals[InstanceID] = Outward;
 				UV0.Set(InstanceID, 0, UVs[c]);
+				if (bWorldUV1)
+				{
+					UV0.Set(InstanceID, 1, WorldUV(Corners[c]));
+				}
 				Colors[InstanceID] = Encode(VertexColors[c]);
 				InstanceIDs.Add(InstanceID);
 			}
@@ -238,6 +273,10 @@ namespace
 				const FVertexInstanceID InstanceID = MeshDesc.CreateVertexInstance(VertexID);
 				Normals[InstanceID] = Outward;
 				UV0.Set(InstanceID, 0, UVs[c]);
+				if (bWorldUV1)
+				{
+					UV0.Set(InstanceID, 1, WorldUV(Corners[c]));
+				}
 				Colors[InstanceID] = Encoded;
 				InstanceIDs.Add(InstanceID);
 			}
@@ -488,8 +527,10 @@ namespace
 	// Empilement decimetrique (Adreno/GLES sans reversed-Z) : dalle 0 < parc < eau <
 	// rail < route 55+. TerrainZ (desktop) : Z terrain par sommet, l'empilement
 	// devient RELATIF au terrain ; nul = plat historique (mobile).
+	// bBakedShade=false (desktop PBR) : teinte brute, Lumen eclaire (plus de Shade cuit).
 	void BuildRoad(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float WidthCm,
-		const FString& Type, int32 RoadIndex, const TArray<float>* TerrainZ = nullptr)
+		const FString& Type, int32 RoadIndex, const TArray<float>* TerrainZ = nullptr,
+		bool bBakedShade = true)
 	{
 		const int32 N = PtsCm.Num();
 		if (N < 2)
@@ -509,7 +550,7 @@ namespace
 		// Teinte de base CLAIRE : les bandes de la texture assombrissent (asphalte 0,2x,
 		// trottoir 0,59x, marquage 1x) pour retrouver les couleurs historiques.
 		const FVector3f Base = bWalkway ? FVector3f(0.48f, 0.45f, 0.42f) : FVector3f(0.85f, 0.85f, 0.80f);
-		const FVector3f Shaded = Shade(Base, Up, ZRoad);
+		const FVector3f Shaded = bBakedShade ? Shade(Base, Up, ZRoad) : Base;
 
 		// Normales par sommet (moyenne des segments adjacents).
 		TArray<FVector2D> Nrm;
@@ -592,9 +633,14 @@ namespace
 		return M;
 	}
 
+	// bNanite (Lot B, desktop) : NaniteSettings.bEnabled sur les meshes OPAQUES
+	// uniquement (murs, sol, routes, proxys) — jamais Glass, jamais mobile. Le flag
+	// est REPOSE a chaque generation : une regeneration mobile par-dessus des assets
+	// desktop les remet a false (golden path).
 	UStaticMesh* CreateMeshAsset(const FString& AssetPath, FCityMeshBuilder& QM,
 		UMaterialInterface* WallMat, UMaterialInterface* GlassMat, bool bWithCollision = true,
-		bool bBoxCollision = false, float BoxTopCm = 0.f, UStaticMesh* ComplexCollisionMesh = nullptr)
+		bool bBoxCollision = false, float BoxTopCm = 0.f, UStaticMesh* ComplexCollisionMesh = nullptr,
+		bool bNanite = false)
 	{
 		// bBoxCollision : une simple boite englobante remplace le trimesh — reserve aux
 		// cellules de sol PLATES (dalles+routes), ou le trimesh coutait ~90 Mo de RAM
@@ -630,6 +676,7 @@ namespace
 		Mesh->CreateMeshDescription(0, MoveTemp(QM.MeshDesc));
 		Mesh->CommitMeshDescription(0);
 		Mesh->SetImportVersion(EImportStaticMeshVersion::LastVersion);
+		Mesh->GetNaniteSettings().bEnabled = bNanite;
 		// Collision : le maillage de rendu sert de collision (drone vs ville). Pas de
 		// primitives simples generees ; les meshes sont statiques, cout memoire accepte.
 		// bWithCollision=false (proxy lointain) : UseSimpleAsComplex sans primitive
@@ -682,6 +729,10 @@ FCityGenProfile FCityGenProfile::Desktop()
 	Profile.GroundCollisionGridN = 16;
 	Profile.RoadResampleStepCm = 1500.f;
 	Profile.bDrapeToTerrain = true;
+	Profile.bWindowReveals = true;
+	Profile.bSplitWallGlass = true;
+	Profile.bNanite = true;
+	Profile.bPBRMaterials = true;
 	return Profile;
 }
 
@@ -699,6 +750,10 @@ FCityGenProfile FCityGenProfile::Resolved() const
 	if (Out.GroundCollisionGridN == Mobile.GroundCollisionGridN) { Out.GroundCollisionGridN = 16; }
 	if (Out.RoadResampleStepCm == Mobile.RoadResampleStepCm) { Out.RoadResampleStepCm = 1500.f; }
 	Out.bDrapeToTerrain = true;
+	Out.bWindowReveals = true;
+	Out.bSplitWallGlass = true;
+	Out.bNanite = true;
+	Out.bPBRMaterials = true;
 	return Out;
 }
 
@@ -1623,6 +1678,417 @@ namespace
 		return M;
 	}
 
+	// ---- Lot B (J2 §3.3-3.4) : matiere desktop — atlas de facades + materiaux PBR ----
+
+	// Hash 2D stable (meme famille que les jitters d'arbres).
+	float TileHash(int32 A, int32 B)
+	{
+		return FMath::Frac(FMath::Sin(A * 12.9898f + B * 78.233f) * 43758.5453f);
+	}
+
+	// Atlas de facades 2048² (parametrable) en grille 4x4 de sous-tuiles generees
+	// procedureralement : 0-3 brique toulousaine (4 variantes), 4-7 enduit (4),
+	// 8 moderne, 9 industriel, 10 toit tuiles terre cuite, 11 toit ardoise,
+	// 12 pierre claire (modenature), 13 beton, 14 enduit blanc, 15 neutre.
+	// Tuiles quasi neutres (valeur/motif) : la COULEUR vient du VertexColor
+	// (UsageTint) dans M_CityWall_PBR — sauf les toits qui portent leur teinte.
+	UTexture2D* GetOrCreateCityAtlasTexture(const FString& AssetFolder, int32 SizePx)
+	{
+		const FString AssetPath = AssetFolder / TEXT("T_CityAtlas");
+		const FString ObjectName = FPackageName::GetLongPackageAssetName(AssetPath);
+		if (UTexture2D* Existing = LoadObject<UTexture2D>(nullptr,
+			*(AssetPath + TEXT(".") + ObjectName), nullptr, LOAD_NoWarn | LOAD_Quiet))
+		{
+			return Existing;
+		}
+		const int32 Size = FMath::Clamp(SizePx, 512, 4096);
+		const int32 T = Size / 4;
+		TArray<FColor> Pixels;
+		Pixels.SetNumUninitialized(Size * Size);
+		for (int32 Y = 0; Y < Size; ++Y)
+		{
+			for (int32 X = 0; X < Size; ++X)
+			{
+				const int32 Tile = (Y / T) * 4 + (X / T);
+				const int32 LX = X % T, LY = Y % T;
+				FColor C(200, 200, 200);
+				if (Tile <= 3)
+				{
+					// Brique : rangees decalees d'une demi-brique, joints de mortier.
+					const int32 BH = FMath::Max(T / 18, 4), BW = FMath::Max(T / 8, 8);
+					const int32 Row = LY / BH;
+					const int32 LXo = LX + ((Row % 2) ? BW / 2 : 0);
+					const int32 Col2 = LXo / BW;
+					if (LY % BH < 2 || LXo % BW < 2)
+					{
+						C = FColor(168, 165, 160);                    // mortier
+					}
+					else
+					{
+						const uint8 V = (uint8)(196 + 28.f * (TileHash(Col2, Row * 7 + Tile) - 0.5f));
+						C = FColor(V, (uint8)(V * 0.95f), (uint8)(V * 0.90f));
+					}
+				}
+				else if (Tile <= 7)
+				{
+					// Enduit : grain leger, 4 graines de variation.
+					const float N = TileHash(LX / 6 + Tile * 31, LY / 6)
+						+ 0.5f * TileHash(LX, LY + Tile);
+					const uint8 V = (uint8)FMath::Clamp(206.f + 14.f * (N - 0.75f), 0.f, 255.f);
+					C = FColor(V, V, (uint8)(V * 0.97f));
+				}
+				else if (Tile == 8)
+				{
+					// Moderne : panneaux avec joints creux.
+					const int32 P = T / 4;
+					C = (LX % P < 2 || LY % P < 2) ? FColor(140, 140, 142) : FColor(212, 212, 214);
+				}
+				else if (Tile == 9)
+				{
+					// Industriel : bardage ondule vertical.
+					C = ((LX / FMath::Max(T / 64, 2)) % 2) ? FColor(180, 181, 184) : FColor(204, 205, 208);
+				}
+				else if (Tile == 10 || Tile == 11)
+				{
+					// Toits : rangees de tuiles ombrees (terre cuite / ardoise).
+					const int32 RH = FMath::Max(T / 12, 6);
+					const float G = (float)(LY % RH) / RH;
+					const int32 Row = LY / RH;
+					const int32 Sep = FMath::Max(T / 16, 4);
+					float V01 = 0.55f + 0.45f * G;
+					if ((LX + Row * Sep / 2) % Sep < 1) { V01 *= 0.8f; }
+					if (Tile == 10)
+					{
+						C = FColor((uint8)(212 * V01), (uint8)(124 * V01), (uint8)(88 * V01));
+					}
+					else
+					{
+						const uint8 V = (uint8)(150 * V01 + 20.f * TileHash(LX / Sep, Row));
+						C = FColor(V, V, (uint8)(V * 1.05f));
+					}
+				}
+				else if (Tile == 12)
+				{
+					// Pierre claire : modenature (tableaux, appuis, linteaux).
+					const uint8 V = (uint8)(220 + 8.f * (TileHash(LX / 8, LY / 8) - 0.5f));
+					C = FColor(V, (uint8)(V * 0.98f), (uint8)(V * 0.93f));
+				}
+				else if (Tile == 13)
+				{
+					const uint8 V = (uint8)(184 + 20.f * (TileHash(LX / 12 + 5, LY / 12) - 0.5f));
+					C = FColor(V, V, V);
+				}
+				else if (Tile == 14)
+				{
+					const uint8 V = (uint8)(233 + 6.f * (TileHash(LX, LY + 9) - 0.5f));
+					C = FColor(V, V, V);
+				}
+				Pixels[Y * Size + X] = C;
+			}
+		}
+		UPackage* Package = CreatePackage(*AssetPath);
+		UTexture2D* Tex = NewObject<UTexture2D>(Package, *ObjectName, RF_Public | RF_Standalone);
+		Tex->Source.Init(Size, Size, 1, 1, TSF_BGRA8, (const uint8*)Pixels.GetData());
+		Tex->SRGB = true;
+		Tex->LODGroup = TEXTUREGROUP_World;
+		Tex->AddressX = TA_Clamp;
+		Tex->AddressY = TA_Clamp;
+		Tex->UpdateResource();
+		Tex->PostEditChange();
+		Tex->MarkPackageDirty();
+		FAssetRegistryModule::AssetCreated(Tex);
+		return Tex;
+	}
+
+	// UV dans une sous-tuile de l'atlas (grille 4x4), marge anti-bleed 3 %.
+	FVector2f AtlasUV(int32 Tile, float U01, float V01)
+	{
+		const int32 TX = Tile % 4, TY = Tile / 4;
+		const float M = 0.03f;
+		return FVector2f((TX + M + FMath::Clamp(U01, 0.f, 1.f) * (1.f - 2.f * M)) * 0.25f,
+			(TY + M + FMath::Clamp(V01, 0.f, 1.f) * (1.f - 2.f * M)) * 0.25f);
+	}
+
+	// Sous-tuile de facade par usage/graine : meme logique de variation qu'UsageTint.
+	int32 UsageTile(const FString& Usage, int32 Seed)
+	{
+		if (Usage == TEXT("res")) { return Seed % 4; }         // brique toulousaine x4
+		if (Usage == TEXT("com")) { return 4 + Seed % 4; }     // enduit x4
+		if (Usage == TEXT("ind")) { return 9; }                // industriel
+		return 8;                                              // moderne
+	}
+
+	// Fabrique commune des materiaux PBR Lot B : DefaultLit (PAS unlit — Lumen
+	// eclaire, spec §3.3), BaseColor = [Texture x] VertexColor ou constante,
+	// Roughness/Metallic constants. Meme patron code que GetOrCreateFacadeMaterial.
+	UMaterialInterface* GetOrCreatePBRMaterial(const FString& AssetFolder, const TCHAR* Name,
+		UTexture2D* TexOrNull, bool bVertexColor, const FLinearColor& ConstantBase,
+		float Roughness, float Metallic)
+	{
+		const FString AssetPath = AssetFolder / Name;
+		const FString ObjectName = FPackageName::GetLongPackageAssetName(AssetPath);
+		if (UMaterialInterface* Existing = LoadObject<UMaterialInterface>(nullptr,
+			*(AssetPath + TEXT(".") + ObjectName), nullptr, LOAD_NoWarn | LOAD_Quiet))
+		{
+			return Existing;
+		}
+		UPackage* Package = CreatePackage(*AssetPath);
+		UMaterial* M = NewObject<UMaterial>(Package, *ObjectName, RF_Public | RF_Standalone);
+		M->MaterialDomain = MD_Surface;
+		M->SetShadingModel(MSM_DefaultLit);
+		UMaterialExpression* Base = nullptr;
+		if (TexOrNull)
+		{
+			UMaterialExpressionTextureSample* Sample = NewObject<UMaterialExpressionTextureSample>(M);
+			Sample->Texture = TexOrNull;
+			Sample->SamplerType = SAMPLERTYPE_Color;
+			M->GetExpressionCollection().AddExpression(Sample);
+			Base = Sample;
+		}
+		if (bVertexColor)
+		{
+			UMaterialExpressionVertexColor* VColor = NewObject<UMaterialExpressionVertexColor>(M);
+			M->GetExpressionCollection().AddExpression(VColor);
+			if (Base)
+			{
+				UMaterialExpressionMultiply* Mul = NewObject<UMaterialExpressionMultiply>(M);
+				Mul->A.Connect(0, Base);
+				Mul->B.Connect(0, VColor);
+				M->GetExpressionCollection().AddExpression(Mul);
+				Base = Mul;
+			}
+			else
+			{
+				Base = VColor;
+			}
+		}
+		if (!Base)
+		{
+			UMaterialExpressionConstant3Vector* CB = NewObject<UMaterialExpressionConstant3Vector>(M);
+			CB->Constant = ConstantBase;
+			M->GetExpressionCollection().AddExpression(CB);
+			Base = CB;
+		}
+		M->GetEditorOnlyData()->BaseColor.Connect(0, Base);
+		UMaterialExpressionConstant* R = NewObject<UMaterialExpressionConstant>(M);
+		R->R = Roughness;
+		M->GetExpressionCollection().AddExpression(R);
+		M->GetEditorOnlyData()->Roughness.Connect(0, R);
+		if (Metallic > 0.f)
+		{
+			UMaterialExpressionConstant* Met = NewObject<UMaterialExpressionConstant>(M);
+			Met->R = Metallic;
+			M->GetExpressionCollection().AddExpression(Met);
+			M->GetEditorOnlyData()->Metallic.Connect(0, Met);
+		}
+		M->PostEditChange();
+		M->MarkPackageDirty();
+		FAssetRegistryModule::AssetCreated(M);
+		return M;
+	}
+
+	// Murs : atlas facades x VertexColor (teinte UsageTint LINEAIRE = variation).
+	UMaterialInterface* GetOrCreateWallPBRMaterial(const FString& AssetFolder, int32 AtlasSizePx)
+	{
+		return GetOrCreatePBRMaterial(AssetFolder, TEXT("M_CityWall_PBR"),
+			GetOrCreateCityAtlasTexture(AssetFolder, AtlasSizePx), true,
+			FLinearColor::White, 0.8f, 0.f);
+	}
+
+	// Vitres : OPAQUE tres lisse (choix Q3, le plus robuste Lumen : le translucide
+	// n'a ni reflets Lumen fiables ni depth propre, l'opaque roughness 0,05 recoit
+	// reflexions ecran/Lumen sans cout ni tri). Sombre bleute, leger metallic.
+	UMaterialInterface* GetOrCreateGlassPBRMaterial(const FString& AssetFolder)
+	{
+		return GetOrCreatePBRMaterial(AssetFolder, TEXT("M_CityGlass_PBR"),
+			nullptr, false, FLinearColor(0.02f, 0.035f, 0.05f), 0.05f, 0.4f);
+	}
+
+	// Sol : version lit du vertex-color unlit historique (dalles peintes, sentiers).
+	UMaterialInterface* GetOrCreateGroundPBRMaterial(const FString& AssetFolder)
+	{
+		return GetOrCreatePBRMaterial(AssetFolder, TEXT("M_CityGround_PBR"),
+			nullptr, true, FLinearColor::White, 0.9f, 0.f);
+	}
+
+	// Routes : version lit du ruban texture (meme T_RoadStrip x VertexColor).
+	UMaterialInterface* GetOrCreateRoadPBRMaterial(const FString& AssetFolder)
+	{
+		return GetOrCreatePBRMaterial(AssetFolder, TEXT("M_CityRoad_PBR"),
+			GetOrCreateRoadTexture(AssetFolder), true, FLinearColor::White, 0.85f, 0.f);
+	}
+
+	// Batiment desktop Lot B : fenetres GEOMETRIQUES en creux. Wall recoit murs,
+	// socle, toit et modenature (opaque -> atlas PBR, Nanite) ; Glass les vitres
+	// (jamais Nanite). En mode non-split, passer le MEME builder aux deux.
+	// bReveals : par fenetre, +9 quads (+18 tris) EXACTEMENT vs la vitre en simple
+	// retrait — 4 tableaux (retours 18 cm) + appui saillant 3 quads (dessus/face/
+	// dessous, saillie 8 cm) + linteau saillant 2 quads (face avant/sous-face,
+	// saillie 6 cm). C'est la base du test « delta de tris par fenetre = +18 ».
+	// bBakedShade=false (PBR) : teintes brutes, Lumen eclaire (plus de Shade cuit).
+	void BuildPolygonBuildingDesktop(FCityMeshBuilder& Wall, FCityMeshBuilder& Glass,
+		const TArray<FVector2D>& PtsCm, float Hcm, const FVector3f& Tint, int32 WallTile,
+		float ZBaseCm, float SocleDepthCm, bool bReveals, bool bBakedShade)
+	{
+		const int32 Floors = FMath::Clamp(FMath::RoundToInt32(Hcm / 290.f), 1, 40);
+		const float FloorH = Hcm / Floors;
+		const FVector3f StoneTint(0.82f, 0.79f, 0.72f);
+		auto Col = [&](const FVector3f& C, const FVector3f& Nrm, float Zrel)
+		{
+			return bBakedShade ? Shade(C, Nrm, Zrel) : C;
+		};
+		const int32 N = PtsCm.Num();
+		for (int32 e = 0; e < N; ++e)
+		{
+			const FVector2D A2 = PtsCm[e];
+			const FVector2D B2 = PtsCm[(e + 1) % N];
+			const FVector2D Dir2 = B2 - A2;
+			const float Len = Dir2.Size();
+			if (Len < 30.f)
+			{
+				continue;
+			}
+			const FVector2D T2 = Dir2 / Len;
+			const FVector3f Nout(T2.Y, -T2.X, 0.f);
+			const FVector3f A(A2.X, A2.Y, 0.f);
+			const FVector3f T(T2.X, T2.Y, 0.f);
+			// Point de facade : U le long du mur, Z relatif au rez-de-chaussee,
+			// D profondeur vers l'interieur (creux) — negatif = saillie.
+			auto Pt = [&](float U, float Z, float D)
+			{
+				return A + T * U + FVector3f(0, 0, ZBaseCm + Z) - Nout * D;
+			};
+			// Quad de mur : UV0 dans la sous-tuile atlas, echelle ~5,12 m / tuile
+			// (clampee : un mur aveugle geant etire sa tuile, assume Lot B).
+			auto WallQuad = [&](float U0, float U1, float Z0, float Z1)
+			{
+				if (U1 - U0 < 1.f || Z1 - Z0 < 1.f)
+				{
+					return;
+				}
+				const FVector3f P[4] = { Pt(U0, Z0, 0), Pt(U1, Z0, 0), Pt(U1, Z1, 0), Pt(U0, Z1, 0) };
+				const float SU = (U1 - U0) / 512.f;
+				const float SV = (Z1 - Z0) / 512.f;
+				const FVector2f UV[4] = { AtlasUV(WallTile, 0, 0), AtlasUV(WallTile, SU, 0),
+					AtlasUV(WallTile, SU, SV), AtlasUV(WallTile, 0, SV) };
+				Wall.AddPoly(Wall.WallGroup, P, 4, Nout, UV, Col(Tint, Nout, (Z0 + Z1) * 0.5f));
+			};
+			// Quad de modenature en pierre claire (sous-tuile 12).
+			auto StoneQuad = [&](const FVector3f& P0, const FVector3f& P1, const FVector3f& P2,
+				const FVector3f& P3, const FVector3f& Nrm)
+			{
+				const FVector3f P[4] = { P0, P1, P2, P3 };
+				const FVector2f UV[4] = { AtlasUV(12, 0.1f, 0.1f), AtlasUV(12, 0.4f, 0.1f),
+					AtlasUV(12, 0.4f, 0.4f), AtlasUV(12, 0.1f, 0.4f) };
+				Wall.AddPoly(Wall.WallGroup, P, 4, Nrm, UV,
+					Col(StoneTint, Nrm, P0.Z - ZBaseCm));
+			};
+			// Fenetre : vitre en retrait D, puis modenature (+9 quads si bReveals).
+			auto Window = [&](float WU0, float WU1, float WZ0, float WZ1)
+			{
+				const float D = 18.f;
+				const FVector3f G[4] = { Pt(WU0, WZ0, D), Pt(WU1, WZ0, D),
+					Pt(WU1, WZ1, D), Pt(WU0, WZ1, D) };
+				const FVector2f GUV[4] = { FVector2f(0, 0), FVector2f(1, 0), FVector2f(1, 1), FVector2f(0, 1) };
+				Glass.AddPoly(Glass.GlassGroup, G, 4, Nout, GUV,
+					bBakedShade ? Shade(FVector3f(0.35f, 0.35f, 0.35f), Nout, (WZ0 + WZ1) * 0.5f)
+						: FVector3f(1, 1, 1));
+				if (!bReveals)
+				{
+					return;
+				}
+				// 4 tableaux (retours d'embrasure de la facade vers la vitre).
+				StoneQuad(Pt(WU0, WZ0, 0), Pt(WU0, WZ1, 0), Pt(WU0, WZ1, D), Pt(WU0, WZ0, D), T);
+				StoneQuad(Pt(WU1, WZ0, 0), Pt(WU1, WZ1, 0), Pt(WU1, WZ1, D), Pt(WU1, WZ0, D), -T);
+				StoneQuad(Pt(WU0, WZ1, 0), Pt(WU1, WZ1, 0), Pt(WU1, WZ1, D), Pt(WU0, WZ1, D),
+					FVector3f(0, 0, -1));
+				StoneQuad(Pt(WU0, WZ0, 0), Pt(WU1, WZ0, 0), Pt(WU1, WZ0, D), Pt(WU0, WZ0, D),
+					FVector3f(0, 0, 1));
+				// Appui saillant : dessus, face avant, dessous (visible en vol drone).
+				const float S = 8.f, E = 6.f;
+				StoneQuad(Pt(WU0, WZ0, -S), Pt(WU1, WZ0, -S), Pt(WU1, WZ0, 0), Pt(WU0, WZ0, 0),
+					FVector3f(0, 0, 1));
+				StoneQuad(Pt(WU0, WZ0 - E, -S), Pt(WU1, WZ0 - E, -S), Pt(WU1, WZ0, -S), Pt(WU0, WZ0, -S),
+					Nout);
+				StoneQuad(Pt(WU0, WZ0 - E, -S), Pt(WU1, WZ0 - E, -S), Pt(WU1, WZ0 - E, 0), Pt(WU0, WZ0 - E, 0),
+					FVector3f(0, 0, -1));
+				// Linteau saillant : face avant + sous-face.
+				const float L = 6.f, LH = 12.f;
+				StoneQuad(Pt(WU0, WZ1, -L), Pt(WU1, WZ1, -L), Pt(WU1, WZ1 + LH, -L), Pt(WU0, WZ1 + LH, -L),
+					Nout);
+				StoneQuad(Pt(WU0, WZ1, -L), Pt(WU1, WZ1, -L), Pt(WU1, WZ1, 0), Pt(WU0, WZ1, 0),
+					FVector3f(0, 0, -1));
+			};
+
+			const float Margin = 40.f;
+			const float Usable = Len - 2.f * Margin;
+			const int32 Bays = Usable > 200.f ? FMath::Max(1, FMath::RoundToInt32(Usable / 280.f)) : 0;
+			// Socle enterre (desktop drape) : mur aveugle sous le rez-de-chaussee.
+			if (SocleDepthCm >= 1.f)
+			{
+				WallQuad(0.f, Len, -SocleDepthCm, 0.f);
+			}
+			float Z0 = 0.f;
+			for (int32 F = 0; F < Floors; ++F)
+			{
+				const float Z1 = Z0 + FloorH;
+				if (Bays == 0 || FloorH < 220.f)
+				{
+					WallQuad(0.f, Len, Z0, Z1);
+					Z0 = Z1;
+					continue;
+				}
+				WallQuad(0.f, Margin, Z0, Z1);
+				WallQuad(Len - Margin, Len, Z0, Z1);
+				const float BayW = Usable / Bays;
+				for (int32 B = 0; B < Bays; ++B)
+				{
+					const float BU0 = Margin + B * BayW;
+					const float BU1 = BU0 + BayW;
+					const float WinW = BayW * 0.5f;
+					const float WinH = FloorH * (F == 0 ? 0.60f : 0.45f);
+					const float WU0 = (BU0 + BU1 - WinW) * 0.5f;
+					const float WU1 = WU0 + WinW;
+					const float WZ0 = F == 0 ? Z0 + 25.f : Z0 + (FloorH - WinH) * 0.5f;
+					const float WZ1 = WZ0 + WinH;
+					WallQuad(BU0, WU0, Z0, Z1);
+					WallQuad(WU1, BU1, Z0, Z1);
+					WallQuad(WU0, WU1, Z0, WZ0);
+					WallQuad(WU0, WU1, WZ1, Z1);
+					Window(WU0, WU1, WZ0, WZ1);
+				}
+				Z0 = Z1;
+			}
+		}
+
+		// Toit plat : sous-tuile toit terre cuite (10), quasi blanc en vertex color
+		// (la tuile porte la couleur), UV0 = emprise normalisee dans la sous-tuile.
+		TArray<int32> Tris;
+		TriangulateRing(PtsCm, Tris);
+		FBox2D RoofBox(ForceInit);
+		for (const FVector2D& P : PtsCm)
+		{
+			RoofBox += P;
+		}
+		const FVector2D RoofSize = RoofBox.GetSize();
+		const FVector3f RoofTint(0.95f, 0.95f, 0.95f);
+		const FVector3f Up(0, 0, 1);
+		for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
+		{
+			FVector3f R[3];
+			FVector2f RUV[3];
+			for (int32 i = 0; i < 3; ++i)
+			{
+				const FVector2D& P2 = PtsCm[Tris[t + i]];
+				R[i] = FVector3f(P2.X, P2.Y, ZBaseCm + Hcm);
+				RUV[i] = AtlasUV(10,
+					(float)((P2.X - RoofBox.Min.X) / FMath::Max(RoofSize.X, 1.0)),
+					(float)((P2.Y - RoofBox.Min.Y) / FMath::Max(RoofSize.Y, 1.0)));
+			}
+			Wall.AddPoly(Wall.WallGroup, R, 3, Up, RUV, Col(RoofTint, Up, Hcm));
+		}
+	}
+
 	// Batiment a facades TEXTUREES : un seul quad par mur, la grille de fenetres est
 	// dans la texture (UV = travees x etages). ~x8-10 moins de triangles que la
 	// version geometrique — budget Adreno 512 ~1,5 M tris/image. Les toits vont sur
@@ -1699,8 +2165,10 @@ namespace
 	// qui clignotent vus d'altitude a 1-2 km, la precision depth ne separe plus 30 cm).
 	// ZBaseCm / SocleDepthCm : meme pose desktop que le batiment detaille (le proxy
 	// doit rester CONTENU dans le detail pour disparaitre dedans) ; 0/0 en mobile.
+	// bBakedShade=false (desktop PBR) : teinte brute, Lumen eclaire (cf. BuildRoad).
 	void BuildProxyBuilding(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float Hcm,
-		const FVector3f& Tint, float ZBaseCm = 0.f, float SocleDepthCm = 0.f)
+		const FVector3f& Tint, float ZBaseCm = 0.f, float SocleDepthCm = 0.f,
+		bool bBakedShade = true)
 	{
 		// RECTANGLE ORIENTE (10 tris par batiment contre ~28 pour le contour simplifie,
 		// « tout garder, moins cher ») : axe = plus longue arete de l'emprise,
@@ -1803,11 +2271,13 @@ namespace
 			const FVector2D T2 = Dir2 / Len;
 			const FVector3f Nout(T2.Y, -T2.X, 0.f);
 			QM.AddQuad(QM.WallGroup, FVector3f(A2.X, A2.Y, Z0), FVector3f(B2.X, B2.Y, Z0),
-				FVector3f(B2.X, B2.Y, Z1), FVector3f(A2.X, A2.Y, Z1), Nout, Shade(Tint, Nout, H * 0.5f));
+				FVector3f(B2.X, B2.Y, Z1), FVector3f(A2.X, A2.Y, Z1), Nout,
+				bBakedShade ? Shade(Tint, Nout, H * 0.5f) : Tint);
 		}
 		TArray<int32> Tris;
 		TriangulateRing(P, Tris);
-		const FVector3f RoofShaded = Shade(FVector3f(0.42f, 0.40f, 0.38f), FVector3f(0, 0, 1), H);
+		const FVector3f RoofBase(0.42f, 0.40f, 0.38f);
+		const FVector3f RoofShaded = bBakedShade ? Shade(RoofBase, FVector3f(0, 0, 1), H) : RoofBase;
 		for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
 		{
 			QM.AddTri(QM.WallGroup,
@@ -1870,6 +2340,16 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	}
 	UEditorLevelUtils::MakeLevelCurrent(World->PersistentLevel, true);
 
+	// Lot B : bascule matiere desktop. Le chemin batiments GEOMETRIQUES est pris des
+	// qu'un flag Lot B batiments est actif ; bPBRMaterials commande les materiaux
+	// DefaultLit, l'encodage LINEAIRE des vertex colors, la fin de l'ombrage cuit
+	// Shade() (Lumen eclaire) et l'UV1 monde (sol, routes, toits — ortho-ready J3).
+	const bool bDesktopBldg = Gen.bWindowReveals || Gen.bSplitWallGlass || Gen.bPBRMaterials;
+	const bool bLinearColors = Gen.bPBRMaterials;
+	const bool bBakedShade = !Gen.bPBRMaterials;
+	const bool bWorldUVs = Gen.bPBRMaterials;
+	const bool bNanite = Gen.bNanite;
+
 	// Idempotence : couches precedentes + heritage monolithique SM_City_*.
 	TArray<AActor*> ToDestroy;
 	for (TActorIterator<AActor> It(World); It; ++It)
@@ -1908,16 +2388,23 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	const float Cell = CellSizeM * 100.f;
 	const float ProxyCell = ProxyCellSizeM * 100.f;
 	const float Block = BlockSizeM * 100.f;
-	TMap<FIntPoint, TUniquePtr<FCityMeshBuilder>> BldgCells, GroundCells, ProxyCells;
+	TMap<FIntPoint, TUniquePtr<FCityMeshBuilder>> BldgCells, BldgGlassCells, GroundCells, ProxyCells;
 	TSet<FIntPoint> SlabKeys;
+	// bLinear / bUV1 (Lot B) : appliques a la CREATION du builder de cellule —
+	// encodage lineaire des couleurs et canal UV1 monde. Defauts = mobile inchange.
 	auto GetIn = [](TMap<FIntPoint, TUniquePtr<FCityMeshBuilder>>& Map, const FVector2D& P,
-		float Size) -> FCityMeshBuilder&
+		float Size, bool bLinear = false, bool bUV1 = false) -> FCityMeshBuilder&
 	{
 		const FIntPoint Key(FMath::FloorToInt(P.X / Size), FMath::FloorToInt(P.Y / Size));
 		TUniquePtr<FCityMeshBuilder>& B = Map.FindOrAdd(Key);
 		if (!B)
 		{
 			B = MakeUnique<FCityMeshBuilder>();
+			B->bLinearColors = bLinear;
+			if (bUV1)
+			{
+				B->EnableWorldUV1();
+			}
 		}
 		return *B;
 	};
@@ -1955,7 +2442,8 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			for (const FVector2D& P : Pts) { Centroid += P; }
 			Centroid /= Pts.Num();
 			const float Hcm = O->GetNumberField(TEXT("h")) * 100.f;
-			const FVector3f Tint = UsageTint(O->GetStringField(TEXT("u")), Index);
+			const FString Usage = O->GetStringField(TEXT("u"));
+			const FVector3f Tint = UsageTint(Usage, Index);
 			// Pose desktop (J2 §3.3) : rez-de-chaussee a MinAlt sous l'emprise
 			// (rebase Capitole), socle aveugle jusqu'a ZBase - (Max - Min) - SocleCm.
 			float ZBase = 0.f, SocleDepth = 0.f;
@@ -1966,8 +2454,23 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				ZBase = MinAlt - Drape.AltCapCm;
 				SocleDepth = (MaxAlt - MinAlt) + Gen.SocleCm;
 			}
-			BuildPolygonBuildingTextured(GetIn(BldgCells, Centroid, Cell), Pts, Hcm, Tint, ZBase, SocleDepth);
-			BuildProxyBuilding(GetIn(ProxyCells, Centroid, ProxyCell), Pts, Hcm, Tint, ZBase, SocleDepth);
+			if (bDesktopBldg)
+			{
+				// Lot B : fenetres geometriques (en creux si bWindowReveals) ; les
+				// vitres partent dans un builder SEPARE si bSplitWallGlass (Q3).
+				FCityMeshBuilder& WallB = GetIn(BldgCells, Centroid, Cell, bLinearColors, bWorldUVs);
+				FCityMeshBuilder& GlassB = Gen.bSplitWallGlass
+					? GetIn(BldgGlassCells, Centroid, Cell, bLinearColors, false) : WallB;
+				BuildPolygonBuildingDesktop(WallB, GlassB, Pts, Hcm, Tint, UsageTile(Usage, Index),
+					ZBase, SocleDepth, Gen.bWindowReveals, bBakedShade);
+			}
+			else
+			{
+				BuildPolygonBuildingTextured(GetIn(BldgCells, Centroid, Cell), Pts, Hcm, Tint,
+					ZBase, SocleDepth);
+			}
+			BuildProxyBuilding(GetIn(ProxyCells, Centroid, ProxyCell, bLinearColors), Pts, Hcm, Tint,
+				ZBase, SocleDepth, bBakedShade);
 			SlabKeys.Add(FIntPoint(FMath::FloorToInt(Centroid.X / Cell), FMath::FloorToInt(Centroid.Y / Cell)));
 			++Summary.Buildings;
 			++Index;
@@ -2007,8 +2510,9 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				ComputePolylineZ(*RoadPts, Drape, bBridge, TerrainZ);
 				TerrainZPtr = &TerrainZ;
 			}
-			BuildRoad(GetIn(GroundCells, Pts[0], Cell), *RoadPts, O->GetNumberField(TEXT("w")) * 100.f,
-				O->GetStringField(TEXT("t")), Index, TerrainZPtr);
+			BuildRoad(GetIn(GroundCells, Pts[0], Cell, bLinearColors, bWorldUVs), *RoadPts,
+				O->GetNumberField(TEXT("w")) * 100.f,
+				O->GetStringField(TEXT("t")), Index, TerrainZPtr, bBakedShade);
 			SlabKeys.Add(FIntPoint(FMath::FloorToInt(Pts[0].X / Cell), FMath::FloorToInt(Pts[0].Y / Cell)));
 			++Summary.Roads;
 			++Index;
@@ -2077,7 +2581,13 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		}
 		return Tint;
 	};
-	UMaterialInterface* RoadMat = GetOrCreateRoadMaterial(AssetFolder);
+	// Lot B : materiaux PBR DefaultLit en desktop — sol/sentiers/proxys en
+	// M_CityGround_PBR (VertexColor lit), rubans en M_CityRoad_PBR (meme
+	// T_RoadStrip). Mobile : materiaux unlit historiques, inchanges.
+	UMaterialInterface* RoadMat = Gen.bPBRMaterials
+		? GetOrCreateRoadPBRMaterial(AssetFolder) : GetOrCreateRoadMaterial(AssetFolder);
+	UMaterialInterface* SlabMat = Gen.bPBRMaterials
+		? GetOrCreateGroundPBRMaterial(AssetFolder) : WallMat;
 	// Grille de sol parametree par le profil : 12x12 plat (mobile) ou 64x64 drape
 	// MNT (desktop, sommets Z = AltCmAt - AltCapitole). Fabrique commune : la teinte
 	// peinte reste echantillonnee en (X, Y), le Z ne change pas les couleurs.
@@ -2099,9 +2609,8 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				FVector3f Cols[4];
 				for (int32 c = 0; c < 4; ++c)
 				{
-					Cols[c] = bPaint
-						? Shade(SampleGround(FVector2D(C[c].X, C[c].Y)), FVector3f(0, 0, 1), 0.f)
-						: Shade(SlabBase, FVector3f(0, 0, 1), 0.f);
+					const FVector3f Base = bPaint ? SampleGround(FVector2D(C[c].X, C[c].Y)) : SlabBase;
+					Cols[c] = bBakedShade ? Shade(Base, FVector3f(0, 0, 1), 0.f) : Base;
 				}
 				Builder.AddPolyPerVertexColors(Builder.WallGroup, C, 4,
 					FVector3f(0, 0, 1), UV, Cols);
@@ -2111,6 +2620,11 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	for (const FIntPoint& Key : SlabKeys)
 	{
 		FCityMeshBuilder SlabBuilder;
+		SlabBuilder.bLinearColors = bLinearColors;
+		if (bWorldUVs)
+		{
+			SlabBuilder.EnableWorldUV1();
+		}
 		BuildGroundGrid(SlabBuilder, Key, SlabGrid, /*bPaint=*/true);
 		const FString SlabName = FString::Printf(TEXT("SM_Slab_%d_%d"), Key.X, Key.Y);
 		UStaticMesh* SlabMesh = nullptr;
@@ -2119,17 +2633,18 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			// Collision desktop : la boite plate est fausse des que le terrain ondule
 			// — trimesh BASSE RESOLUTION dedie (16x16), cuit a la place du rendu 64x64
 			// via ComplexCollisionMesh (le trimesh plein serait du gachis memoire).
+			// Le mesh de collision n'est jamais rendu : ni Nanite ni materiau PBR.
 			FCityMeshBuilder ColBuilder;
 			BuildGroundGrid(ColBuilder, Key, FMath::Clamp(Gen.GroundCollisionGridN, 1, 64), /*bPaint=*/false);
 			UStaticMesh* ColMesh = CreateMeshAsset(AssetFolder / (SlabName + TEXT("_Col")), ColBuilder,
 				WallMat, WallMat, true);
-			SlabMesh = CreateMeshAsset(AssetFolder / SlabName, SlabBuilder, WallMat, WallMat,
-				true, false, 0.f, ColMesh);
+			SlabMesh = CreateMeshAsset(AssetFolder / SlabName, SlabBuilder, SlabMat, SlabMat,
+				true, false, 0.f, ColMesh, bNanite);
 		}
 		else
 		{
-			SlabMesh = CreateMeshAsset(AssetFolder / SlabName, SlabBuilder, WallMat, WallMat,
-				true, true, 60.f);
+			SlabMesh = CreateMeshAsset(AssetFolder / SlabName, SlabBuilder, SlabMat, SlabMat,
+				true, true, 60.f, nullptr, bNanite);
 		}
 		++Summary.GroundMeshes;
 		AStaticMeshActor* SlabActor = World->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
@@ -2143,7 +2658,8 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	for (auto& Pair : GroundCells)
 	{
 		const FString Name = FString::Printf(TEXT("SM_Ground_%d_%d"), Pair.Key.X, Pair.Key.Y);
-		UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *Pair.Value, WallMat, RoadMat, false);
+		UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *Pair.Value, SlabMat, RoadMat, false,
+			false, 0.f, nullptr, bNanite);
 		++Summary.GroundMeshes;
 		AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
 		Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
@@ -2153,7 +2669,8 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	for (auto& Pair : ProxyCells)
 	{
 		const FString Name = FString::Printf(TEXT("SM_Proxy_%d_%d"), Pair.Key.X, Pair.Key.Y);
-		UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *Pair.Value, WallMat, GlassMat, false);
+		UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *Pair.Value, SlabMat,
+			Gen.bPBRMaterials ? SlabMat : GlassMat, false, false, 0.f, nullptr, bNanite);
 		++Summary.ProxyMeshes;
 		AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
 		Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
@@ -2207,17 +2724,50 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		for (const FIntPoint& CellKey : Pair.Value)
 		{
 			const FString Name = FString::Printf(TEXT("SM_Bldg_%d_%d"), CellKey.X, CellKey.Y);
-			// Facades texturees (slot Wall) + toits unis en vertex color (slot Glass).
-			UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *BldgCells[CellKey],
-				GetOrCreateFacadeMaterial(AssetFolder), WallMat, true);
-			++Summary.BuildingMeshes;
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.OverrideLevel = BlockLevel;
-			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(
-				AStaticMeshActor::StaticClass(), Location, FRotator::ZeroRotator, SpawnParams);
-			Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
-			Actor->SetActorLabel(Name);
+			auto SpawnBldg = [&](const FString& ActorName, UStaticMesh* Mesh)
+			{
+				++Summary.BuildingMeshes;
+				FActorSpawnParameters SpawnParams;
+				SpawnParams.OverrideLevel = BlockLevel;
+				SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+				AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(
+					AStaticMeshActor::StaticClass(), Location, FRotator::ZeroRotator, SpawnParams);
+				Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
+				Actor->SetActorLabel(ActorName);
+			};
+			if (bDesktopBldg)
+			{
+				// Lot B : murs geometriques (atlas PBR, Nanite si demande) ; vitres
+				// dans un mesh SEPARE si bSplitWallGlass — jamais Nanite, mais AVEC
+				// collision (l'embrasure est un vrai trou, la vitre doit arreter le
+				// drone). Cellule sans fenetre : pas de mesh Glass.
+				UMaterialInterface* BldgWallMat = Gen.bPBRMaterials
+					? GetOrCreateWallPBRMaterial(AssetFolder, Gen.AtlasSizePx) : WallMat;
+				UMaterialInterface* BldgGlassMat = Gen.bPBRMaterials
+					? GetOrCreateGlassPBRMaterial(AssetFolder) : GlassMat;
+				if (Gen.bSplitWallGlass)
+				{
+					SpawnBldg(Name + TEXT("_Wall"), CreateMeshAsset(AssetFolder / (Name + TEXT("_Wall")),
+						*BldgCells[CellKey], BldgWallMat, BldgWallMat, true, false, 0.f, nullptr, bNanite));
+					TUniquePtr<FCityMeshBuilder>* GlassB = BldgGlassCells.Find(CellKey);
+					if (GlassB && (*GlassB)->QuadCount > 0)
+					{
+						SpawnBldg(Name + TEXT("_Glass"), CreateMeshAsset(AssetFolder / (Name + TEXT("_Glass")),
+							**GlassB, BldgGlassMat, BldgGlassMat, true));
+					}
+				}
+				else
+				{
+					SpawnBldg(Name, CreateMeshAsset(AssetFolder / Name, *BldgCells[CellKey],
+						BldgWallMat, BldgGlassMat, true, false, 0.f, nullptr, bNanite));
+				}
+			}
+			else
+			{
+				// Facades texturees (slot Wall) + toits unis en vertex color (slot Glass).
+				SpawnBldg(Name, CreateMeshAsset(AssetFolder / Name, *BldgCells[CellKey],
+					GetOrCreateFacadeMaterial(AssetFolder), WallMat, true));
+			}
 		}
 		BlockLevel->MarkPackageDirty();
 		// Sauver le bloc TOUT DE SUITE puis le masquer : l'editeur ne cumule jamais la

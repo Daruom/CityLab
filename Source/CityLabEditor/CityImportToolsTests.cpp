@@ -3,7 +3,10 @@
 
 #include "Editor.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/Texture2D.h"
 #include "HAL/PlatformFileManager.h"
+#include "Materials/Material.h"
+#include "Materials/MaterialInterface.h"
 #include "MeshDescription.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/FileHelper.h"
@@ -225,6 +228,22 @@ void FCityImportToolsSpec::Define()
 			TestTrue(TEXT("SM_Bldg_0_0 lisible"), GetMeshZBounds(Bldg, MinZ, MaxZ));
 			TestEqual(TEXT("Batiment mobile : pied a 0"), MinZ, 0.f);
 			TestEqual(TEXT("Batiment mobile : toit a 950"), MaxZ, 950.f);
+
+			// Lot B — le golden path mobile ignore la matiere desktop : pas de Nanite,
+			// un seul canal UV (pas d'UV1 monde), un seul mesh par cellule batiments.
+			if (Slab)
+			{
+				TestFalse(TEXT("Mobile : dalle sans Nanite"), Slab->GetNaniteSettings().bEnabled);
+				if (FMeshDescription* SlabDesc = Slab->GetMeshDescription(0))
+				{
+					TestEqual(TEXT("Mobile : un seul canal UV sur la dalle"),
+						FStaticMeshAttributes(*SlabDesc).GetVertexInstanceUVs().GetNumChannels(), 1);
+				}
+			}
+			if (Bldg)
+			{
+				TestFalse(TEXT("Mobile : batiment sans Nanite"), Bldg->GetNaniteSettings().bEnabled);
+			}
 		});
 
 		It("profil desktop : sol drape dans les bornes MNT de la cellule, collision trimesh dediee", [this]()
@@ -352,9 +371,11 @@ void FCityImportToolsSpec::Define()
 			const float ExpectedMinZ = ZBase - (MaxAlt - MinAlt) - 50.f;
 			const float ExpectedMaxZ = ZBase + 950.f;
 
+			// Lot B : le profil desktop separe Wall/Glass — le socle et le toit
+			// vivent dans le mesh opaque SM_Bldg_*_Wall.
 			const int32 CX = FMath::FloorToInt((SlopeXm * 100.f + 1000.f) / 10000.f);
 			float MinZ = 0.f, MaxZ = 0.f;
-			UStaticMesh* Bldg = LoadTestMesh(FString::Printf(TEXT("SM_Bldg_%d_0"), CX));
+			UStaticMesh* Bldg = LoadTestMesh(FString::Printf(TEXT("SM_Bldg_%d_0_Wall"), CX));
 			if (!TestTrue(TEXT("Batiment drape lisible"), GetMeshZBounds(Bldg, MinZ, MaxZ)))
 			{
 				return;
@@ -438,6 +459,163 @@ void FCityImportToolsSpec::Define()
 			}
 			TestTrue(FString::Printf(TEXT("Tablier interpole lineairement (ecart max %.2f cm ; drape = %.0f cm)"),
 				MaxErr, BestDev), MaxErr <= 1.f);
+		});
+	});
+
+	// Lot B « matiere et modenature » : fenetres en creux geometriques, split
+	// Wall/Glass, Nanite sur les opaques, materiaux PBR DefaultLit, UV1 monde.
+	// Tests A PLAT (bDrapeToTerrain=false, profils manuels sans bDesktop) :
+	// independants du MNT, ils isolent la matiere du relief.
+	Describe("LotB", [this]()
+	{
+		// Fixture commune : 1 batiment 12x10 m h9,5 (3 etages, travees 4+3+4+3 = 42
+		// fenetres) + 1 route, tout en cellule (0,0).
+		auto WriteFixture = [this]()
+		{
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_lotb.json"));
+			const FString Json = TEXT(R"({"buildings":[{"pts":[[0,0],[12,0],[12,10],[0,10]],"h":9.5,"u":"res"}],)")
+				TEXT(R"("roads":[{"pts":[[5,20],[80,20]],"t":"residential","w":6}]})");
+			FFileHelper::SaveStringToFile(Json, *Path);
+			return Path;
+		};
+		auto DesktopFlat = []()
+		{
+			// Matiere desktop SANS relief : profils explicites, pas de prereglage
+			// bDesktop (qui forcerait le drapage MNT).
+			FCityGenProfile P;
+			P.bWindowReveals = true;
+			P.bSplitWallGlass = true;
+			P.bNanite = true;
+			P.bPBRMaterials = true;
+			return P;
+		};
+		auto TriCount = [](UStaticMesh* Mesh) -> int32
+		{
+			FMeshDescription* Desc = Mesh ? Mesh->GetMeshDescription(0) : nullptr;
+			return Desc ? Desc->Triangles().Num() : 0;
+		};
+
+		It("fenetres en creux : delta de +18 tris par fenetre (spec 3-3)", [this, WriteFixture, DesktopFlat, TriCount]()
+		{
+			const FString Path = WriteFixture();
+			FCityGenProfile POff = DesktopFlat();
+			POff.bWindowReveals = false;
+
+			UCityImportTools::ImportCityStreamed(Path, FString(), TEXT("/Game/Dev/Test/City"),
+				TEXT("/Game/Dev/Test/Blocks"), FString(), FString(), 100.f, 200.f, 400.f,
+				FVector::ZeroVector, POff);
+			const int32 WallOff = TriCount(LoadTestMesh(TEXT("SM_Bldg_0_0_Wall")));
+			const int32 GlassOff = TriCount(LoadTestMesh(TEXT("SM_Bldg_0_0_Glass")));
+			if (!TestTrue(TEXT("Baseline sans tableaux lisible"), WallOff > 0 && GlassOff > 0))
+			{
+				return;
+			}
+
+			UCityImportTools::ImportCityStreamed(Path, FString(), TEXT("/Game/Dev/Test/City"),
+				TEXT("/Game/Dev/Test/Blocks"), FString(), FString(), 100.f, 200.f, 400.f,
+				FVector::ZeroVector, DesktopFlat());
+			const int32 WallOn = TriCount(LoadTestMesh(TEXT("SM_Bldg_0_0_Wall")));
+			const int32 GlassOn = TriCount(LoadTestMesh(TEXT("SM_Bldg_0_0_Glass")));
+
+			// La vitre (1 quad/fenetre) compte les fenetres ; elle est identique
+			// avec ou sans tableaux — tout le delta est porte par le mesh Wall.
+			TestEqual(TEXT("Vitres inchangees par les tableaux"), GlassOn, GlassOff);
+			const int32 Windows = GlassOn / 2;
+			TestEqual(TEXT("42 fenetres (3 etages x travees 4+3+4+3)"), Windows, 42);
+			const int32 Delta = (WallOn + GlassOn) - (WallOff + GlassOff);
+			TestEqual(FString::Printf(TEXT("Delta %d tris / %d fenetres = +18 par fenetre"), Delta, Windows),
+				Delta, Windows * 18);
+		});
+
+		It("split Wall/Glass, Nanite opaques, materiaux PBR DefaultLit, UV1 monde", [this, WriteFixture, DesktopFlat]()
+		{
+			const FString Path = WriteFixture();
+			UCityImportTools::ImportCityStreamed(Path, FString(), TEXT("/Game/Dev/Test/City"),
+				TEXT("/Game/Dev/Test/Blocks"), FString(), FString(), 100.f, 200.f, 400.f,
+				FVector::ZeroVector, DesktopFlat());
+
+			// DEUX meshes par cellule batiments (Q3) : opaque + vitres.
+			UStaticMesh* Wall = LoadTestMesh(TEXT("SM_Bldg_0_0_Wall"));
+			UStaticMesh* Glass = LoadTestMesh(TEXT("SM_Bldg_0_0_Glass"));
+			UStaticMesh* Slab = LoadTestMesh(TEXT("SM_Slab_0_0"));
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			UStaticMesh* Proxy = LoadTestMesh(TEXT("SM_Proxy_0_0"));
+			if (!TestTrue(TEXT("Les 5 meshes desktop existent (Wall, Glass, Slab, Ground, Proxy)"),
+				Wall && Glass && Slab && Ground && Proxy))
+			{
+				return;
+			}
+
+			// Nanite sur les OPAQUES uniquement (murs, sol, routes, proxys), jamais Glass.
+			TestTrue(TEXT("Nanite : Wall"), Wall->GetNaniteSettings().bEnabled);
+			TestFalse(TEXT("Nanite : jamais sur Glass"), Glass->GetNaniteSettings().bEnabled);
+			TestTrue(TEXT("Nanite : sol"), Slab->GetNaniteSettings().bEnabled);
+			TestTrue(TEXT("Nanite : routes"), Ground->GetNaniteSettings().bEnabled);
+			TestTrue(TEXT("Nanite : proxys"), Proxy->GetNaniteSettings().bEnabled);
+
+			// Materiaux PBR assignes, shading model DefaultLit (PAS unlit — Lumen).
+			auto CheckMat = [this](const TCHAR* Label, UStaticMesh* Mesh, int32 Slot, const TCHAR* Expected)
+			{
+				const TArray<FStaticMaterial>& Mats = Mesh->GetStaticMaterials();
+				if (!TestTrue(FString::Printf(TEXT("%s : slot %d present"), Label, Slot), Mats.IsValidIndex(Slot)))
+				{
+					return;
+				}
+				UMaterialInterface* MI = Mats[Slot].MaterialInterface;
+				if (!TestNotNull(FString::Printf(TEXT("%s : materiau"), Label), MI))
+				{
+					return;
+				}
+				TestEqual(FString::Printf(TEXT("%s : %s assigne"), Label, Expected), MI->GetName(), FString(Expected));
+				const UMaterial* Mat = MI->GetMaterial();
+				TestTrue(FString::Printf(TEXT("%s : DefaultLit"), Label),
+					Mat && Mat->GetShadingModels().HasShadingModel(MSM_DefaultLit));
+				TestFalse(FString::Printf(TEXT("%s : pas unlit"), Label),
+					Mat && Mat->GetShadingModels().HasShadingModel(MSM_Unlit));
+			};
+			CheckMat(TEXT("Murs"), Wall, 0, TEXT("M_CityWall_PBR"));
+			CheckMat(TEXT("Vitres"), Glass, 0, TEXT("M_CityGlass_PBR"));
+			CheckMat(TEXT("Sol"), Slab, 0, TEXT("M_CityGround_PBR"));
+			CheckMat(TEXT("Routes (rubans)"), Ground, 1, TEXT("M_CityRoad_PBR"));
+			CheckMat(TEXT("Proxys"), Proxy, 0, TEXT("M_CityGround_PBR"));
+
+			// Atlas de facades 2048² (grille 4x4 de sous-tuiles).
+			UTexture2D* Atlas = LoadObject<UTexture2D>(nullptr,
+				TEXT("/Game/Dev/Test/City/T_CityAtlas.T_CityAtlas"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+			if (TestNotNull(TEXT("T_CityAtlas cree"), Atlas))
+			{
+				TestEqual(TEXT("Atlas 2048 px"), (int32)Atlas->Source.GetSizeX(), 2048);
+				TestEqual(TEXT("Atlas carre"), (int32)Atlas->Source.GetSizeY(), 2048);
+			}
+
+			// UV1 monde sur le sol : 2 canaux, valeurs normalisees dalle dans [0,1].
+			FMeshDescription* SlabDesc = Slab->GetMeshDescription(0);
+			if (TestNotNull(TEXT("MeshDescription dalle"), SlabDesc))
+			{
+				TVertexInstanceAttributesRef<FVector2f> UVs =
+					FStaticMeshAttributes(*SlabDesc).GetVertexInstanceUVs();
+				if (TestEqual(TEXT("Dalle : 2 canaux UV (UV1 monde)"), UVs.GetNumChannels(), 2))
+				{
+					bool bAllIn01 = true;
+					for (const FVertexInstanceID I : SlabDesc->VertexInstances().GetElementIDs())
+					{
+						const FVector2f UV1 = UVs.Get(I, 1);
+						if (UV1.X < -0.001f || UV1.X > 1.001f || UV1.Y < -0.001f || UV1.Y > 1.001f)
+						{
+							bAllIn01 = false;
+							break;
+						}
+					}
+					TestTrue(TEXT("Dalle : UV1 dans [0,1]"), bAllIn01);
+				}
+			}
+			// Toits : le mesh Wall des batiments porte aussi l'UV1 monde (ortho J3).
+			FMeshDescription* WallDesc = Wall->GetMeshDescription(0);
+			if (TestNotNull(TEXT("MeshDescription murs"), WallDesc))
+			{
+				TestEqual(TEXT("Batiments : 2 canaux UV (toits ortho-ready)"),
+					FStaticMeshAttributes(*WallDesc).GetVertexInstanceUVs().GetNumChannels(), 2);
+			}
 		});
 	});
 }

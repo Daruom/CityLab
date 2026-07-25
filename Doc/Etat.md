@@ -142,6 +142,11 @@ la BD ORTHO, streaming ×5-10, HLOD auto). Données terrain prêtes :
   par défaut = golden path bit-à-bit ; `Desktop()` : sol 64×64 drapé MNT + collision trimesh 16×16
   dédiée, routes ré-échantillonnées 15 m + ponts `bridge` interpolés, eau plane p10, socle bâtiments). 30/30 tests.
 
+- 2026-07-25 (soir) : **J2 Lot B « matière et modénature » implémenté** — profil étendu (bWindowReveals :
+  fenêtres géométriques en creux, +18 tris/fenêtre exact ; bSplitWallGlass : SM_Bldg_*_Wall/_Glass ; bNanite
+  sur opaques seulement ; bPBRMaterials : M_CityWall_PBR atlas 2048² 4×4 + Glass opaque lisse (choix Q3) +
+  Ground/Road lit, vertex colors LINÉAIRES, Shade() coupé, UV1 monde sol/routes/toits). 32/32 tests.
+
 - **Chronologie complète, mesures device et procédures de reprise : voir
   `../DroneCity/Doc/Journal-Toulouse10.md`** (LE document de référence de la
   campagne Toulouse 10 km, v1→v14b : RAM, GPU, miroir nord=-Y, routes texturées,

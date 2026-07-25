@@ -41,6 +41,38 @@ struct FCityGenProfile
 	/** JSON de georeferencement du MNT. Vide = SourceData/toulouse10_mnt.json. */
 	UPROPERTY() FString TerrainJsonPath;
 
+	/**
+	 * Lot B (spec §3.3) : fenetres en creux GEOMETRIQUES completes — vitre en retrait
+	 * 18 cm + 4 quads de tableaux + appui saillant (3 quads) + linteau saillant
+	 * (2 quads) = +9 quads (+18 tris) par fenetre par rapport a la vitre en simple
+	 * retrait. Mobile : fenetres dans la texture de facade, inchange.
+	 */
+	UPROPERTY() bool bWindowReveals = false;
+
+	/**
+	 * Lot B : chaque cellule batiments produit DEUX meshes — SM_Bldg_*_Wall (opaque,
+	 * Nanite-compatible) et SM_Bldg_*_Glass (vitres, jamais Nanite) — au lieu des
+	 * deux slots d'un seul mesh (spec Q3 : un mesh est Nanite ou ne l'est pas).
+	 */
+	UPROPERTY() bool bSplitWallGlass = false;
+
+	/** Lot B : Nanite sur les meshes OPAQUES (murs, sol, routes, proxys). Jamais sur Glass. */
+	UPROPERTY() bool bNanite = false;
+
+	/**
+	 * Lot B : materiaux PBR DefaultLit (Lumen) generes par code — M_CityWall_PBR
+	 * (atlas facades x VertexColor), M_CityGlass_PBR, M_CityGround_PBR,
+	 * M_CityRoad_PBR — a la place de l'unlit a ombrage cuit. Les vertex colors
+	 * passent en encodage LINEAIRE (le pow 2.2 est un hack unlit, garde en mobile),
+	 * l'ombrage soleil cuit Shade() disparait (Lumen eclaire) et l'UV1 monde
+	 * (x,y normalise sur la dalle 10 km, ortho-ready J3) est ecrite sur sol,
+	 * routes et batiments (toits).
+	 */
+	UPROPERTY() bool bPBRMaterials = false;
+
+	/** Cote en pixels de l'atlas de facades T_CityAtlas (grille 4x4 sous-tuiles). */
+	UPROPERTY() int32 AtlasSizePx = 2048;
+
 	/** Prereglage desktop complet : 64x64 drape, collision 16x16, pas routes 15 m. */
 	static FCityGenProfile Desktop();
 
