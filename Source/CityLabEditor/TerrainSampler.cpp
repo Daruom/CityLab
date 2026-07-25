@@ -158,24 +158,45 @@ float FTerrainSampler::MaxAltCmInPolygon(const TArray<FVector2D>& PolyCm) const
 	return MinMaxAltCmInPolygon(PolyCm, true);
 }
 
+float FTerrainSampler::PercentileAltCmInPolygon(const TArray<FVector2D>& PolyCm, float Percentile) const
+{
+	if (Heights.Num() == 0 || PolyCm.Num() == 0)
+	{
+		return 0.f;
+	}
+	TArray<float> Samples;
+	CollectAltCmInPolygon(PolyCm, Samples);
+	Samples.Sort();
+	const int32 Index = FMath::Clamp(
+		FMath::RoundToInt32(FMath::Clamp(Percentile, 0.f, 1.f) * (Samples.Num() - 1)),
+		0, Samples.Num() - 1);
+	return Samples[Index];
+}
+
 float FTerrainSampler::MinMaxAltCmInPolygon(const TArray<FVector2D>& PolyCm, bool bWantMax) const
 {
 	if (Heights.Num() == 0 || PolyCm.Num() == 0)
 	{
 		return 0.f;
 	}
-
-	// Les sommets d'abord : garantit un resultat meme pour un polygone fin ou
-	// plus petit que le pas de la grille.
-	float Best = AltCmAt(PolyCm[0].X, PolyCm[0].Y);
-	auto Consider = [&Best, bWantMax](float Alt)
+	TArray<float> Samples;
+	CollectAltCmInPolygon(PolyCm, Samples);
+	float Best = Samples[0];
+	for (const float Alt : Samples)
 	{
 		Best = bWantMax ? FMath::Max(Best, Alt) : FMath::Min(Best, Alt);
-	};
+	}
+	return Best;
+}
+
+void FTerrainSampler::CollectAltCmInPolygon(const TArray<FVector2D>& PolyCm, TArray<float>& OutAltCm) const
+{
+	// Les sommets d'abord : garantit un resultat meme pour un polygone fin ou
+	// plus petit que le pas de la grille.
 	FVector2D BboxMin = PolyCm[0], BboxMax = PolyCm[0];
-	for (int32 i = 1; i < PolyCm.Num(); ++i)
+	for (int32 i = 0; i < PolyCm.Num(); ++i)
 	{
-		Consider(AltCmAt(PolyCm[i].X, PolyCm[i].Y));
+		OutAltCm.Add(AltCmAt(PolyCm[i].X, PolyCm[i].Y));
 		BboxMin = FVector2D::Min(BboxMin, PolyCm[i]);
 		BboxMax = FVector2D::Max(BboxMax, PolyCm[i]);
 	}
@@ -188,9 +209,8 @@ float FTerrainSampler::MinMaxAltCmInPolygon(const TArray<FVector2D>& PolyCm, boo
 		{
 			if (PointInPolygon(FVector2D(X, Y), PolyCm))
 			{
-				Consider(AltCmAt(X, Y));
+				OutAltCm.Add(AltCmAt(X, Y));
 			}
 		}
 	}
-	return Best;
 }

@@ -1,16 +1,65 @@
 #include "CityImportTools.h"
+#include "TerrainSampler.h"
 
 #include "Editor.h"
+#include "Engine/StaticMesh.h"
 #include "HAL/PlatformFileManager.h"
+#include "MeshDescription.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "StaticMeshAttributes.h"
 
 BEGIN_DEFINE_SPEC(
 	FCityImportToolsSpec,
 	"CityLab.CityImportTools",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+	// Sampler MNT de CONTROLE des tests desktop (independant de celui de l'outil),
+	// charge une seule fois pour toute la spec (~200 Mo decompresses).
+	FTerrainSampler Terrain;
+	bool EnsureTerrainLoaded();
 END_DEFINE_SPEC(FCityImportToolsSpec)
+
+bool FCityImportToolsSpec::EnsureTerrainLoaded()
+{
+	if (!Terrain.IsLoaded())
+	{
+		Terrain.Load(
+			FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/toulouse10_mnt.png")),
+			FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/toulouse10_mnt.json")));
+	}
+	return Terrain.IsLoaded();
+}
+
+namespace
+{
+	// Charge un mesh genere sous /Game/Dev/Test/City (regenere en place par l'import).
+	UStaticMesh* LoadTestMesh(const FString& Name)
+	{
+		const FString Path = FString::Printf(TEXT("/Game/Dev/Test/City/%s.%s"), *Name, *Name);
+		return LoadObject<UStaticMesh>(nullptr, *Path, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	}
+
+	// Bornes Z reelles du mesh, lues dans la MeshDescription committee.
+	bool GetMeshZBounds(UStaticMesh* Mesh, float& OutMinZ, float& OutMaxZ)
+	{
+		FMeshDescription* MeshDesc = Mesh ? Mesh->GetMeshDescription(0) : nullptr;
+		if (!MeshDesc || MeshDesc->Vertices().Num() == 0)
+		{
+			return false;
+		}
+		TVertexAttributesRef<FVector3f> Positions = FStaticMeshAttributes(*MeshDesc).GetVertexPositions();
+		OutMinZ = FLT_MAX;
+		OutMaxZ = -FLT_MAX;
+		for (const FVertexID V : MeshDesc->Vertices().GetElementIDs())
+		{
+			OutMinZ = FMath::Min(OutMinZ, Positions[V].Z);
+			OutMaxZ = FMath::Max(OutMaxZ, Positions[V].Z);
+		}
+		return true;
+	}
+}
 
 void FCityImportToolsSpec::Define()
 {
@@ -61,7 +110,7 @@ void FCityImportToolsSpec::Define()
 
 			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
 				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
-				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector);
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, FCityGenProfile());
 			TestEqual(TEXT("Buildings"), Summary.Buildings, 2);
 			TestEqual(TEXT("Roads"), Summary.Roads, 1);
 			TestEqual(TEXT("Trees"), Summary.Trees, 2);
@@ -75,7 +124,8 @@ void FCityImportToolsSpec::Define()
 		{
 			AddExpectedError(TEXT("Cannot read district file"), EAutomationExpectedErrorFlags::Contains);
 			UCityImportTools::ImportCityStreamed(TEXT("Z:/nope.json"), FString(), TEXT("/Game/Dev/Test/City"),
-				TEXT("/Game/Dev/Test/Blocks"), FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector);
+				TEXT("/Game/Dev/Test/Blocks"), FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector,
+				FCityGenProfile());
 		});
 	});
 
@@ -91,7 +141,7 @@ void FCityImportToolsSpec::Define()
 			FFileHelper::SaveStringToFile(Json, *Path);
 
 			const FCitySurfacesSummary Summary = UCityImportTools::ImportCitySurfaces(
-				Path, TEXT("/Game/Dev/Test/City"), FString(), 100.f, FVector::ZeroVector);
+				Path, TEXT("/Game/Dev/Test/City"), FString(), 100.f, FVector::ZeroVector, FCityGenProfile());
 			TestEqual(TEXT("Water"), Summary.Water, 1);
 			TestEqual(TEXT("Green"), Summary.Green, 2);
 			TestEqual(TEXT("Rails"), Summary.Rails, 1);
@@ -103,7 +153,7 @@ void FCityImportToolsSpec::Define()
 		{
 			AddExpectedError(TEXT("Cannot read surfaces file"), EAutomationExpectedErrorFlags::Contains);
 			UCityImportTools::ImportCitySurfaces(TEXT("Z:/nope.json"), TEXT("/Game/Dev/Test/City"),
-				FString(), 100.f, FVector::ZeroVector);
+				FString(), 100.f, FVector::ZeroVector, FCityGenProfile());
 		});
 	});
 
@@ -116,7 +166,7 @@ void FCityImportToolsSpec::Define()
 				TEXT(R"({"markers":[{"x":0,"y":0,"k":"metro","n":"Test"},{"x":10,"y":0,"k":"metro_e","n":""},{"x":20,"y":0,"k":"inconnu","n":""}]})"),
 				*Path);
 			const int32 Placed = UCityImportTools::ImportCityMarkers(
-				Path, TEXT("/Game/Dev/Test/City"), FString(), FVector::ZeroVector);
+				Path, TEXT("/Game/Dev/Test/City"), FString(), FVector::ZeroVector, FCityGenProfile());
 			TestEqual(TEXT("Marqueurs places"), Placed, 2);
 		});
 
@@ -124,7 +174,7 @@ void FCityImportToolsSpec::Define()
 		{
 			AddExpectedError(TEXT("Cannot read markers file"), EAutomationExpectedErrorFlags::Contains);
 			UCityImportTools::ImportCityMarkers(TEXT("Z:/nope.json"), TEXT("/Game/Dev/Test/City"),
-				FString(), FVector::ZeroVector);
+				FString(), FVector::ZeroVector, FCityGenProfile());
 		});
 
 		It("raises when the markers array is missing", [this]()
@@ -132,7 +182,262 @@ void FCityImportToolsSpec::Define()
 			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_markers2.json"));
 			FFileHelper::SaveStringToFile(TEXT("{}"), *Path);
 			AddExpectedError(TEXT("no 'markers' array"), EAutomationExpectedErrorFlags::Contains);
-			UCityImportTools::ImportCityMarkers(Path, TEXT("/Game/Dev/Test/City"), FString(), FVector::ZeroVector);
+			UCityImportTools::ImportCityMarkers(Path, TEXT("/Game/Dev/Test/City"), FString(), FVector::ZeroVector,
+				FCityGenProfile());
+		});
+	});
+
+	// Jalon J2 : profil desktop (relief MNT). Le profil mobile par defaut reste le
+	// golden path — premiere verification ci-dessous. Les tests desktop utilisent la
+	// VRAIE dalle MNT (comme la spec TerrainSampler) et un sampler de controle
+	// independant de celui de l'outil.
+	Describe("ProfilDesktop", [this]()
+	{
+		It("profil mobile par defaut : geometrie a plat inchangee (non-regression)", [this]()
+		{
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_mobile.json"));
+			const FString Json = TEXT(R"({"buildings":[{"pts":[[0,0],[12,0],[12,10],[0,10]],"h":9.5,"u":"res"}],)")
+				TEXT(R"("roads":[{"pts":[[-20,-8],[30,-8]],"t":"residential","w":6}],)")
+				TEXT(R"("trees":[[5,-15],[8,-15]]})");
+			FFileHelper::SaveStringToFile(Json, *Path);
+
+			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, FCityGenProfile());
+			TestEqual(TEXT("Buildings"), Summary.Buildings, 1);
+			TestEqual(TEXT("Roads"), Summary.Roads, 1);
+			TestEqual(TEXT("Trees"), Summary.Trees, 2);
+
+			// Dalle historique : grille a plat stricte z=0, collision boite simple.
+			float MinZ = 0.f, MaxZ = 0.f;
+			UStaticMesh* Slab = LoadTestMesh(TEXT("SM_Slab_0_0"));
+			TestTrue(TEXT("SM_Slab_0_0 lisible"), GetMeshZBounds(Slab, MinZ, MaxZ));
+			TestEqual(TEXT("Dalle mobile : Z min = 0"), MinZ, 0.f);
+			TestEqual(TEXT("Dalle mobile : Z max = 0"), MaxZ, 0.f);
+			if (Slab && Slab->GetBodySetup())
+			{
+				TestEqual(TEXT("Dalle mobile : une boite simple"),
+					Slab->GetBodySetup()->AggGeom.BoxElems.Num(), 1);
+			}
+
+			// Batiment historique : pied a z=0, toit a h=9,5 m, pas de socle.
+			UStaticMesh* Bldg = LoadTestMesh(TEXT("SM_Bldg_0_0"));
+			TestTrue(TEXT("SM_Bldg_0_0 lisible"), GetMeshZBounds(Bldg, MinZ, MaxZ));
+			TestEqual(TEXT("Batiment mobile : pied a 0"), MinZ, 0.f);
+			TestEqual(TEXT("Batiment mobile : toit a 950"), MaxZ, 950.f);
+		});
+
+		It("profil desktop : sol drape dans les bornes MNT de la cellule, collision trimesh dediee", [this]()
+		{
+			if (!TestTrue(TEXT("MNT charge"), EnsureTerrainLoaded()))
+			{
+				return;
+			}
+			const float AltCap = Terrain.AltCapitoleCm();
+
+			// Cellule en PENTE cherchee sur la dalle reelle (berges de la Garonne a
+			// l'ouest du Capitole) : premiere emprise 20 x 20 m avec >= 2 m de denivele.
+			int32 SlopeXm = 0;
+			bool bFound = false;
+			for (int32 Xm = -3000; Xm <= 3000 && !bFound; Xm += 50)
+			{
+				const TArray<FVector2D> Foot = {
+					FVector2D(Xm * 100.0, -1000.0), FVector2D(Xm * 100.0 + 2000.0, -1000.0),
+					FVector2D(Xm * 100.0 + 2000.0, 1000.0), FVector2D(Xm * 100.0, 1000.0) };
+				if (Terrain.MaxAltCmInPolygon(Foot) - Terrain.MinAltCmInPolygon(Foot) >= 200.f)
+				{
+					SlopeXm = Xm;
+					bFound = true;
+				}
+			}
+			if (!TestTrue(TEXT("Une pente >= 2 m trouvee sur la dalle"), bFound))
+			{
+				return;
+			}
+
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_desktop_sol.json"));
+			FFileHelper::SaveStringToFile(FString::Printf(
+				TEXT(R"({"buildings":[{"pts":[[%d,-10],[%d,-10],[%d,10],[%d,10]],"h":9.5,"u":"res"}]})"),
+				SlopeXm, SlopeXm + 20, SlopeXm + 20, SlopeXm), *Path);
+			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, FCityGenProfile::Desktop());
+			TestEqual(TEXT("Buildings"), Summary.Buildings, 1);
+
+			// Bornes MNT de la zone de la cellule (marge 2 m : le support bilineaire
+			// des coins de dalle deborde du rectangle d'un pixel).
+			const float Cell = 10000.f;
+			const int32 CX = FMath::FloorToInt((SlopeXm * 100.f + 1000.f) / Cell);
+			const int32 CY = FMath::FloorToInt(0.f / Cell);
+			const TArray<FVector2D> Zone = {
+				FVector2D(CX * Cell - 200.0, CY * Cell - 200.0),
+				FVector2D((CX + 1) * Cell + 200.0, CY * Cell - 200.0),
+				FVector2D((CX + 1) * Cell + 200.0, (CY + 1) * Cell + 200.0),
+				FVector2D(CX * Cell - 200.0, (CY + 1) * Cell + 200.0) };
+			const float ZoneMinZ = Terrain.MinAltCmInPolygon(Zone) - AltCap;
+			const float ZoneMaxZ = Terrain.MaxAltCmInPolygon(Zone) - AltCap;
+
+			float MinZ = 0.f, MaxZ = 0.f;
+			UStaticMesh* Slab = LoadTestMesh(FString::Printf(TEXT("SM_Slab_%d_%d"), CX, CY));
+			if (!TestTrue(TEXT("Dalle drapee lisible"), GetMeshZBounds(Slab, MinZ, MaxZ)))
+			{
+				return;
+			}
+			TestTrue(FString::Printf(TEXT("Z min dalle %.1f >= borne basse zone %.1f"), MinZ, ZoneMinZ - 300.f),
+				MinZ >= ZoneMinZ - 300.f);
+			TestTrue(FString::Printf(TEXT("Z max dalle %.1f <= borne haute zone %.1f"), MaxZ, ZoneMaxZ + 300.f),
+				MaxZ <= ZoneMaxZ + 300.f);
+			TestTrue(FString::Printf(TEXT("Z varies sur la cellule en pente (%.1f cm d'amplitude)"), MaxZ - MinZ),
+				MaxZ - MinZ >= 50.f);
+
+			// Collision desktop : trimesh basse resolution dedie, plus de boite.
+			if (TestNotNull(TEXT("BodySetup"), Slab ? Slab->GetBodySetup() : nullptr))
+			{
+				TestEqual(TEXT("CTF complex-as-simple (trimesh)"),
+					(int32)Slab->GetBodySetup()->CollisionTraceFlag, (int32)CTF_UseComplexAsSimple);
+				TestEqual(TEXT("Plus de boite simple"), Slab->GetBodySetup()->AggGeom.BoxElems.Num(), 0);
+			}
+			UStaticMesh* ColMesh = LoadTestMesh(FString::Printf(TEXT("SM_Slab_%d_%d_Col"), CX, CY));
+			TestNotNull(TEXT("Mesh de collision 16x16 dedie cree"), ColMesh);
+			if (Slab && ColMesh)
+			{
+				TestTrue(TEXT("ComplexCollisionMesh pointe le 16x16"),
+					Slab->ComplexCollisionMesh.Get() == ColMesh);
+			}
+		});
+
+		It("profil desktop : batiment en pente pose a MinAlt avec socle enterre", [this]()
+		{
+			if (!TestTrue(TEXT("MNT charge"), EnsureTerrainLoaded()))
+			{
+				return;
+			}
+			const float AltCap = Terrain.AltCapitoleCm();
+
+			// Meme recherche de pente que le test du sol (berges de la Garonne).
+			int32 SlopeXm = 0;
+			bool bFound = false;
+			for (int32 Xm = -3000; Xm <= 3000 && !bFound; Xm += 50)
+			{
+				const TArray<FVector2D> Foot = {
+					FVector2D(Xm * 100.0, -1000.0), FVector2D(Xm * 100.0 + 2000.0, -1000.0),
+					FVector2D(Xm * 100.0 + 2000.0, 1000.0), FVector2D(Xm * 100.0, 1000.0) };
+				if (Terrain.MaxAltCmInPolygon(Foot) - Terrain.MinAltCmInPolygon(Foot) >= 200.f)
+				{
+					SlopeXm = Xm;
+					bFound = true;
+				}
+			}
+			if (!TestTrue(TEXT("Une pente >= 2 m trouvee sur la dalle"), bFound))
+			{
+				return;
+			}
+
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_desktop_bldg.json"));
+			FFileHelper::SaveStringToFile(FString::Printf(
+				TEXT(R"({"buildings":[{"pts":[[%d,-10],[%d,-10],[%d,10],[%d,10]],"h":9.5,"u":"res"}]})"),
+				SlopeXm, SlopeXm + 20, SlopeXm + 20, SlopeXm), *Path);
+			UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, FCityGenProfile::Desktop());
+
+			// Attendu (J2 §3.3) : ZBase = MinAlt(emprise) - AltCapitole, mur prolonge
+			// jusqu'a ZBase - (MaxAlt - MinAlt) - 50 (socle), toit a ZBase + h.
+			const TArray<FVector2D> Foot = {
+				FVector2D(SlopeXm * 100.0, -1000.0), FVector2D(SlopeXm * 100.0 + 2000.0, -1000.0),
+				FVector2D(SlopeXm * 100.0 + 2000.0, 1000.0), FVector2D(SlopeXm * 100.0, 1000.0) };
+			const float MinAlt = Terrain.MinAltCmInPolygon(Foot);
+			const float MaxAlt = Terrain.MaxAltCmInPolygon(Foot);
+			const float ZBase = MinAlt - AltCap;
+			const float ExpectedMinZ = ZBase - (MaxAlt - MinAlt) - 50.f;
+			const float ExpectedMaxZ = ZBase + 950.f;
+
+			const int32 CX = FMath::FloorToInt((SlopeXm * 100.f + 1000.f) / 10000.f);
+			float MinZ = 0.f, MaxZ = 0.f;
+			UStaticMesh* Bldg = LoadTestMesh(FString::Printf(TEXT("SM_Bldg_%d_0"), CX));
+			if (!TestTrue(TEXT("Batiment drape lisible"), GetMeshZBounds(Bldg, MinZ, MaxZ)))
+			{
+				return;
+			}
+			TestTrue(FString::Printf(TEXT("Pied du socle %.1f = ZBase - denivele - 50 (%.1f)"), MinZ, ExpectedMinZ),
+				FMath::Abs(MinZ - ExpectedMinZ) <= 1.f);
+			TestTrue(FString::Printf(TEXT("Toit %.1f = ZBase + 950 (%.1f)"), MaxZ, ExpectedMaxZ),
+				FMath::Abs(MaxZ - ExpectedMaxZ) <= 1.f);
+			TestTrue(FString::Printf(TEXT("Hauteur de mur %.1f augmentee du socle (denivele %.1f + 50)"),
+					MaxZ - MinZ, MaxAlt - MinAlt),
+				(MaxZ - MinZ) - 950.f >= (MaxAlt - MinAlt) + 50.f - 1.f);
+		});
+
+		It("profil desktop : route bridge=true interpolee entre culees, pas le creux du terrain", [this]()
+		{
+			if (!TestTrue(TEXT("MNT charge"), EnsureTerrainLoaded()))
+			{
+				return;
+			}
+			const float AltCap = Terrain.AltCapitoleCm();
+
+			// Segment de 600 m sur l'axe Y=0 ou le terrain s'ecarte LE PLUS de la
+			// corde entre les deux culees (le creux de la Garonne ou une butte) :
+			// c'est exactement l'ecart qu'un tablier interpole doit ignorer.
+			int32 MidXm = 0;
+			float BestDev = 0.f;
+			for (int32 Xm = -4500; Xm <= 4500; Xm += 10)
+			{
+				const float Chord = 0.5f * (Terrain.AltCmAt((Xm - 300) * 100.0, 0.0)
+					+ Terrain.AltCmAt((Xm + 300) * 100.0, 0.0));
+				const float Dev = FMath::Abs(Terrain.AltCmAt(Xm * 100.0, 0.0) - Chord);
+				if (Dev > BestDev)
+				{
+					BestDev = Dev;
+					MidXm = Xm;
+				}
+			}
+			const int32 AXm = MidXm - 300, BXm = MidXm + 300;
+			const float ZA = Terrain.AltCmAt(AXm * 100.0, 0.0) - AltCap;
+			const float ZB = Terrain.AltCmAt(BXm * 100.0, 0.0) - AltCap;
+			if (!TestTrue(FString::Printf(TEXT("Terrain a >= 3 m de la corde des culees (%.1f cm en x=%d m)"),
+					BestDev, MidXm),
+				BestDev >= 300.f))
+			{
+				return;
+			}
+
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_desktop_pont.json"));
+			FFileHelper::SaveStringToFile(FString::Printf(
+				TEXT(R"({"roads":[{"pts":[[%d,0],[%d,0]],"t":"primary","w":10,"bridge":true,"layer":1}]})"),
+				AXm, BXm), *Path);
+			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, FCityGenProfile::Desktop());
+			TestEqual(TEXT("Roads"), Summary.Roads, 1);
+
+			// Le ruban est construit dans la cellule du premier point ; tablier =
+			// interpolation lineaire entre les culees + empilement 55 (index 0).
+			const int32 CX = FMath::FloorToInt(AXm * 100.f / 10000.f);
+			float MinZ = 0.f, MaxZ = 0.f;
+			UStaticMesh* Road = LoadTestMesh(FString::Printf(TEXT("SM_Ground_%d_0"), CX));
+			if (!TestTrue(TEXT("Ruban du pont lisible"), GetMeshZBounds(Road, MinZ, MaxZ)))
+			{
+				return;
+			}
+			TestTrue(FString::Printf(TEXT("Tablier %.1f >= culee basse %.1f"), MinZ, FMath::Min(ZA, ZB) + 55.f - 1.f),
+				MinZ >= FMath::Min(ZA, ZB) + 55.f - 1.f);
+			TestTrue(FString::Printf(TEXT("Tablier %.1f <= culee haute %.1f"), MaxZ, FMath::Max(ZA, ZB) + 55.f + 1.f),
+				MaxZ <= FMath::Max(ZA, ZB) + 55.f + 1.f);
+			// Chaque sommet du ruban (X = abscisse re-echantillonnee, la route est
+			// alignee sur X) doit etre sur la DROITE entre culees + empilement 55 :
+			// un drapage MNT donnerait >= BestDev (>= 3 m) d'ecart au point critique.
+			FMeshDescription* RoadDesc = Road->GetMeshDescription(0);
+			TVertexAttributesRef<FVector3f> Positions = FStaticMeshAttributes(*RoadDesc).GetVertexPositions();
+			float MaxErr = 0.f;
+			for (const FVertexID V : RoadDesc->Vertices().GetElementIDs())
+			{
+				const float T = (Positions[V].X - AXm * 100.f) / ((BXm - AXm) * 100.f);
+				const float Expected = FMath::Lerp(ZA, ZB, T) + 55.f;
+				MaxErr = FMath::Max(MaxErr, FMath::Abs(Positions[V].Z - Expected));
+			}
+			TestTrue(FString::Printf(TEXT("Tablier interpole lineairement (ecart max %.2f cm ; drape = %.0f cm)"),
+				MaxErr, BestDev), MaxErr <= 1.f);
 		});
 	});
 }

@@ -39,6 +39,13 @@ public:
 	/** Altitude maximale (cm) sous un polygone, meme echantillonnage que le min. */
 	float MaxAltCmInPolygon(const TArray<FVector2D>& PolyCm) const;
 
+	/**
+	 * Altitude (cm) au percentile donne (0..1) des echantillons sous un polygone,
+	 * memes echantillons que Min/Max (sommets + grille interieure au pas du MNT).
+	 * Sert a poser l'eau plane au quantile bas (p10) de son emprise (J2 §3.4).
+	 */
+	float PercentileAltCmInPolygon(const TArray<FVector2D>& PolyCm, float Percentile) const;
+
 	/** Altitude (cm) au point Unreal (0,0) — le Capitole — cachee au Load. Sert de rebase Z=0. */
 	float AltCapitoleCm() const { return CachedAltCapitoleCm; }
 
@@ -51,6 +58,9 @@ public:
 private:
 	/** Parcours commun min/max : sommets + grille interieure du polygone. */
 	float MinMaxAltCmInPolygon(const TArray<FVector2D>& PolyCm, bool bWantMax) const;
+
+	/** Echantillonnage commun min/max/percentile : sommets + grille interieure. */
+	void CollectAltCmInPolygon(const TArray<FVector2D>& PolyCm, TArray<float>& OutAltCm) const;
 
 	/** Altitudes NGF en cm, row-major, ligne 0 = nord (une valeur PNG = 1 cm). */
 	TArray64<uint16> Heights;

@@ -138,6 +138,10 @@ la BD ORTHO, streaming ×5-10, HLOD auto). Données terrain prêtes :
   Conception du profil desktop écrite : `Doc/J2-ProfilDesktop.md`. Tuiles brutes
   `SourceData/MNT/` hors git (régénérables, 400 Mo).
 
+- 2026-07-25 (après-midi) : **J2 Lot A « le relief » implémenté** — `FCityGenProfile` (mobile
+  par défaut = golden path bit-à-bit ; `Desktop()` : sol 64×64 drapé MNT + collision trimesh 16×16
+  dédiée, routes ré-échantillonnées 15 m + ponts `bridge` interpolés, eau plane p10, socle bâtiments). 30/30 tests.
+
 - **Chronologie complète, mesures device et procédures de reprise : voir
   `../DroneCity/Doc/Journal-Toulouse10.md`** (LE document de référence de la
   campagne Toulouse 10 km, v1→v14b : RAM, GPU, miroir nord=-Y, routes texturées,

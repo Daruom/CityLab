@@ -4,6 +4,50 @@
 #include "ToolsetRegistry/ToolsetDefinition.h"
 #include "CityImportTools.generated.h"
 
+/**
+ * Profil de generation (jalon J2) : un seul pipeline, deux jeux de budgets.
+ * La construction par defaut EST le profil MOBILE verrouille — golden path des
+ * tests : la generation mobile reste bit-a-bit identique a l'existant.
+ * bDesktop=true (appel MCP minimal) : Resolved() bascule vers le prereglage
+ * desktop tout champ laisse a sa valeur mobile ; un champ renseigne
+ * explicitement est conserve. Spec : Doc/J2-ProfilDesktop.md §4.
+ */
+USTRUCT(BlueprintType)
+struct FCityGenProfile
+{
+	GENERATED_BODY()
+
+	/** Prereglage desktop : releve les budgets et active le drapage MNT (voir Resolved()). */
+	UPROPERTY() bool bDesktop = false;
+
+	/** Subdivisions de la grille de sol par cellule (12 mobile ~42 m/sommet, 64 desktop ~7,8 m). */
+	UPROPERTY() int32 GroundGridN = 12;
+
+	/** Grille du trimesh de collision dedie du sol. 0 = boite simple (mobile), 16 desktop. */
+	UPROPERTY() int32 GroundCollisionGridN = 0;
+
+	/** Pas de re-echantillonnage des polylignes (routes, rails) avant extrusion, cm. 0 = aucun. */
+	UPROPERTY() float RoadResampleStepCm = 0.f;
+
+	/** Drape sol, routes, surfaces, batiments, arbres et reperes sur le MNT (rebase Capitole = z0). */
+	UPROPERTY() bool bDrapeToTerrain = false;
+
+	/** Socle enterre des batiments : le mur descend a ZBase - (MaxAlt - MinAlt) - SocleCm. */
+	UPROPERTY() float SocleCm = 50.f;
+
+	/** PNG 16 bits du MNT (valeur = alt NGF en cm). Vide = SourceData/toulouse10_mnt.png. */
+	UPROPERTY() FString TerrainPngPath;
+
+	/** JSON de georeferencement du MNT. Vide = SourceData/toulouse10_mnt.json. */
+	UPROPERTY() FString TerrainJsonPath;
+
+	/** Prereglage desktop complet : 64x64 drape, collision 16x16, pas routes 15 m. */
+	static FCityGenProfile Desktop();
+
+	/** Profil effectif : si bDesktop, les champs laisses en valeur mobile prennent le prereglage desktop. */
+	FCityGenProfile Resolved() const;
+};
+
 /** Counts of what ImportCityDistrict generated. */
 USTRUCT(BlueprintType)
 struct FCityImportSummary
@@ -112,11 +156,13 @@ public:
 	 * @param AssetFolder Package folder for the totem meshes, e.g. "/Game/City/Capitole".
 	 * @param WallMaterialPath Opaque vertex-color material for the totems.
 	 * @param Location World position of the district origin.
+	 * @param Profile Generation profile; default (all fields omitted) is the mobile
+	 *        golden path (totems at z=0), desktop drapes them onto the MNT.
 	 * @return Number of markers placed.
 	 */
 	UFUNCTION(meta = (AICallable), Category = "CityImportTools")
 	static int32 ImportCityMarkers(const FString& JsonFilePath, const FString& AssetFolder,
-		const FString& WallMaterialPath, FVector Location);
+		const FString& WallMaterialPath, FVector Location, const FCityGenProfile& Profile);
 
 	/**
 	 * Places lightweight orientation surfaces from a JSON file with "water", "green"
@@ -130,11 +176,15 @@ public:
 	 * @param WallMaterialPath Opaque vertex-color material for every surface.
 	 * @param CellSizeM Grid cell size used to merge geometry, meters.
 	 * @param Location World position of the district origin.
+	 * @param Profile Generation profile; default (all fields omitted) is the mobile
+	 *        golden path (flat stacked films). Desktop drapes greens and rails onto
+	 *        the MNT, water becomes a horizontal plane at the low percentile (p10)
+	 *        of the terrain under each polygon.
 	 * @return Counts of generated content.
 	 */
 	UFUNCTION(meta = (AICallable), Category = "CityImportTools")
 	static FCitySurfacesSummary ImportCitySurfaces(const FString& JsonFilePath, const FString& AssetFolder,
-		const FString& WallMaterialPath, float CellSizeM, FVector Location);
+		const FString& WallMaterialPath, float CellSizeM, FVector Location, const FCityGenProfile& Profile);
 
 	/**
 	 * Imports a district split into three layers for distance streaming on device:
@@ -158,11 +208,18 @@ public:
 	 * @param BlockSizeM Streaming sublevel size, meters (multiple of CellSizeM).
 	 * @param ProxyCellSizeM Merge cell size for the proxy layer, meters.
 	 * @param Location World position of the district origin.
+	 * @param Profile Generation profile; default (all fields omitted) is the mobile
+	 *        golden path, bit-identical to the historical generation. Desktop (J2):
+	 *        ground grid draped onto the MNT with a dedicated low-res collision
+	 *        trimesh, roads resampled then draped (roads tagged bridge=true keep a
+	 *        linear deck between abutments), buildings seated at the terrain with a
+	 *        buried plinth, trees at terrain height.
 	 * @return Counts of generated content.
 	 */
 	UFUNCTION(meta = (AICallable), Category = "CityImportTools")
 	static FCityStreamedSummary ImportCityStreamed(const FString& JsonFilePath,
 		const FString& SurfacesJsonFilePath, const FString& AssetFolder,
 		const FString& BlocksFolder, const FString& WallMaterialPath, const FString& GlassMaterialPath,
-		float CellSizeM, float BlockSizeM, float ProxyCellSizeM, FVector Location);
+		float CellSizeM, float BlockSizeM, float ProxyCellSizeM, FVector Location,
+		const FCityGenProfile& Profile);
 };

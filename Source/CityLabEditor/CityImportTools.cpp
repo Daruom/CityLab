@@ -1,6 +1,7 @@
 #include "CityImportTools.h"
 
 #include "Algo/Reverse.h"
+#include "TerrainSampler.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Dom/JsonObject.h"
@@ -22,6 +23,7 @@
 #include "Materials/MaterialInterface.h"
 #include "MeshDescription.h"
 #include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
@@ -37,6 +39,124 @@ namespace
 	{
 		UE_LOG(LogCityImport, Error, TEXT("%s"), *Message);
 		UKismetSystemLibrary::RaiseScriptError(Message);
+	}
+
+	// Sampler MNT partage : la dalle 10k x 10k pese ~200 Mo decompressee, elle se
+	// charge UNE fois et reste en cache pour tout l'import (et les suivants).
+	// Cache un emplacement : rechargee seulement si les chemins changent.
+	FTerrainSampler* GetTerrainSampler(const FString& PngPath, const FString& JsonPath)
+	{
+		static FTerrainSampler Sampler;
+		static FString LoadedKey;
+		const FString Key = PngPath + TEXT("|") + JsonPath;
+		if (LoadedKey != Key)
+		{
+			LoadedKey.Empty();
+			if (!Sampler.Load(PngPath, JsonPath))
+			{
+				return nullptr;
+			}
+			LoadedKey = Key;
+		}
+		return &Sampler;
+	}
+
+	// Contexte de drapage resolu en debut d'import : sampler charge une fois +
+	// altitude de rebase (Capitole -> z=0). Sampler nul = profil plat (mobile),
+	// GroundZ rend alors exactement 0 (golden path bit-a-bit).
+	struct FDrapeContext
+	{
+		const FTerrainSampler* Sampler = nullptr;
+		float AltCapCm = 0.f;
+
+		bool IsActive() const { return Sampler != nullptr; }
+
+		float GroundZ(double Xcm, double Ycm) const
+		{
+			return Sampler ? Sampler->AltCmAt(Xcm, Ycm) - AltCapCm : 0.f;
+		}
+	};
+
+	// Charge le MNT si le profil le demande. Rend false (apres RaiseError) si le
+	// MNT est introuvable — un import desktop sans relief serait un faux resultat.
+	bool MakeDrapeContext(const FCityGenProfile& Profile, FDrapeContext& Out)
+	{
+		if (!Profile.bDrapeToTerrain)
+		{
+			return true;
+		}
+		const FString Png = Profile.TerrainPngPath.IsEmpty()
+			? FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/toulouse10_mnt.png"))
+			: Profile.TerrainPngPath;
+		const FString Jsn = Profile.TerrainJsonPath.IsEmpty()
+			? FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/toulouse10_mnt.json"))
+			: Profile.TerrainJsonPath;
+		FTerrainSampler* Sampler = GetTerrainSampler(Png, Jsn);
+		if (!Sampler)
+		{
+			RaiseError(FString::Printf(TEXT("Cannot load MNT ('%s' + '%s')."), *Png, *Jsn));
+			return false;
+		}
+		Out.Sampler = Sampler;
+		Out.AltCapCm = Sampler->AltCapitoleCm();
+		return true;
+	}
+
+	// Re-echantillonne une polyligne a pas fixe : chaque segment plus long que
+	// StepCm est subdivise, sommets d'origine conserves — sans cela les longs
+	// segments droits OSM traversent les bosses du MNT (spec J2 §3.2).
+	TArray<FVector2D> ResamplePolyline(const TArray<FVector2D>& Pts, float StepCm)
+	{
+		TArray<FVector2D> Out;
+		Out.Reserve(Pts.Num());
+		for (int32 i = 0; i < Pts.Num(); ++i)
+		{
+			if (i > 0)
+			{
+				const FVector2D& A = Pts[i - 1];
+				const FVector2D& B = Pts[i];
+				const int32 Sub = FMath::CeilToInt32((float)(B - A).Size() / StepCm);
+				for (int32 s = 1; s < Sub; ++s)
+				{
+					Out.Add(FMath::Lerp(A, B, (double)s / (double)Sub));
+				}
+			}
+			Out.Add(Pts[i]);
+		}
+		return Out;
+	}
+
+	// Z terrain par sommet d'une polyligne : drape sur le MNT, ou — pont — Z
+	// interpole lineairement entre les deux culees par abscisse curviligne (le MNT
+	// est un sol nu : une route drapee plongerait dans la Garonne, spec J2 Q5).
+	void ComputePolylineZ(const TArray<FVector2D>& Pts, const FDrapeContext& Drape,
+		bool bBridge, TArray<float>& OutZ)
+	{
+		OutZ.SetNum(Pts.Num());
+		if (!bBridge)
+		{
+			for (int32 i = 0; i < Pts.Num(); ++i)
+			{
+				OutZ[i] = Drape.GroundZ(Pts[i].X, Pts[i].Y);
+			}
+			return;
+		}
+		const float Z0 = Drape.GroundZ(Pts[0].X, Pts[0].Y);
+		const float Z1 = Drape.GroundZ(Pts.Last().X, Pts.Last().Y);
+		float Total = 0.f;
+		for (int32 i = 0; i + 1 < Pts.Num(); ++i)
+		{
+			Total += (float)(Pts[i + 1] - Pts[i]).Size();
+		}
+		float Arc = 0.f;
+		for (int32 i = 0; i < Pts.Num(); ++i)
+		{
+			if (i > 0)
+			{
+				Arc += (float)(Pts[i] - Pts[i - 1]).Size();
+			}
+			OutZ[i] = Total > 1.f ? FMath::Lerp(Z0, Z1, Arc / Total) : Z0;
+		}
 	}
 
 	// Copie assumee du builder de BuildingTools.cpp, version couleur RGB + triangles.
@@ -366,9 +486,10 @@ namespace
 	// z-fight de marquage (aucune geometrie superposee). Les sentiers pietons restent
 	// un ruban uni sur le slot Wall (ils n'avaient deja ni trottoir ni marquage).
 	// Empilement decimetrique (Adreno/GLES sans reversed-Z) : dalle 0 < parc < eau <
-	// rail < route 55+.
+	// rail < route 55+. TerrainZ (desktop) : Z terrain par sommet, l'empilement
+	// devient RELATIF au terrain ; nul = plat historique (mobile).
 	void BuildRoad(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float WidthCm,
-		const FString& Type, int32 RoadIndex)
+		const FString& Type, int32 RoadIndex, const TArray<float>* TerrainZ = nullptr)
 	{
 		const int32 N = PtsCm.Num();
 		if (N < 2)
@@ -408,9 +529,11 @@ namespace
 			const FVector2D A = PtsCm[i], B = PtsCm[i + 1];
 			const FVector2D NA = Nrm[i] * Half, NB = Nrm[i + 1] * Half;
 			const float SegLen = (B - A).Size();
+			const float ZA = ZRoad + (TerrainZ ? (*TerrainZ)[i] : 0.f);
+			const float ZB = ZRoad + (TerrainZ ? (*TerrainZ)[i + 1] : 0.f);
 			const FVector3f P[4] = {
-				FVector3f(A.X - NA.X, A.Y - NA.Y, ZRoad), FVector3f(B.X - NB.X, B.Y - NB.Y, ZRoad),
-				FVector3f(B.X + NB.X, B.Y + NB.Y, ZRoad), FVector3f(A.X + NA.X, A.Y + NA.Y, ZRoad) };
+				FVector3f(A.X - NA.X, A.Y - NA.Y, ZA), FVector3f(B.X - NB.X, B.Y - NB.Y, ZB),
+				FVector3f(B.X + NB.X, B.Y + NB.Y, ZB), FVector3f(A.X + NA.X, A.Y + NA.Y, ZA) };
 			if (bWalkway)
 			{
 				QM.AddQuad(QM.WallGroup, P[0], P[1], P[2], P[3], Up, Shaded);
@@ -471,7 +594,7 @@ namespace
 
 	UStaticMesh* CreateMeshAsset(const FString& AssetPath, FCityMeshBuilder& QM,
 		UMaterialInterface* WallMat, UMaterialInterface* GlassMat, bool bWithCollision = true,
-		bool bBoxCollision = false, float BoxTopCm = 0.f)
+		bool bBoxCollision = false, float BoxTopCm = 0.f, UStaticMesh* ComplexCollisionMesh = nullptr)
 	{
 		// bBoxCollision : une simple boite englobante remplace le trimesh — reserve aux
 		// cellules de sol PLATES (dalles+routes), ou le trimesh coutait ~90 Mo de RAM
@@ -511,11 +634,25 @@ namespace
 		// primitives simples generees ; les meshes sont statiques, cout memoire accepte.
 		// bWithCollision=false (proxy lointain) : UseSimpleAsComplex sans primitive
 		// simple = aucun trimesh cuit, zero data de collision dans l'APK.
+		// ComplexCollisionMesh (sol desktop) : le trimesh cuit vient d'un mesh basse
+		// resolution dedie (grille 16x16), le rendu garde sa pleine densite 64x64.
+		// Attendre la fin de sa compilation async AVANT le build de ce mesh : le cook
+		// physique lit sa SectionInfoMap depuis un worker (ensure StaticMesh.cpp:4790).
+		Mesh->ComplexCollisionMesh = ComplexCollisionMesh;
+		if (ComplexCollisionMesh)
+		{
+			FStaticMeshCompilingManager::Get().FinishCompilation(
+				TArrayView<UStaticMesh* const>(&ComplexCollisionMesh, 1));
+		}
 		Mesh->CreateBodySetup();
 		if (UBodySetup* Body = Mesh->GetBodySetup())
 		{
 			Body->CollisionTraceFlag = (bWithCollision && !bBoxCollision)
 				? CTF_UseComplexAsSimple : CTF_UseSimpleAsComplex;
+			// Regeneration en place : purger les boites de la generation precedente
+			// (elles s'ACCUMULAIENT a chaque re-import — bug latent expose par le
+			// test de non-regression du profil mobile).
+			Body->AggGeom.BoxElems.Reset();
 			if (bWithCollision && bBoxCollision && SimpleBox.IsValid)
 			{
 				// BoxTopCm > 0 : plafond de boite force (ex. dalles de sol dont la boite
@@ -535,6 +672,34 @@ namespace
 		Mesh->MarkPackageDirty();
 		return Mesh;
 	}
+}
+
+FCityGenProfile FCityGenProfile::Desktop()
+{
+	FCityGenProfile Profile;
+	Profile.bDesktop = true;
+	Profile.GroundGridN = 64;
+	Profile.GroundCollisionGridN = 16;
+	Profile.RoadResampleStepCm = 1500.f;
+	Profile.bDrapeToTerrain = true;
+	return Profile;
+}
+
+FCityGenProfile FCityGenProfile::Resolved() const
+{
+	if (!bDesktop)
+	{
+		return *this;
+	}
+	// bDesktop seul (appel MCP minimal) : tout champ laisse a sa valeur mobile
+	// bascule vers le prereglage desktop ; un champ renseigne est conserve.
+	const FCityGenProfile Mobile;
+	FCityGenProfile Out = *this;
+	if (Out.GroundGridN == Mobile.GroundGridN) { Out.GroundGridN = 64; }
+	if (Out.GroundCollisionGridN == Mobile.GroundCollisionGridN) { Out.GroundCollisionGridN = 16; }
+	if (Out.RoadResampleStepCm == Mobile.RoadResampleStepCm) { Out.RoadResampleStepCm = 1500.f; }
+	Out.bDrapeToTerrain = true;
+	return Out;
 }
 
 FCityImportSummary UCityImportTools::ImportCityDistrict(const FString& JsonFilePath, const FString& AssetFolder,
@@ -791,8 +956,16 @@ namespace
 }
 
 int32 UCityImportTools::ImportCityMarkers(const FString& JsonFilePath, const FString& AssetFolder,
-	const FString& WallMaterialPath, FVector Location)
+	const FString& WallMaterialPath, FVector Location, const FCityGenProfile& Profile)
 {
+	// Profil effectif + MNT charge UNE fois pour tout l'import (jalon J2).
+	const FCityGenProfile Gen = Profile.Resolved();
+	FDrapeContext Drape;
+	if (!MakeDrapeContext(Gen, Drape))
+	{
+		return 0;
+	}
+
 	FString Json;
 	if (!FFileHelper::LoadFileToString(Json, *JsonFilePath))
 	{
@@ -863,8 +1036,10 @@ int32 UCityImportTools::ImportCityMarkers(const FString& JsonFilePath, const FSt
 		{
 			continue;
 		}
-		const FVector Pos = Location + FVector(O->GetNumberField(TEXT("x")) * 100.0,
-			O->GetNumberField(TEXT("y")) * 100.0, 0.0);
+		// Desktop : totem et labels poses a l'altitude du terrain (rebase Capitole).
+		const double Mx = O->GetNumberField(TEXT("x")) * 100.0;
+		const double My = O->GetNumberField(TEXT("y")) * 100.0;
+		const FVector Pos = Location + FVector(Mx, My, Drape.GroundZ(Mx, My));
 
 		UHierarchicalInstancedStaticMeshComponent*& Hism = HismByKind.FindOrAdd(KindName);
 		if (!Hism)
@@ -924,25 +1099,34 @@ int32 UCityImportTools::ImportCityMarkers(const FString& JsonFilePath, const FSt
 
 namespace
 {
-	// Polygone plat de reperage (eau, parc, bois) : triangulation de l'anneau, teinte cuite.
+	// Polygone plat de reperage (eau, parc, bois) : triangulation de l'anneau, teinte
+	// cuite. TerrainZ (desktop) : Z terrain PAR SOMMET ajoute a l'offset d'empilement
+	// Zcm (verts drapes) ; nul = film plat historique (mobile, et l'eau desktop qui
+	// reste plane — son niveau est alors porte par Zcm).
 	void BuildFlatPolygon(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float Zcm,
-		const FVector3f& Tint)
+		const FVector3f& Tint, const TArray<float>* TerrainZ = nullptr)
 	{
 		TArray<int32> Tris;
 		TriangulateRing(PtsCm, Tris);
 		const FVector3f Shaded = Shade(Tint, FVector3f(0, 0, 1), Zcm);
+		auto VertexZ = [&](int32 Index)
+		{
+			return Zcm + (TerrainZ ? (*TerrainZ)[Index] : 0.f);
+		};
 		for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
 		{
 			QM.AddTri(QM.WallGroup,
-				FVector3f(PtsCm[Tris[t]].X, PtsCm[Tris[t]].Y, Zcm),
-				FVector3f(PtsCm[Tris[t + 1]].X, PtsCm[Tris[t + 1]].Y, Zcm),
-				FVector3f(PtsCm[Tris[t + 2]].X, PtsCm[Tris[t + 2]].Y, Zcm),
+				FVector3f(PtsCm[Tris[t]].X, PtsCm[Tris[t]].Y, VertexZ(Tris[t])),
+				FVector3f(PtsCm[Tris[t + 1]].X, PtsCm[Tris[t + 1]].Y, VertexZ(Tris[t + 1])),
+				FVector3f(PtsCm[Tris[t + 2]].X, PtsCm[Tris[t + 2]].Y, VertexZ(Tris[t + 2])),
 				FVector3f(0, 0, 1), Shaded);
 		}
 	}
 
 	// Ruban de voie ferree : ballast sombre, sans trottoir ni marquage.
-	void BuildRail(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float WidthCm, int32 RailIndex)
+	// TerrainZ : cf. BuildRoad (drapage desktop, nul = plat mobile).
+	void BuildRail(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float WidthCm, int32 RailIndex,
+		const TArray<float>* TerrainZ = nullptr)
 	{
 		const int32 N = PtsCm.Num();
 		if (N < 2)
@@ -968,9 +1152,11 @@ namespace
 		{
 			const FVector2D A = PtsCm[i], B = PtsCm[i + 1];
 			const FVector2D NA = Nrm[i] * Half, NB = Nrm[i + 1] * Half;
+			const float ZA = Z + (TerrainZ ? (*TerrainZ)[i] : 0.f);
+			const float ZB = Z + (TerrainZ ? (*TerrainZ)[i + 1] : 0.f);
 			QM.AddQuad(QM.WallGroup,
-				FVector3f(A.X - NA.X, A.Y - NA.Y, Z), FVector3f(B.X - NB.X, B.Y - NB.Y, Z),
-				FVector3f(B.X + NB.X, B.Y + NB.Y, Z), FVector3f(A.X + NA.X, A.Y + NA.Y, Z),
+				FVector3f(A.X - NA.X, A.Y - NA.Y, ZA), FVector3f(B.X - NB.X, B.Y - NB.Y, ZB),
+				FVector3f(B.X + NB.X, B.Y + NB.Y, ZB), FVector3f(A.X + NA.X, A.Y + NA.Y, ZA),
 				Up, Ballast);
 		}
 	}
@@ -1000,9 +1186,18 @@ namespace
 }
 
 FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFilePath,
-	const FString& AssetFolder, const FString& WallMaterialPath, float CellSizeM, FVector Location)
+	const FString& AssetFolder, const FString& WallMaterialPath, float CellSizeM, FVector Location,
+	const FCityGenProfile& Profile)
 {
 	FCitySurfacesSummary Summary;
+
+	// Profil effectif + MNT charge UNE fois pour tout l'import (jalon J2).
+	const FCityGenProfile Gen = Profile.Resolved();
+	FDrapeContext Drape;
+	if (!MakeDrapeContext(Gen, Drape))
+	{
+		return Summary;
+	}
 
 	FString Json;
 	if (!FFileHelper::LoadFileToString(Json, *JsonFilePath))
@@ -1104,7 +1299,15 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 			{
 				Algo::Reverse(Pts);
 			}
-			BuildFlatPolygon(GetCell(Centroid(Pts)), Pts, 30.f, WaterTint);
+			// Desktop (J2 §3.4) : l'eau n'est PAS drapee — plan horizontal au
+			// percentile bas (p10) du MNT sous le polygone (le MNT sol nu descend
+			// dans le lit ; la Garonne reste plane par troncon), offset conserve.
+			float ZWater = 30.f;
+			if (Drape.IsActive())
+			{
+				ZWater += Drape.Sampler->PercentileAltCmInPolygon(Pts, 0.10f) - Drape.AltCapCm;
+			}
+			BuildFlatPolygon(GetCell(Centroid(Pts)), Pts, ZWater, WaterTint);
 			++Summary.Water;
 		}
 	}
@@ -1129,9 +1332,17 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 			const bool bForest = O->GetStringField(TEXT("k")) == TEXT("forest");
 			// Etagement PAR POLYGONE : les verts se chevauchent entre eux (parc sur
 			// pelouse, bois sur parc) — a hauteur egale ils z-fightaient encore.
+			// Desktop : drapes sur le MNT par sommet, l'etagement reste RELATIF.
 			const float ZJitter = (GreenIndex % 5) * 1.5f;
+			TArray<float> GreenTerrainZ;
+			const TArray<float>* GreenTerrainZPtr = nullptr;
+			if (Drape.IsActive())
+			{
+				ComputePolylineZ(Pts, Drape, /*bBridge=*/false, GreenTerrainZ);
+				GreenTerrainZPtr = &GreenTerrainZ;
+			}
 			BuildFlatPolygon(GetCell(Centroid(Pts)), Pts, (bForest ? 20.f : 12.f) + ZJitter,
-				bForest ? ForestTint : ParkTint);
+				bForest ? ForestTint : ParkTint, GreenTerrainZPtr);
 			++GreenIndex;
 			++Summary.Green;
 
@@ -1156,7 +1367,8 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 						}
 						const float Yaw = FMath::Frac(FMath::Sin(Seed * 39.11f) * 6543.87f) * 360.f;
 						const float Scale = 0.9f + 0.6f * FMath::Frac(FMath::Sin(Seed * 3.7f) * 971.3f);
-						ScatterXf.Emplace(FRotator(0, Yaw, 0), FVector(Q.X, Q.Y, 0), FVector(Scale));
+						ScatterXf.Emplace(FRotator(0, Yaw, 0),
+							FVector(Q.X, Q.Y, Drape.GroundZ(Q.X, Q.Y)), FVector(Scale));
 						++Summary.ScatterTrees;
 						if (ScatterXf.Num() >= 80000)
 						{
@@ -1184,7 +1396,22 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 			{
 				continue;
 			}
-			BuildRail(GetCell(Pts[0]), Pts, 400.f, Index);
+			// Desktop : meme traitement que les routes (re-echantillonnage + drapage).
+			const TArray<FVector2D>* RailPts = &Pts;
+			TArray<FVector2D> Resampled;
+			TArray<float> TerrainZ;
+			const TArray<float>* TerrainZPtr = nullptr;
+			if (Drape.IsActive())
+			{
+				if (Gen.RoadResampleStepCm > 0.f)
+				{
+					Resampled = ResamplePolyline(Pts, Gen.RoadResampleStepCm);
+					RailPts = &Resampled;
+				}
+				ComputePolylineZ(*RailPts, Drape, /*bBridge=*/false, TerrainZ);
+				TerrainZPtr = &TerrainZ;
+			}
+			BuildRail(GetCell(Pts[0]), *RailPts, 400.f, Index, TerrainZPtr);
 			++Summary.Rails;
 			++Index;
 		}
@@ -1400,8 +1627,12 @@ namespace
 	// dans la texture (UV = travees x etages). ~x8-10 moins de triangles que la
 	// version geometrique — budget Adreno 512 ~1,5 M tris/image. Les toits vont sur
 	// le slot Glass (materiau uni) pour ne pas recevoir la texture de fenetres.
+	// Desktop (J2 §3.3) : ZBaseCm pose le rez-de-chaussee a MinAlt du terrain sous
+	// l'emprise (rebase Capitole) et SocleDepthCm prolonge le mur en socle aveugle
+	// enterre jusqu'a ZBase - (MaxAlt - MinAlt) - SocleCm : aucun coin ne flotte en
+	// pente. Mobile : 0/0, geometrie bit-a-bit identique a l'historique.
 	void BuildPolygonBuildingTextured(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm,
-		float Hcm, const FVector3f& Tint)
+		float Hcm, const FVector3f& Tint, float ZBaseCm = 0.f, float SocleDepthCm = 0.f)
 	{
 		const int32 Floors = FMath::Clamp(FMath::RoundToInt32(Hcm / 290.f), 1, 40);
 		const float FloorH = Hcm / Floors;
@@ -1422,8 +1653,8 @@ namespace
 			const int32 Bays = (Usable > 200.f && FloorH >= 220.f)
 				? FMath::Max(1, FMath::RoundToInt32(Usable / 280.f)) : 0;
 			const FVector3f P[4] = {
-				FVector3f(A2.X, A2.Y, 0), FVector3f(B2.X, B2.Y, 0),
-				FVector3f(B2.X, B2.Y, Hcm), FVector3f(A2.X, A2.Y, Hcm) };
+				FVector3f(A2.X, A2.Y, ZBaseCm), FVector3f(B2.X, B2.Y, ZBaseCm),
+				FVector3f(B2.X, B2.Y, ZBaseCm + Hcm), FVector3f(A2.X, A2.Y, ZBaseCm + Hcm) };
 			// Mur aveugle : UV constante dans un coin 100 % mur de la tuile.
 			FVector2f UV[4] = { FVector2f(0.03f, 0.03f), FVector2f(0.03f, 0.03f),
 				FVector2f(0.03f, 0.03f), FVector2f(0.03f, 0.03f) };
@@ -1435,6 +1666,16 @@ namespace
 				UV[3] = FVector2f(0, Floors);
 			}
 			QM.AddPoly(QM.WallGroup, P, 4, Nout, UV, Shade(Tint, Nout, Hcm * 0.5f));
+			// Socle enterre (desktop) : mur aveugle sous le rez-de-chaussee.
+			if (SocleDepthCm >= 1.f)
+			{
+				const FVector3f S[4] = {
+					FVector3f(A2.X, A2.Y, ZBaseCm - SocleDepthCm), FVector3f(B2.X, B2.Y, ZBaseCm - SocleDepthCm),
+					FVector3f(B2.X, B2.Y, ZBaseCm), FVector3f(A2.X, A2.Y, ZBaseCm) };
+				const FVector2f SocleUV[4] = { FVector2f(0.03f, 0.03f), FVector2f(0.03f, 0.03f),
+					FVector2f(0.03f, 0.03f), FVector2f(0.03f, 0.03f) };
+				QM.AddPoly(QM.WallGroup, S, 4, Nout, SocleUV, Shade(Tint * 0.85f, Nout, 0.f));
+			}
 		}
 		// Toit plat : slot Glass = materiau uni (M_BldgWall), pas de texture fenetres.
 		TArray<int32> Tris;
@@ -1443,9 +1684,9 @@ namespace
 		for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
 		{
 			const FVector3f R[3] = {
-				FVector3f(PtsCm[Tris[t]].X, PtsCm[Tris[t]].Y, Hcm),
-				FVector3f(PtsCm[Tris[t + 1]].X, PtsCm[Tris[t + 1]].Y, Hcm),
-				FVector3f(PtsCm[Tris[t + 2]].X, PtsCm[Tris[t + 2]].Y, Hcm) };
+				FVector3f(PtsCm[Tris[t]].X, PtsCm[Tris[t]].Y, ZBaseCm + Hcm),
+				FVector3f(PtsCm[Tris[t + 1]].X, PtsCm[Tris[t + 1]].Y, ZBaseCm + Hcm),
+				FVector3f(PtsCm[Tris[t + 2]].X, PtsCm[Tris[t + 2]].Y, ZBaseCm + Hcm) };
 			const FVector2f RUV[3] = { FVector2f(0, 0), FVector2f(1, 0), FVector2f(1, 1) };
 			QM.AddPoly(QM.GlassGroup, R, 3, FVector3f(0, 0, 1), RUV, RoofShaded);
 		}
@@ -1456,8 +1697,10 @@ namespace
 	// detaillee du batiment recouvre le proxy -> il disparait dedans quand le bloc de
 	// detail est charge. Retrait 30 cm au depart : z-fight VISIBLE sur device (toits
 	// qui clignotent vus d'altitude a 1-2 km, la precision depth ne separe plus 30 cm).
+	// ZBaseCm / SocleDepthCm : meme pose desktop que le batiment detaille (le proxy
+	// doit rester CONTENU dans le detail pour disparaitre dedans) ; 0/0 en mobile.
 	void BuildProxyBuilding(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float Hcm,
-		const FVector3f& Tint)
+		const FVector3f& Tint, float ZBaseCm = 0.f, float SocleDepthCm = 0.f)
 	{
 		// RECTANGLE ORIENTE (10 tris par batiment contre ~28 pour le contour simplifie,
 		// « tout garder, moins cher ») : axe = plus longue arete de l'emprise,
@@ -1545,6 +1788,8 @@ namespace
 			Algo::Reverse(P);
 		}
 		const float H = FMath::Max(Hcm - 250.f, 100.f);
+		const float Z0 = ZBaseCm - SocleDepthCm;
+		const float Z1 = ZBaseCm + H;
 		const int32 N = P.Num();
 		for (int32 e = 0; e < N; ++e)
 		{
@@ -1557,8 +1802,8 @@ namespace
 			}
 			const FVector2D T2 = Dir2 / Len;
 			const FVector3f Nout(T2.Y, -T2.X, 0.f);
-			QM.AddQuad(QM.WallGroup, FVector3f(A2.X, A2.Y, 0), FVector3f(B2.X, B2.Y, 0),
-				FVector3f(B2.X, B2.Y, H), FVector3f(A2.X, A2.Y, H), Nout, Shade(Tint, Nout, H * 0.5f));
+			QM.AddQuad(QM.WallGroup, FVector3f(A2.X, A2.Y, Z0), FVector3f(B2.X, B2.Y, Z0),
+				FVector3f(B2.X, B2.Y, Z1), FVector3f(A2.X, A2.Y, Z1), Nout, Shade(Tint, Nout, H * 0.5f));
 		}
 		TArray<int32> Tris;
 		TriangulateRing(P, Tris);
@@ -1566,9 +1811,9 @@ namespace
 		for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
 		{
 			QM.AddTri(QM.WallGroup,
-				FVector3f(P[Tris[t]].X, P[Tris[t]].Y, H),
-				FVector3f(P[Tris[t + 1]].X, P[Tris[t + 1]].Y, H),
-				FVector3f(P[Tris[t + 2]].X, P[Tris[t + 2]].Y, H),
+				FVector3f(P[Tris[t]].X, P[Tris[t]].Y, Z1),
+				FVector3f(P[Tris[t + 1]].X, P[Tris[t + 1]].Y, Z1),
+				FVector3f(P[Tris[t + 2]].X, P[Tris[t + 2]].Y, Z1),
 				FVector3f(0, 0, 1), RoofShaded);
 		}
 	}
@@ -1577,9 +1822,17 @@ namespace
 FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFilePath,
 	const FString& SurfacesJsonFilePath, const FString& AssetFolder, const FString& BlocksFolder,
 	const FString& WallMaterialPath, const FString& GlassMaterialPath, float CellSizeM,
-	float BlockSizeM, float ProxyCellSizeM, FVector Location)
+	float BlockSizeM, float ProxyCellSizeM, FVector Location, const FCityGenProfile& Profile)
 {
 	FCityStreamedSummary Summary;
+
+	// Profil effectif + MNT charge UNE fois pour tout l'import (jalon J2).
+	const FCityGenProfile Gen = Profile.Resolved();
+	FDrapeContext Drape;
+	if (!MakeDrapeContext(Gen, Drape))
+	{
+		return Summary;
+	}
 
 	FString Json;
 	if (!FFileHelper::LoadFileToString(Json, *JsonFilePath))
@@ -1703,8 +1956,18 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			Centroid /= Pts.Num();
 			const float Hcm = O->GetNumberField(TEXT("h")) * 100.f;
 			const FVector3f Tint = UsageTint(O->GetStringField(TEXT("u")), Index);
-			BuildPolygonBuildingTextured(GetIn(BldgCells, Centroid, Cell), Pts, Hcm, Tint);
-			BuildProxyBuilding(GetIn(ProxyCells, Centroid, ProxyCell), Pts, Hcm, Tint);
+			// Pose desktop (J2 §3.3) : rez-de-chaussee a MinAlt sous l'emprise
+			// (rebase Capitole), socle aveugle jusqu'a ZBase - (Max - Min) - SocleCm.
+			float ZBase = 0.f, SocleDepth = 0.f;
+			if (Drape.IsActive())
+			{
+				const float MinAlt = Drape.Sampler->MinAltCmInPolygon(Pts);
+				const float MaxAlt = Drape.Sampler->MaxAltCmInPolygon(Pts);
+				ZBase = MinAlt - Drape.AltCapCm;
+				SocleDepth = (MaxAlt - MinAlt) + Gen.SocleCm;
+			}
+			BuildPolygonBuildingTextured(GetIn(BldgCells, Centroid, Cell), Pts, Hcm, Tint, ZBase, SocleDepth);
+			BuildProxyBuilding(GetIn(ProxyCells, Centroid, ProxyCell), Pts, Hcm, Tint, ZBase, SocleDepth);
 			SlabKeys.Add(FIntPoint(FMath::FloorToInt(Centroid.X / Cell), FMath::FloorToInt(Centroid.Y / Cell)));
 			++Summary.Buildings;
 			++Index;
@@ -1725,8 +1988,27 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			{
 				continue;
 			}
-			BuildRoad(GetIn(GroundCells, Pts[0], Cell), Pts, O->GetNumberField(TEXT("w")) * 100.f,
-				O->GetStringField(TEXT("t")), Index);
+			// Desktop (J2 §3.2) : re-echantillonnage a pas fixe puis drapage MNT,
+			// l'empilement 55+ devient relatif au terrain. Champ optionnel bridge
+			// (lu TOLERANT, absent = false) : tablier interpole entre les culees.
+			const TArray<FVector2D>* RoadPts = &Pts;
+			TArray<FVector2D> Resampled;
+			TArray<float> TerrainZ;
+			const TArray<float>* TerrainZPtr = nullptr;
+			if (Drape.IsActive())
+			{
+				if (Gen.RoadResampleStepCm > 0.f)
+				{
+					Resampled = ResamplePolyline(Pts, Gen.RoadResampleStepCm);
+					RoadPts = &Resampled;
+				}
+				bool bBridge = false;
+				O->TryGetBoolField(TEXT("bridge"), bBridge);
+				ComputePolylineZ(*RoadPts, Drape, bBridge, TerrainZ);
+				TerrainZPtr = &TerrainZ;
+			}
+			BuildRoad(GetIn(GroundCells, Pts[0], Cell), *RoadPts, O->GetNumberField(TEXT("w")) * 100.f,
+				O->GetStringField(TEXT("t")), Index, TerrainZPtr);
 			SlabKeys.Add(FIntPoint(FMath::FloorToInt(Pts[0].X / Cell), FMath::FloorToInt(Pts[0].Y / Cell)));
 			++Summary.Roads;
 			++Index;
@@ -1796,32 +2078,59 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		return Tint;
 	};
 	UMaterialInterface* RoadMat = GetOrCreateRoadMaterial(AssetFolder);
-	constexpr int32 SlabGrid = 12;
-	for (const FIntPoint& Key : SlabKeys)
+	// Grille de sol parametree par le profil : 12x12 plat (mobile) ou 64x64 drape
+	// MNT (desktop, sommets Z = AltCmAt - AltCapitole). Fabrique commune : la teinte
+	// peinte reste echantillonnee en (X, Y), le Z ne change pas les couleurs.
+	const int32 SlabGrid = FMath::Clamp(Gen.GroundGridN, 1, 256);
+	auto BuildGroundGrid = [&](FCityMeshBuilder& Builder, const FIntPoint& Key, int32 GridN, bool bPaint)
 	{
-		FCityMeshBuilder SlabBuilder;
-		const float Step = Cell / SlabGrid;
-		for (int32 GY = 0; GY < SlabGrid; ++GY)
+		const float Step = Cell / GridN;
+		for (int32 GY = 0; GY < GridN; ++GY)
 		{
-			for (int32 GX = 0; GX < SlabGrid; ++GX)
+			for (int32 GX = 0; GX < GridN; ++GX)
 			{
 				const float X0 = Key.X * Cell + GX * Step, Y0 = Key.Y * Cell + GY * Step;
 				const FVector3f C[4] = {
-					FVector3f(X0, Y0, 0), FVector3f(X0 + Step, Y0, 0),
-					FVector3f(X0 + Step, Y0 + Step, 0), FVector3f(X0, Y0 + Step, 0) };
+					FVector3f(X0, Y0, Drape.GroundZ(X0, Y0)),
+					FVector3f(X0 + Step, Y0, Drape.GroundZ(X0 + Step, Y0)),
+					FVector3f(X0 + Step, Y0 + Step, Drape.GroundZ(X0 + Step, Y0 + Step)),
+					FVector3f(X0, Y0 + Step, Drape.GroundZ(X0, Y0 + Step)) };
 				const FVector2f UV[4] = { FVector2f(0, 0), FVector2f(1, 0), FVector2f(1, 1), FVector2f(0, 1) };
 				FVector3f Cols[4];
 				for (int32 c = 0; c < 4; ++c)
 				{
-					Cols[c] = Shade(SampleGround(FVector2D(C[c].X, C[c].Y)), FVector3f(0, 0, 1), 0.f);
+					Cols[c] = bPaint
+						? Shade(SampleGround(FVector2D(C[c].X, C[c].Y)), FVector3f(0, 0, 1), 0.f)
+						: Shade(SlabBase, FVector3f(0, 0, 1), 0.f);
 				}
-				SlabBuilder.AddPolyPerVertexColors(SlabBuilder.WallGroup, C, 4,
+				Builder.AddPolyPerVertexColors(Builder.WallGroup, C, 4,
 					FVector3f(0, 0, 1), UV, Cols);
 			}
 		}
+	};
+	for (const FIntPoint& Key : SlabKeys)
+	{
+		FCityMeshBuilder SlabBuilder;
+		BuildGroundGrid(SlabBuilder, Key, SlabGrid, /*bPaint=*/true);
 		const FString SlabName = FString::Printf(TEXT("SM_Slab_%d_%d"), Key.X, Key.Y);
-		UStaticMesh* SlabMesh = CreateMeshAsset(AssetFolder / SlabName, SlabBuilder, WallMat, WallMat,
-			true, true, 60.f);
+		UStaticMesh* SlabMesh = nullptr;
+		if (Drape.IsActive() && Gen.GroundCollisionGridN > 0)
+		{
+			// Collision desktop : la boite plate est fausse des que le terrain ondule
+			// — trimesh BASSE RESOLUTION dedie (16x16), cuit a la place du rendu 64x64
+			// via ComplexCollisionMesh (le trimesh plein serait du gachis memoire).
+			FCityMeshBuilder ColBuilder;
+			BuildGroundGrid(ColBuilder, Key, FMath::Clamp(Gen.GroundCollisionGridN, 1, 64), /*bPaint=*/false);
+			UStaticMesh* ColMesh = CreateMeshAsset(AssetFolder / (SlabName + TEXT("_Col")), ColBuilder,
+				WallMat, WallMat, true);
+			SlabMesh = CreateMeshAsset(AssetFolder / SlabName, SlabBuilder, WallMat, WallMat,
+				true, false, 0.f, ColMesh);
+		}
+		else
+		{
+			SlabMesh = CreateMeshAsset(AssetFolder / SlabName, SlabBuilder, WallMat, WallMat,
+				true, true, 60.f);
+		}
 		++Summary.GroundMeshes;
 		AStaticMeshActor* SlabActor = World->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
 		SlabActor->GetStaticMeshComponent()->SetStaticMesh(SlabMesh);
@@ -1953,8 +2262,9 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			}
 			const float Yaw = FMath::Frac(FMath::Sin(Index * 78.233f) * 12543.21f) * 360.f;
 			const float Scale = 0.8f + 0.5f * FMath::Frac(FMath::Sin(Index * 39.11f) * 6543.87f);
+			const double Tx = C[0]->AsNumber() * 100.0, Ty = C[1]->AsNumber() * 100.0;
 			Hism->AddInstance(FTransform(FRotator(0, Yaw, 0),
-				FVector(C[0]->AsNumber() * 100.0, C[1]->AsNumber() * 100.0, 0), FVector(Scale)));
+				FVector(Tx, Ty, Drape.GroundZ(Tx, Ty)), FVector(Scale)));
 			++Summary.Trees;
 			++Index;
 		}
