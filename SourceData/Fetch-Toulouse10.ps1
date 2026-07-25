@@ -91,6 +91,7 @@ $SeenTrees = New-Object 'System.Collections.Generic.HashSet[long]'
 $SbR = New-Object System.Text.StringBuilder
 $SbT = New-Object System.Text.StringBuilder
 $NbR = 0; $NbT = 0
+$NbBridge = 0; $NbLayer = 0; $NbSurface = 0; $NbLanes = 0
 $Tiles = 5
 for ($Ty = 0; $Ty -lt $Tiles; $Ty++) {
 	for ($Tx = 0; $Tx -lt $Tiles; $Tx++) {
@@ -129,8 +130,33 @@ node["natural"="tree"]($TS,$TW,$TN,$TE);out;
 					$NPts++
 				}
 				if ($NPts -ge 2) {
+					# Tags OSM conserves : bridge (bool, toujours ecrit), layer (int, toujours
+					# ecrit, 0 si absent), surface (chaine brute, omise si absente), lanes
+					# (int, omis si absent ou non entier). .Replace et non -replace (casse).
+					$IsBridge = ($El.tags.bridge -and "$($El.tags.bridge)" -ne 'no')
+					$Layer = 0
+					if ($El.tags.layer) {
+						$LayerTmp = 0
+						if ([int]::TryParse("$($El.tags.layer)", [ref]$LayerTmp)) { $Layer = $LayerTmp }
+					}
+					$Surface = $null
+					if ($El.tags.surface) { $Surface = "$($El.tags.surface)".Replace('\', '\\').Replace('"', '\"') }
+					$Lanes = $null
+					if ($El.tags.lanes) {
+						$LanesTmp = 0
+						if ([int]::TryParse("$($El.tags.lanes)", [ref]$LanesTmp)) { $Lanes = $LanesTmp }
+					}
 					if ($NbR -gt 0) { [void]$SbR.Append(',') }
-					[void]$SbR.Append('{"pts":[').Append($SbP.ToString()).Append('],"t":"').Append($T).Append('","w":').Append((F $W2)).Append('}')
+					[void]$SbR.Append('{"pts":[').Append($SbP.ToString()).Append('],"t":"').Append($T).Append('","w":').Append((F $W2))
+					[void]$SbR.Append(',"bridge":').Append($(if ($IsBridge) { 'true' } else { 'false' }))
+					[void]$SbR.Append(',"layer":').Append($Layer.ToString($Inv))
+					if ($null -ne $Surface) { [void]$SbR.Append(',"surface":"').Append($Surface).Append('"') }
+					if ($null -ne $Lanes) { [void]$SbR.Append(',"lanes":').Append($Lanes.ToString($Inv)) }
+					[void]$SbR.Append('}')
+					if ($IsBridge) { $NbBridge++ }
+					if ($Layer -ne 0) { $NbLayer++ }
+					if ($null -ne $Surface) { $NbSurface++ }
+					if ($null -ne $Lanes) { $NbLanes++ }
 					$NbR++; $TileR++
 				}
 			} elseif ($El.type -eq 'node') {
@@ -145,6 +171,7 @@ node["natural"="tree"]($TS,$TW,$TN,$TE);out;
 	}
 }
 Write-Host "Routes : $NbR / Arbres : $NbT"
+Write-Host "Tags routes : bridge=true $NbBridge, layer!=0 $NbLayer, surface $NbSurface, lanes $NbLanes"
 
 # ---------- Sortie ----------
 $Sb = New-Object System.Text.StringBuilder
