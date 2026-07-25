@@ -147,6 +147,39 @@ la BD ORTHO, streaming ×5-10, HLOD auto). Données terrain prêtes :
   sur opaques seulement ; bPBRMaterials : M_CityWall_PBR atlas 2048² 4×4 + Glass opaque lisse (choix Q3) +
   Ground/Road lit, vertex colors LINÉAIRES, Shade() coupé, UV1 monde sol/routes/toits). 32/32 tests.
 
+- 2026-07-25 (soir) : **J2c — VILLE DESKTOP GÉNÉRÉE** : L_Toulouse10 régénérée EN PLACE
+  au profil `Desktop()` complet (sol 64×64 drapé MNT + collision 16×16 dédiée, routes
+  15 m + ponts, fenêtres en creux, split Wall/Glass, Nanite opaques, PBR Lumen, UV1
+  monde) — mêmes paramètres que les générations mobiles (Wall/Glass = /Game/Dev/M_Bldg*,
+  cellules 500/1000/2000 m, ordre Streamed→Surfaces→Markers). Chiffres : 131 257
+  bâtiments / 45 162 routes / 104 296 arbres / 962 sols / 36 proxys / **913 meshes
+  détail (457 Wall + 456 Glass)** / 136 blocs (51 min) ; surfaces 186 eau / 3 708
+  verts / 697 rails / 13 633 arbres dispersés / 451 meshes (34 min) ; 414 marqueurs
+  drapés. Habillage desktop posé (labels City*) : soleil Movable atmosphère pitch -35,
+  SkyLight real-time capture, **SkyAtmosphere** (pas de dôme custom), fog 0.005,
+  CityPlayerStart (-7000, 0, 500). Scripts rejouables `Tools/gen_desktop_*.py`
+  (headless -run=pythonscript -nullrhi). Destination : Survol (copie fichiers pilotée
+  par manifeste des packages réellement référencés, Saved/desktop_manifest_strict.txt).
+- **Pièges payés J2c** : (1) **OOM silencieux mono-processus** — la passe unique est
+  morte à ~101 Go de working set (accumulation builders + MeshDescriptions/Nanite de
+  ~2 400 meshes, jamais libérés) au début des surfaces, SANS crash log (WER seulement) ;
+  parade VALIDÉE : **un processus headless par passe** (streamed | surfaces | markers),
+  la passe surfaces seule tient à ~16 Go. Les données étaient saines : Streamed sauve
+  tout AVANT de rendre la main. (2) `ImportCitySurfaces`/`ImportCityMarkers` **ne
+  sauvent PAS eux-mêmes** (seul Streamed appelle SaveDirtyPackages) → chaque passe
+  doit appeler `save_dirty_packages` explicitement. (3) Python headless sur les outils
+  AICallable sans glue Blueprint : `CDO.call_method('ImportCityStreamed', args=(...))`
+  fonctionne ; les UPROPERTY() nus refusent `set_editor_property` (« protected ») →
+  `struct.import_text('(bDesktop=True)')` et lecture des compteurs via `export_text`.
+  (4) **Purge d'idempotence AVEUGLE en commandlet** : à l'ouverture headless de la map,
+  les sous-niveaux ne sont PAS chargés (ils ne le sont qu'au remplissage, via
+  FlushLevelStreaming) → le TActorIterator de la purge d'ImportCityStreamed n'a pas vu
+  les anciens acteurs SM_Bldg_* des blocs : ville EN DOUBLE (mobile + desktop) dans
+  chaque bloc. En éditeur interactif le bug n'existe pas (sous-niveaux chargés à
+  l'ouverture). Correctif : passe D (`Tools/gen_desktop_pass_d_purge_blocks.py`),
+  un load_map PAR bloc + destruction des labels mobiles exacts + resauvegarde.
+  À corriger dans l'outil si une régénération headless doit redevenir mono-passe.
+
 - **Chronologie complète, mesures device et procédures de reprise : voir
   `../DroneCity/Doc/Journal-Toulouse10.md`** (LE document de référence de la
   campagne Toulouse 10 km, v1→v14b : RAM, GPU, miroir nord=-Y, routes texturées,
