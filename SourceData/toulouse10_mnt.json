@@ -1,0 +1,28 @@
+{
+  "source": "IGN RGE ALTI 1 m (MNT sol nu) via WMS-Raster Geoplateforme data.geopf.fr/wms-r, couche ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES, format image/x-bil;bits=32, Licence Ouverte 2.0 (attribution IGN)",
+  "date_fetch": "2026-07-25",
+  "origin_wgs84": { "lat0": 43.6045, "lon0": 1.4442 },
+  "bbox_wgs84": { "south": 43.5592675049756, "north": 43.6497324950244, "west": 1.38217201896912, "east": 1.50622798103088 },
+  "projection_locale": {
+    "type": "equirectangulaire locale, IDENTIQUE a Fetch-Toulouse10.ps1 (toulouse10*.json)",
+    "m_per_deg_lat": 110540,
+    "m_per_deg_lon": 80608.782,
+    "x_m": "(lon - lon0) * m_per_deg_lon  (X = est)",
+    "y_m": "(lat0 - lat) * m_per_deg_lat  (NORD = -Y, Unreal main gauche, convention Cesium)"
+  },
+  "grid": {
+    "width_px": 10000, "height_px": 10000, "pixel_size_m": 1.0,
+    "coin_nw_local_m": { "x": -5000, "y": -5000 },
+    "coin_nw_unreal_cm": { "x": -500000, "y": -500000 },
+    "ordre_lignes": "ligne 0 = NORD (y local minimal), les lignes croissent vers le sud (+Y)",
+    "centre_pixel": "x_m = -5000 + (col + 0.5) ; y_m = -5000 + (row + 0.5)"
+  },
+  "encoding": {
+    "format": "PNG 16 bits niveaux de gris, filtre Up",
+    "alt_m": "valeur / 100.0 (la valeur est l'altitude NGF en centimetres)",
+    "unreal_z_cm": "valeur (1 unite PNG = 1 cm Unreal, Z vers le haut ; rebaser sur alt_capitole_m pour garder l'origine pres de z=0)",
+    "nodata_source": -99999.0, "nodata_count": 0, "nodata_remplacement": "altitude min valide"
+  },
+  "stats": { "min_alt_m": 120.34, "max_alt_m": 259.4, "moy_alt_m": 145.62, "alt_capitole_m": 142.39 },
+  "tuiles": { "grille": "5 x 5", "tile_px": 2000, "fichiers": "MNT/mnt_1m_<tx>_<ty>.bil (float32 LE, 1 bande row-major, ligne 0 = nord, tx 0 = ouest, ty 0 = nord)" }
+}

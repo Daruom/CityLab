@@ -11,6 +11,14 @@ qualité visuelle suffisante pour un quartier FPV, dans le contexte de rendu Dro
 (unlit, LDR, zéro bake). Verdict utilisateur sur screenshot éditeur (preview ES3.1)
 puis capture Redmi. Si KO → pivot plan B (Blender headless blosm+Buildify + décimation).
 
+## Jalon J2 — profil de génération desktop
+
+Conception dans **`Doc/J2-ProfilDesktop.md`** (budgets relevés : MNT RGE ALTI 1 m comme
+sol réel, PBR Lumen + Nanite, fenêtres en creux complètes, atlas façades, UV monde pour
+la BD ORTHO, streaming ×5-10, HLOD auto). Données terrain prêtes :
+`SourceData/Fetch-Toulouse10-MNT.ps1` → `toulouse10_mnt.png` (10 000², 16 bits, valeur
+= alt en cm) + `toulouse10_mnt.json` (géoréférencement exact). Rien d'implémenté côté C++.
+
 ## Décisions & conventions
 
 - **MCP port 8101** (le 8100 = éditeur DroneFPV ; les deux tournent en parallèle).
@@ -121,6 +129,14 @@ puis capture Redmi. Si KO → pivot plan B (Blender headless blosm+Buildify + d�
   sol en collision BOÎTE simple (FKBoxElem par cellule — le trimesh des routes coûtait
   ~90 Mo pour <20 cm de précision), rayons streaming 500/800 m → plateau stable
   1,61-1,65 Go pendant 5 min sur Redmi (pic transitoire 1,94 au chargement initial).
+
+- 2026-07-25 : **jalon J2 (tranche données + conception)** — MNT RGE ALTI 1 m fetché
+  sur la dalle 10×10 km (`Fetch-Toulouse10-MNT.ps1`, 25 tuiles BIL float32 via WMS-R
+  Géoplateforme, couche ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES — pas de WCS sur
+  data.geopf.fr) assemblé en `toulouse10_mnt.png` 16 bits (alt en cm = Z Unreal) +
+  `toulouse10_mnt.json` (géoréf : 1 px = 1 m local, nord = -Y, coin NW = -5000 m).
+  Conception du profil desktop écrite : `Doc/J2-ProfilDesktop.md`. Tuiles brutes
+  `SourceData/MNT/` hors git (régénérables, 400 Mo).
 
 - **Chronologie complète, mesures device et procédures de reprise : voir
   `../DroneCity/Doc/Journal-Toulouse10.md`** (LE document de référence de la

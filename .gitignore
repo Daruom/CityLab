@@ -9,3 +9,6 @@ PackagedBuilds/
 *.suo
 *.VC.db
 *.VC.opendb
+
+# Donnees MNT brutes (regenerables via SourceData/Fetch-Toulouse10-MNT.ps1, ~400 Mo)
+SourceData/MNT/
