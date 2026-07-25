@@ -633,10 +633,12 @@ namespace
 		return M;
 	}
 
-	// bNanite (Lot B, desktop) : NaniteSettings.bEnabled sur les meshes OPAQUES
-	// uniquement (murs, sol, routes, proxys) — jamais Glass, jamais mobile. Le flag
-	// est REPOSE a chaque generation : une regeneration mobile par-dessus des assets
-	// desktop les remet a false (golden path).
+	// bNanite (Lot B, desktop) : NaniteSettings.bEnabled sur les meshes generes —
+	// murs, sol, routes, proxys ET vitres (J2e, 25/07 : le verre est OPAQUE ;
+	// vitres non-Nanite devant murs Nanite = fenetres qui « flottent » aux
+	// transitions LOD). Jamais mobile. Le flag est REPOSE a chaque generation :
+	// une regeneration mobile par-dessus des assets desktop les remet a false
+	// (golden path).
 	UStaticMesh* CreateMeshAsset(const FString& AssetPath, FCityMeshBuilder& QM,
 		UMaterialInterface* WallMat, UMaterialInterface* GlassMat, bool bWithCollision = true,
 		bool bBoxCollision = false, float BoxTopCm = 0.f, UStaticMesh* ComplexCollisionMesh = nullptr,
@@ -1920,7 +1922,8 @@ namespace
 
 	// Batiment desktop Lot B : fenetres GEOMETRIQUES en creux. Wall recoit murs,
 	// socle, toit et modenature (opaque -> atlas PBR, Nanite) ; Glass les vitres
-	// (jamais Nanite). En mode non-split, passer le MEME builder aux deux.
+	// (Nanite AUSSI depuis J2e — verre opaque). En mode non-split, passer le
+	// MEME builder aux deux.
 	// bReveals : par fenetre, +9 quads (+18 tris) EXACTEMENT vs la vitre en simple
 	// retrait — 4 tableaux (retours 18 cm) + appui saillant 3 quads (dessus/face/
 	// dessous, saillie 8 cm) + linteau saillant 2 quads (face avant/sous-face,
@@ -2738,9 +2741,11 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			if (bDesktopBldg)
 			{
 				// Lot B : murs geometriques (atlas PBR, Nanite si demande) ; vitres
-				// dans un mesh SEPARE si bSplitWallGlass — jamais Nanite, mais AVEC
-				// collision (l'embrasure est un vrai trou, la vitre doit arreter le
-				// drone). Cellule sans fenetre : pas de mesh Glass.
+				// dans un mesh SEPARE si bSplitWallGlass — Nanite AUSSI (J2e,
+				// retours utilisateur du 25/07 : le verre est opaque, et des vitres
+				// non-Nanite devant des murs Nanite « flottent » aux transitions
+				// LOD), et AVEC collision (l'embrasure est un vrai trou, la vitre
+				// doit arreter le drone). Cellule sans fenetre : pas de mesh Glass.
 				UMaterialInterface* BldgWallMat = Gen.bPBRMaterials
 					? GetOrCreateWallPBRMaterial(AssetFolder, Gen.AtlasSizePx) : WallMat;
 				UMaterialInterface* BldgGlassMat = Gen.bPBRMaterials
@@ -2753,7 +2758,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 					if (GlassB && (*GlassB)->QuadCount > 0)
 					{
 						SpawnBldg(Name + TEXT("_Glass"), CreateMeshAsset(AssetFolder / (Name + TEXT("_Glass")),
-							**GlassB, BldgGlassMat, BldgGlassMat, true));
+							**GlassB, BldgGlassMat, BldgGlassMat, true, false, 0.f, nullptr, bNanite));
 					}
 				}
 				else

@@ -463,7 +463,8 @@ void FCityImportToolsSpec::Define()
 	});
 
 	// Lot B « matiere et modenature » : fenetres en creux geometriques, split
-	// Wall/Glass, Nanite sur les opaques, materiaux PBR DefaultLit, UV1 monde.
+	// Wall/Glass, Nanite sur tous les meshes generes (vitres comprises depuis
+	// J2e — verre opaque), materiaux PBR DefaultLit, UV1 monde.
 	// Tests A PLAT (bDrapeToTerrain=false, profils manuels sans bDesktop) :
 	// independants du MNT, ils isolent la matiere du relief.
 	Describe("LotB", [this]()
@@ -527,7 +528,7 @@ void FCityImportToolsSpec::Define()
 				Delta, Windows * 18);
 		});
 
-		It("split Wall/Glass, Nanite opaques, materiaux PBR DefaultLit, UV1 monde", [this, WriteFixture, DesktopFlat]()
+		It("split Wall/Glass, Nanite partout (vitres comprises), materiaux PBR DefaultLit, UV1 monde", [this, WriteFixture, DesktopFlat]()
 		{
 			const FString Path = WriteFixture();
 			UCityImportTools::ImportCityStreamed(Path, FString(), TEXT("/Game/Dev/Test/City"),
@@ -546,9 +547,11 @@ void FCityImportToolsSpec::Define()
 				return;
 			}
 
-			// Nanite sur les OPAQUES uniquement (murs, sol, routes, proxys), jamais Glass.
+			// Nanite sur TOUS les meshes generes, vitres comprises (J2e, 25/07 :
+			// le verre est opaque ; vitres non-Nanite + murs Nanite = fenetres
+			// qui « flottent » aux transitions LOD).
 			TestTrue(TEXT("Nanite : Wall"), Wall->GetNaniteSettings().bEnabled);
-			TestFalse(TEXT("Nanite : jamais sur Glass"), Glass->GetNaniteSettings().bEnabled);
+			TestTrue(TEXT("Nanite : Glass aussi (verre opaque, J2e)"), Glass->GetNaniteSettings().bEnabled);
 			TestTrue(TEXT("Nanite : sol"), Slab->GetNaniteSettings().bEnabled);
 			TestTrue(TEXT("Nanite : routes"), Ground->GetNaniteSettings().bEnabled);
 			TestTrue(TEXT("Nanite : proxys"), Proxy->GetNaniteSettings().bEnabled);

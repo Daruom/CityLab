@@ -51,12 +51,14 @@ struct FCityGenProfile
 
 	/**
 	 * Lot B : chaque cellule batiments produit DEUX meshes — SM_Bldg_*_Wall (opaque,
-	 * Nanite-compatible) et SM_Bldg_*_Glass (vitres, jamais Nanite) — au lieu des
+	 * Nanite-compatible) et SM_Bldg_*_Glass (vitres) — au lieu des
 	 * deux slots d'un seul mesh (spec Q3 : un mesh est Nanite ou ne l'est pas).
 	 */
 	UPROPERTY() bool bSplitWallGlass = false;
 
-	/** Lot B : Nanite sur les meshes OPAQUES (murs, sol, routes, proxys). Jamais sur Glass. */
+	/** Lot B : Nanite sur TOUS les meshes generes du profil desktop — murs, sol,
+	 * routes, proxys ET vitres (J2e, retours utilisateur du 25/07 : le verre est
+	 * OPAQUE ; vitres non-Nanite + murs Nanite = fenetres qui « flottent »). */
 	UPROPERTY() bool bNanite = false;
 
 	/**
