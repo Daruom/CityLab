@@ -1,0 +1,278 @@
+2026-07-25 21:43:33  bati_enrichi  DEBUT (BDTOPO_V3:batiment, bbox +-5000 m)
+2026-07-25 21:44:33  bati_enrichi  WFS BDTOPO_V3:batiment STARTINDEX=0 echec (1/6) : Le serveur distant a retourné une erreur : (504) Dépassement du délai de la passerelle. -- retry 5 s
+2026-07-25 21:44:51  chaine-osm  DEBUT Fetch-GF-RuesNommees.ps1
+2026-07-25 21:44:51  rues_nommees  DEBUT (Overpass way[highway][name], 9 tuiles)
+2026-07-25 21:44:53  rues_nommees  Overpass tuile (0,0) OK via https://overpass.openstreetmap.fr/api/interpreter (1621 elements)
+2026-07-25 21:44:54  rues_nommees  tuile (0,0) : +1615 rues (cumul 1615)
+2026-07-25 21:44:58  rues_nommees  Overpass tuile (1,0) OK via https://overpass.openstreetmap.fr/api/interpreter (1447 elements)
+2026-07-25 21:44:59  rues_nommees  tuile (1,0) : +1421 rues (cumul 3036)
+2026-07-25 21:45:02  rues_nommees  Overpass tuile (2,0) OK via https://overpass.openstreetmap.fr/api/interpreter (1464 elements)
+2026-07-25 21:45:03  rues_nommees  tuile (2,0) : +1404 rues (cumul 4440)
+2026-07-25 21:45:06  rues_nommees  Overpass tuile (0,1) OK via https://overpass.openstreetmap.fr/api/interpreter (1359 elements)
+2026-07-25 21:45:07  rues_nommees  tuile (0,1) : +1339 rues (cumul 5779)
+2026-07-25 21:45:12  rues_nommees  Overpass tuile (1,1) OK via https://overpass.openstreetmap.fr/api/interpreter (3355 elements)
+2026-07-25 21:45:14  rues_nommees  tuile (1,1) : +3289 rues (cumul 9068)
+2026-07-25 21:45:18  rues_nommees  Overpass tuile (2,1) OK via https://overpass.openstreetmap.fr/api/interpreter (1666 elements)
+2026-07-25 21:45:19  rues_nommees  tuile (2,1) : +1590 rues (cumul 10658)
+2026-07-25 21:45:22  rues_nommees  Overpass tuile (0,2) OK via https://overpass.openstreetmap.fr/api/interpreter (1019 elements)
+2026-07-25 21:45:23  rues_nommees  tuile (0,2) : +994 rues (cumul 11652)
+2026-07-25 21:45:26  rues_nommees  Overpass tuile (1,2) OK via https://overpass.openstreetmap.fr/api/interpreter (1492 elements)
+2026-07-25 21:45:27  rues_nommees  tuile (1,2) : +1437 rues (cumul 13089)
+2026-07-25 21:45:30  rues_nommees  Overpass tuile (2,2) OK via https://overpass.openstreetmap.fr/api/interpreter (1029 elements)
+2026-07-25 21:45:31  rues_nommees  tuile (2,2) : +965 rues (cumul 14054)
+2026-07-25 21:45:33  rues_nommees  FIN : 14054 rues, 2.47 Mo
+2026-07-25 21:45:33  chaine-osm  FIN Fetch-GF-RuesNommees.ps1
+2026-07-25 21:45:33  chaine-osm  DEBUT Fetch-GF-Eclairage.ps1
+2026-07-25 21:45:33  eclairage  DEBUT (Overpass node[highway=street_lamp], 9 tuiles)
+2026-07-25 21:45:34  eclairage  Overpass tuile (0,0) OK via https://overpass.openstreetmap.fr/api/interpreter (338 elements)
+2026-07-25 21:45:34  eclairage  tuile (0,0) : +338 lampadaires (cumul 338)
+2026-07-25 21:45:37  eclairage  Overpass tuile (1,0) OK via https://overpass.openstreetmap.fr/api/interpreter (179 elements)
+2026-07-25 21:45:37  eclairage  tuile (1,0) : +179 lampadaires (cumul 517)
+2026-07-25 21:45:38  bati_enrichi  WFS BDTOPO_V3:batiment STARTINDEX=0 echec (2/6) : Le serveur distant a retourné une erreur : (504) Dépassement du délai de la passerelle. -- retry 5 s
+2026-07-25 21:45:39  eclairage  Overpass tuile (2,0) OK via https://overpass.openstreetmap.fr/api/interpreter (273 elements)
+2026-07-25 21:45:39  eclairage  tuile (2,0) : +273 lampadaires (cumul 790)
+2026-07-25 21:45:42  eclairage  Overpass tuile (0,1) OK via https://overpass.openstreetmap.fr/api/interpreter (697 elements)
+2026-07-25 21:45:42  eclairage  tuile (0,1) : +697 lampadaires (cumul 1487)
+2026-07-25 21:45:44  eclairage  Overpass tuile (1,1) OK via https://overpass.openstreetmap.fr/api/interpreter (407 elements)
+2026-07-25 21:45:44  eclairage  tuile (1,1) : +407 lampadaires (cumul 1894)
+2026-07-25 21:45:47  eclairage  Overpass tuile (2,1) OK via https://overpass.openstreetmap.fr/api/interpreter (949 elements)
+2026-07-25 21:45:47  eclairage  tuile (2,1) : +949 lampadaires (cumul 2843)
+2026-07-25 21:45:50  eclairage  Overpass tuile (0,2) OK via https://overpass.openstreetmap.fr/api/interpreter (330 elements)
+2026-07-25 21:45:50  eclairage  tuile (0,2) : +330 lampadaires (cumul 3173)
+2026-07-25 21:45:52  eclairage  Overpass tuile (1,2) OK via https://overpass.openstreetmap.fr/api/interpreter (257 elements)
+2026-07-25 21:45:52  eclairage  tuile (1,2) : +257 lampadaires (cumul 3430)
+2026-07-25 21:45:55  eclairage  Overpass tuile (2,2) OK via https://overpass.openstreetmap.fr/api/interpreter (195 elements)
+2026-07-25 21:45:55  eclairage  tuile (2,2) : +195 lampadaires (cumul 3625)
+2026-07-25 21:45:57  eclairage  FIN : 3625 lampadaires, 0.06 Mo
+2026-07-25 21:45:57  chaine-osm  FIN Fetch-GF-Eclairage.ps1
+2026-07-25 21:45:57  chaine-osm  DEBUT Fetch-GF-Tunnels.ps1
+2026-07-25 21:45:57  tunnels  DEBUT (Overpass tunnels highway+railway, 1 requete)
+2026-07-25 21:45:59  tunnels  Overpass bbox complete OK via https://overpass.openstreetmap.fr/api/interpreter (702 elements)
+2026-07-25 21:45:59  tunnels  FIN : 702 tunnels, 0.1 Mo
+2026-07-25 21:45:59  chaine-osm  FIN Fetch-GF-Tunnels.ps1
+2026-07-25 21:45:59  chaine-osm  CHAINE OSM TERMINEE
+2026-07-25 21:46:10  bati_enrichi  attributs retenus : nature, usage_1, usage_2, construction_legere, etat_de_l_objet, nombre_de_logements, nombre_d_etages, materiaux_des_murs, materiaux_de_la_toiture, hauteur, altitude_minimale_sol, altitude_minimale_toit, altitude_maximale_toit, altitude_maximale_sol, origine_du_batiment
+2026-07-25 21:46:11  bati_enrichi  page STARTINDEX=0 : 1000 lus, cumul 1000 retenus
+2026-07-25 21:46:39  bati_enrichi  page STARTINDEX=1000 : 1000 lus, cumul 1996 retenus
+2026-07-25 21:47:11  bati_enrichi  page STARTINDEX=2000 : 1000 lus, cumul 2996 retenus
+2026-07-25 21:47:34  bati_enrichi  page STARTINDEX=3000 : 1000 lus, cumul 3996 retenus
+2026-07-25 21:48:07  bati_enrichi  page STARTINDEX=4000 : 1000 lus, cumul 4991 retenus
+2026-07-25 21:48:35  bati_enrichi  page STARTINDEX=5000 : 1000 lus, cumul 5989 retenus
+2026-07-25 21:48:59  bati_enrichi  page STARTINDEX=6000 : 1000 lus, cumul 6987 retenus
+2026-07-25 21:49:21  bati_enrichi  page STARTINDEX=7000 : 1000 lus, cumul 7985 retenus
+2026-07-25 21:49:24  bati_enrichi  page STARTINDEX=8000 : 1000 lus, cumul 8984 retenus
+2026-07-25 21:49:28  bati_enrichi  page STARTINDEX=9000 : 1000 lus, cumul 9983 retenus
+2026-07-25 21:49:31  bati_enrichi  page STARTINDEX=10000 : 1000 lus, cumul 10983 retenus
+2026-07-25 21:49:34  bati_enrichi  page STARTINDEX=11000 : 1000 lus, cumul 11982 retenus
+2026-07-25 21:49:37  bati_enrichi  page STARTINDEX=12000 : 1000 lus, cumul 12982 retenus
+2026-07-25 21:49:40  bati_enrichi  page STARTINDEX=13000 : 1000 lus, cumul 13982 retenus
+2026-07-25 21:49:43  bati_enrichi  page STARTINDEX=14000 : 1000 lus, cumul 14982 retenus
+2026-07-25 21:49:48  bati_enrichi  page STARTINDEX=15000 : 1000 lus, cumul 15981 retenus
+2026-07-25 21:49:54  bati_enrichi  page STARTINDEX=16000 : 1000 lus, cumul 16981 retenus
+2026-07-25 21:50:00  bati_enrichi  page STARTINDEX=17000 : 1000 lus, cumul 17981 retenus
+2026-07-25 21:50:06  bati_enrichi  page STARTINDEX=18000 : 1000 lus, cumul 18980 retenus
+2026-07-25 21:50:12  bati_enrichi  page STARTINDEX=19000 : 1000 lus, cumul 19980 retenus
+2026-07-25 21:50:18  bati_enrichi  page STARTINDEX=20000 : 1000 lus, cumul 20979 retenus
+2026-07-25 21:50:24  bati_enrichi  page STARTINDEX=21000 : 1000 lus, cumul 21979 retenus
+2026-07-25 21:50:30  bati_enrichi  page STARTINDEX=22000 : 1000 lus, cumul 22977 retenus
+2026-07-25 21:50:35  bati_enrichi  page STARTINDEX=23000 : 1000 lus, cumul 23976 retenus
+2026-07-25 21:50:41  bati_enrichi  page STARTINDEX=24000 : 1000 lus, cumul 24976 retenus
+2026-07-25 21:50:47  bati_enrichi  page STARTINDEX=25000 : 1000 lus, cumul 25976 retenus
+2026-07-25 21:50:53  bati_enrichi  page STARTINDEX=26000 : 1000 lus, cumul 26976 retenus
+2026-07-25 21:50:59  bati_enrichi  page STARTINDEX=27000 : 1000 lus, cumul 27975 retenus
+2026-07-25 21:51:05  bati_enrichi  page STARTINDEX=28000 : 1000 lus, cumul 28975 retenus
+2026-07-25 21:51:11  bati_enrichi  page STARTINDEX=29000 : 1000 lus, cumul 29974 retenus
+2026-07-25 21:51:17  bati_enrichi  page STARTINDEX=30000 : 1000 lus, cumul 30973 retenus
+2026-07-25 21:51:22  bati_enrichi  page STARTINDEX=31000 : 1000 lus, cumul 31973 retenus
+2026-07-25 21:51:27  bati_enrichi  page STARTINDEX=32000 : 1000 lus, cumul 32973 retenus
+2026-07-25 21:51:32  bati_enrichi  page STARTINDEX=33000 : 1000 lus, cumul 33973 retenus
+2026-07-25 21:51:38  bati_enrichi  page STARTINDEX=34000 : 1000 lus, cumul 34971 retenus
+2026-07-25 21:51:43  bati_enrichi  page STARTINDEX=35000 : 1000 lus, cumul 35971 retenus
+2026-07-25 21:51:49  bati_enrichi  page STARTINDEX=36000 : 1000 lus, cumul 36970 retenus
+2026-07-25 21:51:54  bati_enrichi  page STARTINDEX=37000 : 1000 lus, cumul 37970 retenus
+2026-07-25 21:52:00  bati_enrichi  page STARTINDEX=38000 : 1000 lus, cumul 38970 retenus
+2026-07-25 21:52:06  bati_enrichi  page STARTINDEX=39000 : 1000 lus, cumul 39970 retenus
+2026-07-25 21:52:12  bati_enrichi  page STARTINDEX=40000 : 1000 lus, cumul 40969 retenus
+2026-07-25 21:52:18  bati_enrichi  page STARTINDEX=41000 : 1000 lus, cumul 41969 retenus
+2026-07-25 21:52:24  bati_enrichi  page STARTINDEX=42000 : 1000 lus, cumul 42969 retenus
+2026-07-25 21:52:30  bati_enrichi  page STARTINDEX=43000 : 1000 lus, cumul 43968 retenus
+2026-07-25 21:52:36  bati_enrichi  page STARTINDEX=44000 : 1000 lus, cumul 44968 retenus
+2026-07-25 21:52:42  bati_enrichi  page STARTINDEX=45000 : 1000 lus, cumul 45967 retenus
+2026-07-25 21:52:48  bati_enrichi  page STARTINDEX=46000 : 1000 lus, cumul 46963 retenus
+2026-07-25 21:52:54  bati_enrichi  page STARTINDEX=47000 : 1000 lus, cumul 47959 retenus
+2026-07-25 21:53:00  bati_enrichi  page STARTINDEX=48000 : 1000 lus, cumul 48959 retenus
+2026-07-25 21:53:07  bati_enrichi  page STARTINDEX=49000 : 1000 lus, cumul 49958 retenus
+2026-07-25 21:53:13  bati_enrichi  page STARTINDEX=50000 : 1000 lus, cumul 50958 retenus
+2026-07-25 21:53:19  bati_enrichi  page STARTINDEX=51000 : 1000 lus, cumul 51958 retenus
+2026-07-25 21:53:25  bati_enrichi  page STARTINDEX=52000 : 1000 lus, cumul 52956 retenus
+2026-07-25 21:53:31  bati_enrichi  page STARTINDEX=53000 : 1000 lus, cumul 53952 retenus
+2026-07-25 21:53:37  bati_enrichi  page STARTINDEX=54000 : 1000 lus, cumul 54948 retenus
+2026-07-25 21:53:41  bati_enrichi  page STARTINDEX=55000 : 1000 lus, cumul 55946 retenus
+2026-07-25 21:53:46  bati_enrichi  page STARTINDEX=56000 : 1000 lus, cumul 56946 retenus
+2026-07-25 21:53:51  bati_enrichi  page STARTINDEX=57000 : 1000 lus, cumul 57938 retenus
+2026-07-25 21:53:57  bati_enrichi  page STARTINDEX=58000 : 1000 lus, cumul 58937 retenus
+2026-07-25 21:54:02  bati_enrichi  page STARTINDEX=59000 : 1000 lus, cumul 59935 retenus
+2026-07-25 21:54:07  bati_enrichi  page STARTINDEX=60000 : 1000 lus, cumul 60935 retenus
+2026-07-25 21:54:12  bati_enrichi  page STARTINDEX=61000 : 1000 lus, cumul 61935 retenus
+2026-07-25 21:54:17  bati_enrichi  page STARTINDEX=62000 : 1000 lus, cumul 62935 retenus
+2026-07-25 21:54:22  bati_enrichi  page STARTINDEX=63000 : 1000 lus, cumul 63935 retenus
+2026-07-25 21:54:27  bati_enrichi  page STARTINDEX=64000 : 1000 lus, cumul 64935 retenus
+2026-07-25 21:54:33  bati_enrichi  page STARTINDEX=65000 : 1000 lus, cumul 65935 retenus
+2026-07-25 21:54:38  bati_enrichi  page STARTINDEX=66000 : 1000 lus, cumul 66934 retenus
+2026-07-25 21:54:43  bati_enrichi  page STARTINDEX=67000 : 1000 lus, cumul 67934 retenus
+2026-07-25 21:54:46  bati_enrichi  page STARTINDEX=68000 : 1000 lus, cumul 68934 retenus
+2026-07-25 21:54:49  bati_enrichi  page STARTINDEX=69000 : 1000 lus, cumul 69934 retenus
+2026-07-25 21:54:53  bati_enrichi  page STARTINDEX=70000 : 1000 lus, cumul 70934 retenus
+2026-07-25 21:54:56  bati_enrichi  page STARTINDEX=71000 : 1000 lus, cumul 71934 retenus
+2026-07-25 21:54:59  bati_enrichi  page STARTINDEX=72000 : 1000 lus, cumul 72934 retenus
+2026-07-25 21:55:02  bati_enrichi  page STARTINDEX=73000 : 1000 lus, cumul 73934 retenus
+2026-07-25 21:55:05  bati_enrichi  page STARTINDEX=74000 : 1000 lus, cumul 74934 retenus
+2026-07-25 21:55:08  bati_enrichi  page STARTINDEX=75000 : 1000 lus, cumul 75934 retenus
+2026-07-25 21:55:12  bati_enrichi  page STARTINDEX=76000 : 1000 lus, cumul 76932 retenus
+2026-07-25 21:55:15  bati_enrichi  page STARTINDEX=77000 : 1000 lus, cumul 77931 retenus
+2026-07-25 21:55:18  bati_enrichi  page STARTINDEX=78000 : 1000 lus, cumul 78927 retenus
+2026-07-25 21:55:21  bati_enrichi  page STARTINDEX=79000 : 1000 lus, cumul 79923 retenus
+2026-07-25 21:55:24  bati_enrichi  page STARTINDEX=80000 : 1000 lus, cumul 80923 retenus
+2026-07-25 21:55:28  bati_enrichi  page STARTINDEX=81000 : 1000 lus, cumul 81923 retenus
+2026-07-25 21:55:31  bati_enrichi  page STARTINDEX=82000 : 1000 lus, cumul 82922 retenus
+2026-07-25 21:55:34  bati_enrichi  page STARTINDEX=83000 : 1000 lus, cumul 83921 retenus
+2026-07-25 21:55:37  bati_enrichi  page STARTINDEX=84000 : 1000 lus, cumul 84920 retenus
+2026-07-25 21:55:40  bati_enrichi  page STARTINDEX=85000 : 1000 lus, cumul 85920 retenus
+2026-07-25 21:55:43  bati_enrichi  page STARTINDEX=86000 : 1000 lus, cumul 86918 retenus
+2026-07-25 21:55:47  bati_enrichi  page STARTINDEX=87000 : 1000 lus, cumul 87917 retenus
+2026-07-25 21:55:50  bati_enrichi  page STARTINDEX=88000 : 1000 lus, cumul 88917 retenus
+2026-07-25 21:55:53  bati_enrichi  page STARTINDEX=89000 : 1000 lus, cumul 89915 retenus
+2026-07-25 21:55:56  bati_enrichi  page STARTINDEX=90000 : 1000 lus, cumul 90915 retenus
+2026-07-25 21:56:00  bati_enrichi  page STARTINDEX=91000 : 1000 lus, cumul 91915 retenus
+2026-07-25 21:56:03  bati_enrichi  page STARTINDEX=92000 : 1000 lus, cumul 92915 retenus
+2026-07-25 21:56:06  bati_enrichi  page STARTINDEX=93000 : 1000 lus, cumul 93913 retenus
+2026-07-25 21:56:09  bati_enrichi  page STARTINDEX=94000 : 1000 lus, cumul 94913 retenus
+2026-07-25 21:56:12  bati_enrichi  page STARTINDEX=95000 : 1000 lus, cumul 95913 retenus
+2026-07-25 21:56:16  bati_enrichi  page STARTINDEX=96000 : 1000 lus, cumul 96913 retenus
+2026-07-25 21:56:19  bati_enrichi  page STARTINDEX=97000 : 1000 lus, cumul 97911 retenus
+2026-07-25 21:56:22  bati_enrichi  page STARTINDEX=98000 : 1000 lus, cumul 98908 retenus
+2026-07-25 21:56:25  bati_enrichi  page STARTINDEX=99000 : 1000 lus, cumul 99901 retenus
+2026-07-25 21:56:28  bati_enrichi  page STARTINDEX=100000 : 1000 lus, cumul 100900 retenus
+2026-07-25 21:56:31  bati_enrichi  page STARTINDEX=101000 : 1000 lus, cumul 101900 retenus
+2026-07-25 21:56:35  bati_enrichi  page STARTINDEX=102000 : 1000 lus, cumul 102900 retenus
+2026-07-25 21:56:38  bati_enrichi  page STARTINDEX=103000 : 1000 lus, cumul 103900 retenus
+2026-07-25 21:56:41  bati_enrichi  page STARTINDEX=104000 : 1000 lus, cumul 104900 retenus
+2026-07-25 21:56:44  bati_enrichi  page STARTINDEX=105000 : 1000 lus, cumul 105900 retenus
+2026-07-25 21:56:47  bati_enrichi  page STARTINDEX=106000 : 1000 lus, cumul 106900 retenus
+2026-07-25 21:56:50  bati_enrichi  page STARTINDEX=107000 : 1000 lus, cumul 107900 retenus
+2026-07-25 21:56:54  bati_enrichi  page STARTINDEX=108000 : 1000 lus, cumul 108900 retenus
+2026-07-25 21:56:57  bati_enrichi  page STARTINDEX=109000 : 1000 lus, cumul 109900 retenus
+2026-07-25 21:57:00  bati_enrichi  page STARTINDEX=110000 : 1000 lus, cumul 110900 retenus
+2026-07-25 21:57:03  bati_enrichi  page STARTINDEX=111000 : 1000 lus, cumul 111900 retenus
+2026-07-25 21:57:06  bati_enrichi  page STARTINDEX=112000 : 1000 lus, cumul 112900 retenus
+2026-07-25 21:57:09  bati_enrichi  page STARTINDEX=113000 : 1000 lus, cumul 113900 retenus
+2026-07-25 21:57:13  bati_enrichi  page STARTINDEX=114000 : 1000 lus, cumul 114900 retenus
+2026-07-25 21:57:16  bati_enrichi  page STARTINDEX=115000 : 1000 lus, cumul 115900 retenus
+2026-07-25 21:57:19  bati_enrichi  page STARTINDEX=116000 : 1000 lus, cumul 116898 retenus
+2026-07-25 21:57:22  bati_enrichi  page STARTINDEX=117000 : 1000 lus, cumul 117897 retenus
+2026-07-25 21:57:26  bati_enrichi  page STARTINDEX=118000 : 1000 lus, cumul 118897 retenus
+2026-07-25 21:57:29  bati_enrichi  page STARTINDEX=119000 : 1000 lus, cumul 119896 retenus
+2026-07-25 21:57:32  bati_enrichi  page STARTINDEX=120000 : 1000 lus, cumul 120894 retenus
+2026-07-25 21:57:35  bati_enrichi  page STARTINDEX=121000 : 1000 lus, cumul 121891 retenus
+2026-07-25 21:57:39  bati_enrichi  page STARTINDEX=122000 : 1000 lus, cumul 122890 retenus
+2026-07-25 21:57:42  bati_enrichi  page STARTINDEX=123000 : 1000 lus, cumul 123889 retenus
+2026-07-25 21:57:45  bati_enrichi  page STARTINDEX=124000 : 1000 lus, cumul 124883 retenus
+2026-07-25 21:57:49  bati_enrichi  page STARTINDEX=125000 : 1000 lus, cumul 125883 retenus
+2026-07-25 21:57:52  bati_enrichi  page STARTINDEX=126000 : 1000 lus, cumul 126881 retenus
+2026-07-25 21:57:55  bati_enrichi  page STARTINDEX=127000 : 1000 lus, cumul 127881 retenus
+2026-07-25 21:57:59  bati_enrichi  page STARTINDEX=128000 : 1000 lus, cumul 128874 retenus
+2026-07-25 21:58:02  bati_enrichi  page STARTINDEX=129000 : 1000 lus, cumul 129837 retenus
+2026-07-25 21:58:05  bati_enrichi  page STARTINDEX=130000 : 1000 lus, cumul 130814 retenus
+2026-07-25 21:58:08  bati_enrichi  page STARTINDEX=131000 : 575 lus, cumul 131357 retenus
+2026-07-25 21:58:09  bati_enrichi  FIN : 131357 batiments, 58.9 Mo
+2026-07-25 21:59:06  chaine-wfs  SKIP Fetch-GF-BatiEnrichi.ps1 (sortie existante)
+2026-07-25 21:59:06  chaine-wfs  DEBUT Fetch-GF-Aerodrome.ps1
+2026-07-25 21:59:07  aerodrome  DEBUT (BDTOPO_V3:aerodrome + piste_d_aerodrome, bbox ETENDUE +-9000 m)
+2026-07-25 21:59:07  aerodrome  WFS BDTOPO_V3:aerodrome page STARTINDEX=0 : 6 features (cumul 6)
+2026-07-25 21:59:08  aerodrome  aerodromes : 3 emprises
+2026-07-25 21:59:08  aerodrome  WFS BDTOPO_V3:piste_d_aerodrome page STARTINDEX=0 : 60 features (cumul 60)
+2026-07-25 21:59:10  aerodrome  pistes : 60 surfaces
+2026-07-25 21:59:10  aerodrome  FIN : 3 aerodromes + 60 pistes, 0.07 Mo
+2026-07-25 21:59:10  chaine-wfs  FIN Fetch-GF-Aerodrome.ps1
+2026-07-25 21:59:10  chaine-wfs  DEBUT Fetch-GF-Electrique.ps1
+2026-07-25 21:59:10  electrique  DEBUT (BDTOPO_V3:pylone + ligne_electrique)
+2026-07-25 21:59:10  electrique  WFS BDTOPO_V3:pylone page STARTINDEX=0 : 104 features (cumul 104)
+2026-07-25 21:59:12  electrique  pylones : 104 retenus (0 geometrie non ponctuelle)
+2026-07-25 21:59:12  electrique  WFS BDTOPO_V3:ligne_electrique page STARTINDEX=0 : 25 features (cumul 25)
+2026-07-25 21:59:13  electrique  lignes : 25 polylignes retenues (0 features sans polyligne)
+2026-07-25 21:59:13  electrique  FIN : 104 pylones + 25 lignes, 0.02 Mo
+2026-07-25 21:59:13  chaine-wfs  FIN Fetch-GF-Electrique.ps1
+2026-07-25 21:59:13  chaine-wfs  DEBUT Fetch-GF-HydroAxes.ps1
+2026-07-25 21:59:13  hydro_axes  DEBUT (BDTOPO_V3:troncon_hydrographique)
+2026-07-25 21:59:14  hydro_axes  WFS BDTOPO_V3:troncon_hydrographique page STARTINDEX=0 : 280 features (cumul 280)
+2026-07-25 21:59:15  hydro_axes  attributs retenus : code_hydrographique, code_du_pays, nature, fictif, etat_de_l_objet, position_par_rapport_au_sol, mode_d_obtention_des_coordonnees, mode_d_obtention_de_l_altitude, statut, persistance, fosse, navigabilite, salinite, numero_d_ordre, strategie_de_classement, origine, perimetre_d_utilisation_ou_origine, sens_de_l_ecoulement, reseau_principal_coulant, trace_connu, classe_de_largeur, type_de_bras, commentaire_sur_l_objet_hydro, code_du_cours_d_eau_bdcarthage, inventaire_police_de_l_eau, identifiant_police_de_l_eau, lien_vers_noeud_hydrographique_ini, lien_vers_noeud_hydrographique_fin, lien_vers_entite_de_transition, cpx_toponyme_de_cours_d_eau, cpx_toponyme_d_entite_de_transition
+2026-07-25 21:59:16  hydro_axes  FIN : 280 troncons, 0.31 Mo
+2026-07-25 21:59:16  chaine-wfs  FIN Fetch-GF-HydroAxes.ps1
+2026-07-25 21:59:16  chaine-wfs  DEBUT Fetch-GF-Admin.ps1
+2026-07-25 21:59:16  admin  DEBUT (ADMINEXPRESS-COG.LATEST:commune)
+2026-07-25 21:59:16  admin  WFS ADMINEXPRESS-COG.LATEST:commune page STARTINDEX=0 : 8 features (cumul 8)
+2026-07-25 21:59:17  admin  attributs retenus : nom_officiel, nom_officiel_en_majuscules, statut, code_insee, population, organisme_recenseur, code_insee_du_canton, code_insee_de_l_arrondissement, code_insee_du_departement, code_insee_de_la_region, code_siren, codes_siren_des_epci, code_postal, superficie_cadastrale
+2026-07-25 21:59:18  admin  FIN : 8 communes, 0.04 Mo
+2026-07-25 21:59:18  chaine-wfs  FIN Fetch-GF-Admin.ps1
+2026-07-25 21:59:18  chaine-wfs  DEBUT Fetch-GF-EchantillonsJ5.ps1
+2026-07-25 21:59:18  echantillons_j5  DEBUT (RPG + BD Foret + haies, bbox standard)
+2026-07-25 21:59:18  echantillons_j5  WFS RPG.LATEST:parcelles_graphiques page STARTINDEX=0 : 137 features (cumul 137)
+2026-07-25 21:59:19  echantillons_j5  attributs rpg.json : id_parcel, surf_parc, code_cultu, code_group, culture_d1, culture_d2, cat_cult_p
+2026-07-25 21:59:20  echantillons_j5  rpg.json : 137 objets
+2026-07-25 21:59:20  echantillons_j5  WFS LANDCOVER.FORESTINVENTORY.V2:formation_vegetale page STARTINDEX=0 : 85 features (cumul 85)
+2026-07-25 21:59:21  echantillons_j5  attributs foret.json : id, code_tfv, tfv, tfv_g11, essence
+2026-07-25 21:59:22  echantillons_j5  foret.json : 85 objets
+2026-07-25 21:59:22  echantillons_j5  WFS BDTOPO_V3:haie page STARTINDEX=0 : 479 features (cumul 479)
+2026-07-25 21:59:23  echantillons_j5  attributs haie.json : hauteur, largeur
+2026-07-25 21:59:23  echantillons_j5  haie.json : 479 objets
+2026-07-25 21:59:23  echantillons_j5  FIN
+2026-07-25 21:59:23  chaine-wfs  FIN Fetch-GF-EchantillonsJ5.ps1
+2026-07-25 21:59:23  chaine-wfs  DEBUT Fetch-GF-Ferre.ps1
+2026-07-25 21:59:24  ferre  DEBUT (troncon_de_voie_ferree + equipement_de_transport + stations OSM)
+2026-07-25 21:59:24  ferre  WFS BDTOPO_V3:troncon_de_voie_ferree page STARTINDEX=0 : 312 features (cumul 312)
+2026-07-25 21:59:25  ferre  attributs troncons : nature, position_par_rapport_au_sol, etat_de_l_objet, electrifie, largeur, nombre_de_voies, usage, vitesse_maximale, cpx_toponyme
+2026-07-25 21:59:26  ferre  troncons ferres : 312
+2026-07-25 21:59:26  ferre  WFS BDTOPO_V3:equipement_de_transport page STARTINDEX=0 : 1000 features (cumul 1000)
+2026-07-25 21:59:28  ferre  WFS BDTOPO_V3:equipement_de_transport page STARTINDEX=1000 : 476 features (cumul 1476)
+2026-07-25 21:59:29  ferre  equipements gare/station/halte BD TOPO : 77 (sur 1476 equipements de transport)
+2026-07-25 21:59:31  ferre  Overpass stations OK via https://overpass.openstreetmap.fr/api/interpreter (181 elements)
+2026-07-25 21:59:31  ferre  stations OSM : 181
+2026-07-25 21:59:31  ferre  FIN : 312 troncons + 77 equipements + 181 stations, 0.12 Mo
+2026-07-25 21:59:31  chaine-wfs  FIN Fetch-GF-Ferre.ps1
+2026-07-25 21:59:31  chaine-wfs  DEBUT Fetch-GF-Equipements.ps1
+2026-07-25 21:59:31  equipements  DEBUT (terrain_de_sport + cimetiere + parkings BDTOPO/OSM)
+2026-07-25 21:59:32  equipements  WFS BDTOPO_V3:terrain_de_sport page STARTINDEX=0 : 459 features (cumul 459)
+2026-07-25 21:59:34  equipements  terrains de sport : 459
+2026-07-25 21:59:34  equipements  WFS BDTOPO_V3:cimetiere page STARTINDEX=0 : 13 features (cumul 13)
+2026-07-25 21:59:35  equipements  cimetieres : 13
+2026-07-25 21:59:36  equipements  WFS BDTOPO_V3:equipement_de_transport page STARTINDEX=0 : 1000 features (cumul 1000)
+2026-07-25 21:59:37  equipements  WFS BDTOPO_V3:equipement_de_transport page STARTINDEX=1000 : 476 features (cumul 1476)
+2026-07-25 21:59:39  equipements  parkings BD TOPO (equipement_de_transport nature~parking) : 248
+2026-07-25 21:59:40  equipements  Overpass parkings quadrant (0,0) OK via https://overpass.openstreetmap.fr/api/interpreter (684 elements)
+2026-07-25 21:59:41  equipements  parkings quadrant (0,0) : cumul 684
+2026-07-25 21:59:44  equipements  Overpass parkings quadrant (1,0) OK via https://overpass.openstreetmap.fr/api/interpreter (547 elements)
+2026-07-25 21:59:44  equipements  parkings quadrant (1,0) : cumul 1223
+2026-07-25 21:59:47  equipements  Overpass parkings quadrant (0,1) OK via https://overpass.openstreetmap.fr/api/interpreter (461 elements)
+2026-07-25 21:59:47  equipements  parkings quadrant (0,1) : cumul 1681
+2026-07-25 21:59:50  equipements  Overpass parkings quadrant (1,1) OK via https://overpass.openstreetmap.fr/api/interpreter (486 elements)
+2026-07-25 21:59:51  equipements  parkings quadrant (1,1) : cumul 2156
+2026-07-25 21:59:53  equipements  FIN : sport=459 cimetieres=13 parkingsBD=248 parkingsOSM=2156, 0.6 Mo
+2026-07-25 21:59:53  chaine-wfs  FIN Fetch-GF-Equipements.ps1
+2026-07-25 21:59:53  chaine-wfs  DEBUT Fetch-GF-Poi.ps1
+2026-07-25 21:59:53  poi  DEBUT (zone_d_activite_ou_d_interet + POI OSM)
+2026-07-25 21:59:54  poi  WFS BDTOPO_V3:zone_d_activite_ou_d_interet page STARTINDEX=0 : 1000 features (cumul 1000)
+2026-07-25 21:59:55  poi  WFS BDTOPO_V3:zone_d_activite_ou_d_interet page STARTINDEX=1000 : 487 features (cumul 1487)
+2026-07-25 21:59:57  poi  attributs ZAI : categorie, nature, nature_detaillee, toponyme, statut_du_toponyme, importance, fictif, etat_de_l_objet, insee_commune, commune, adresse_postale, identifiant_voie_ban, nom_commercial, id_ban_odonyme
+2026-07-25 21:59:58  poi  ZAI : 1487 (0 sans geometrie exploitable)
+2026-07-25 22:00:01  poi  Overpass POI quadrant (0,0) OK via https://overpass.openstreetmap.fr/api/interpreter (1585 elements)
+2026-07-25 22:00:01  poi  POI quadrant (0,0) : cumul 1585
+2026-07-25 22:00:05  poi  Overpass POI quadrant (1,0) OK via https://overpass.openstreetmap.fr/api/interpreter (1574 elements)
+2026-07-25 22:00:05  poi  POI quadrant (1,0) : cumul 3151
+2026-07-25 22:00:09  poi  Overpass POI quadrant (0,1) OK via https://overpass.openstreetmap.fr/api/interpreter (1178 elements)
+2026-07-25 22:00:09  poi  POI quadrant (0,1) : cumul 4324
+2026-07-25 22:00:22  poi  Overpass POI quadrant (1,1) OK via https://overpass.openstreetmap.fr/api/interpreter (1231 elements)
+2026-07-25 22:00:22  poi  POI quadrant (1,1) : cumul 5546
+2026-07-25 22:00:24  poi  FIN : 1487 ZAI + 5546 POI OSM, 1.2 Mo
+2026-07-25 22:00:24  chaine-wfs  FIN Fetch-GF-Poi.ps1
+2026-07-25 22:00:24  chaine-wfs  CHAINE WFS TERMINEE
+2026-07-25 22:03:17  campagne  GRAND FETCH TERMINE : 12 themes, 13 JSON, rapport complet + addendum
