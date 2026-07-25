@@ -185,6 +185,15 @@ la BD ORTHO, streaming ×5-10, HLOD auto). Données terrain prêtes :
   set_editor_property ne dirty pas le package, save_asset only_if_is_dirty par défaut n'écrivait RIEN) ; finit le
   « missing usage flag Nanite » en -game (fallback décimé en Default Material, toits fondus). 32/32 tests.
 
+- 2026-07-25 (nuit) : **Verrou 2 « collision bâtiments » prouvé + passe complète** — les murs Nanite ne servent
+  jamais de collision (fallback décimé ~0,1 % = façades traversables) : chaque cellule desktop reçoit un
+  SM_Bldg_*_Col en prismes fermés (pose Lot A exacte, complex-as-simple, sans Nanite) câblé en
+  ComplexCollisionMesh du _Wall — natif dans ImportCityStreamed (profil desktop) + outils AICallable
+  GenerateBuildingCollisionCell/All (`Tools/gen_bldg_collision.py`, 457 _Col en 14 min, sauvegarde forcée au
+  fil de l'eau, copiés vers Survol hash-vérifiés). Test SENTINELLE par line traces physiques dans un monde de
+  jeu dédié (piège : traces muettes sans monde initialisé) : HIT façade ±50 cm, MISS rue, HIT toits au Z exact.
+  35/35 tests.
+
 - **Chronologie complète, mesures device et procédures de reprise : voir
   `../DroneCity/Doc/Journal-Toulouse10.md`** (LE document de référence de la
   campagne Toulouse 10 km, v1→v14b : RAM, GPU, miroir nord=-Y, routes texturées,

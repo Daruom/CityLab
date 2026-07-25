@@ -125,8 +125,49 @@ struct FCityStreamedSummary
 	/** Detail building meshes, one per cell, spawned inside streaming blocks. */
 	UPROPERTY() int32 BuildingMeshes = 0;
 
+	/** Dedicated building collision meshes (SM_Bldg_*_Col), one per desktop cell. */
+	UPROPERTY() int32 BuildingColMeshes = 0;
+
 	/** Streaming sublevels created or refilled. */
 	UPROPERTY() int32 StreamingBlocks = 0;
+};
+
+/** Counts of what GenerateBuildingCollisionCell produced for one cell. */
+USTRUCT(BlueprintType)
+struct FCityBldgColSummary
+{
+	GENERATED_BODY()
+
+	/** Buildings whose footprint prism went into the cell's collision mesh. */
+	UPROPERTY() int32 Buildings = 0;
+
+	/** Triangles in the generated collision mesh. */
+	UPROPERTY() int32 Triangles = 0;
+
+	/** True when SM_Bldg_<x>_<y>_Wall existed and now uses the _Col as ComplexCollisionMesh. */
+	UPROPERTY() bool bWallWired = false;
+
+	/** True when the touched packages were saved to disk. */
+	UPROPERTY() bool bSaved = false;
+};
+
+/** Counts of what GenerateBuildingCollisionAll produced. */
+USTRUCT(BlueprintType)
+struct FCityBldgColBatchSummary
+{
+	GENERATED_BODY()
+
+	/** Cells that received a SM_Bldg_*_Col mesh. */
+	UPROPERTY() int32 Cells = 0;
+
+	/** Building prisms built, all cells together. */
+	UPROPERTY() int32 Buildings = 0;
+
+	/** Wall meshes wired to their _Col. */
+	UPROPERTY() int32 WiredWalls = 0;
+
+	/** Cells whose SM_Bldg_*_Wall asset was missing (the _Col is still created). */
+	UPROPERTY() int32 MissingWalls = 0;
 };
 
 /** Counts of what ImportCitySurfaces generated. */
@@ -256,4 +297,40 @@ public:
 		const FString& BlocksFolder, const FString& WallMaterialPath, const FString& GlassMaterialPath,
 		float CellSizeM, float BlockSizeM, float ProxyCellSizeM, FVector Location,
 		const FCityGenProfile& Profile);
+
+	/**
+	 * Builds the dedicated building-collision mesh of one grid cell: one CLOSED prism
+	 * per building whose centroid falls in the cell (ear-clipped footprint as top and
+	 * bottom caps + one quad per edge), seated exactly like the district import
+	 * (roof = ZBase + h, foot = ZBase - socle; flat profile = 0..h). The mesh
+	 * SM_Bldg_<CellX>_<CellY>_Col is written under AssetFolder (complex-as-simple
+	 * trimesh, no Nanite, default material) and wired as ComplexCollisionMesh of
+	 * SM_Bldg_<CellX>_<CellY>_Wall when that mesh exists. Touched packages are saved.
+	 * @param JsonFilePath Absolute path to the district JSON (see SourceData/*.json).
+	 * @param AssetFolder Package folder of the generated meshes, e.g. "/Game/City/Toulouse10".
+	 * @param CellSizeM Grid cell size the district was imported with, meters.
+	 * @param CellX Cell index X (floor of building centroid X / cell size).
+	 * @param CellY Cell index Y.
+	 * @param Profile Generation profile; must match the city's generation profile so
+	 *        the prisms seat at the same Z (desktop drapes onto the MNT).
+	 * @return Counts for the cell.
+	 */
+	UFUNCTION(meta = (AICallable), Category = "CityImportTools")
+	static FCityBldgColSummary GenerateBuildingCollisionCell(const FString& JsonFilePath,
+		const FString& AssetFolder, float CellSizeM, int32 CellX, int32 CellY,
+		const FCityGenProfile& Profile);
+
+	/**
+	 * Runs GenerateBuildingCollisionCell over EVERY cell that contains buildings,
+	 * parsing the district JSON once. Packages are saved cell by cell, so a killed
+	 * run keeps everything already generated.
+	 * @param JsonFilePath Absolute path to the district JSON (see SourceData/*.json).
+	 * @param AssetFolder Package folder of the generated meshes, e.g. "/Game/City/Toulouse10".
+	 * @param CellSizeM Grid cell size the district was imported with, meters.
+	 * @param Profile Generation profile; must match the city's generation profile.
+	 * @return Aggregated counts.
+	 */
+	UFUNCTION(meta = (AICallable), Category = "CityImportTools")
+	static FCityBldgColBatchSummary GenerateBuildingCollisionAll(const FString& JsonFilePath,
+		const FString& AssetFolder, float CellSizeM, const FCityGenProfile& Profile);
 };

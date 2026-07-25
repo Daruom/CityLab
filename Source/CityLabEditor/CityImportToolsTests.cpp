@@ -1,9 +1,13 @@
 #include "CityImportTools.h"
 #include "TerrainSampler.h"
 
+#include "Components/StaticMeshComponent.h"
 #include "Editor.h"
+#include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
 #include "Engine/Texture2D.h"
+#include "Engine/World.h"
 #include "HAL/PlatformFileManager.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInterface.h"
@@ -13,6 +17,7 @@
 #include "Misc/Paths.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "StaticMeshAttributes.h"
+#include "StaticMeshCompiler.h"
 
 BEGIN_DEFINE_SPEC(
 	FCityImportToolsSpec,
@@ -619,6 +624,147 @@ void FCityImportToolsSpec::Define()
 				TestEqual(TEXT("Batiments : 2 canaux UV (toits ortho-ready)"),
 					FStaticMeshAttributes(*WallDesc).GetVertexInstanceUVs().GetNumChannels(), 2);
 			}
+		});
+	});
+
+	// Verrou 2 « collision batiments » : les murs Nanite ne servent JAMAIS de
+	// collision (fallback decime ~0,1 % = facades traversables, sonde 2026-07-25) —
+	// chaque cellule desktop recoit un SM_Bldg_*_Col en prismes fermes, cable en
+	// ComplexCollisionMesh du SM_Bldg_*_Wall. TEST SENTINELLE : preuve par line
+	// traces PHYSIQUES dans un monde de jeu dedie (piege connu : les traces sont
+	// muettes sans monde initialise avec sa scene physique).
+	Describe("CollisionBatiments", [this]()
+	{
+		// Fixture a plat (profil desktop manuel SANS MNT, Z deterministes) : deux
+		// batiments 20x20 m (h 12 et 9 m) separes par une rue de 20 m d'axe Y en
+		// x = 40 m, tout en cellule (0,0).
+		auto WriteFixture = [this]()
+		{
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_bldgcol.json"));
+			const FString Json = TEXT(R"({"buildings":[{"pts":[[10,10],[30,10],[30,30],[10,30]],"h":12,"u":"res"},)")
+				TEXT(R"({"pts":[[50,10],[70,10],[70,30],[50,30]],"h":9,"u":"com"}]})");
+			FFileHelper::SaveStringToFile(Json, *Path);
+			return Path;
+		};
+		auto DesktopFlat = []()
+		{
+			FCityGenProfile P;
+			P.bWindowReveals = true;
+			P.bSplitWallGlass = true;
+			P.bNanite = true;
+			P.bPBRMaterials = true;
+			return P;
+		};
+
+		It("sentinelle : prismes _Col cables — HIT facade a 50 cm pres, MISS rue, HIT toits au Z attendu", [this, WriteFixture, DesktopFlat]()
+		{
+			const FString Path = WriteFixture();
+			// La generation desktop cree ET cable les _Col nativement ; l'outil par
+			// cellule repasse par-dessus — les deux chemins doivent converger vers le
+			// meme asset cable (regeneration en place).
+			UCityImportTools::ImportCityStreamed(Path, FString(), TEXT("/Game/Dev/Test/City"),
+				TEXT("/Game/Dev/Test/Blocks"), FString(), FString(), 100.f, 200.f, 400.f,
+				FVector::ZeroVector, DesktopFlat());
+			const FCityBldgColSummary Summary = UCityImportTools::GenerateBuildingCollisionCell(
+				Path, TEXT("/Game/Dev/Test/City"), 100.f, 0, 0, DesktopFlat());
+			TestEqual(TEXT("2 batiments dans la cellule"), Summary.Buildings, 2);
+			TestTrue(TEXT("Wall cable"), Summary.bWallWired);
+			TestTrue(TEXT("Packages sauves"), Summary.bSaved);
+			// 2 prismes rectangulaires fermes : (4 quads lateraux + 2 chapeaux) x 2 tris.
+			TestEqual(TEXT("24 tris (2 prismes fermes)"), Summary.Triangles, 24);
+
+			UStaticMesh* Col = LoadTestMesh(TEXT("SM_Bldg_0_0_Col"));
+			UStaticMesh* Wall = LoadTestMesh(TEXT("SM_Bldg_0_0_Wall"));
+			if (!TestNotNull(TEXT("SM_Bldg_0_0_Col"), Col) || !TestNotNull(TEXT("SM_Bldg_0_0_Wall"), Wall))
+			{
+				return;
+			}
+			TestFalse(TEXT("_Col sans Nanite"), Col->GetNaniteSettings().bEnabled);
+			if (TestNotNull(TEXT("BodySetup _Col"), Col->GetBodySetup()))
+			{
+				TestEqual(TEXT("_Col complex-as-simple"),
+					(int32)Col->GetBodySetup()->CollisionTraceFlag, (int32)CTF_UseComplexAsSimple);
+				TestEqual(TEXT("_Col sans boite simple"), Col->GetBodySetup()->AggGeom.BoxElems.Num(), 0);
+			}
+			TestTrue(TEXT("Wall.ComplexCollisionMesh -> _Col"), Wall->ComplexCollisionMesh.Get() == Col);
+			if (Wall->GetBodySetup())
+			{
+				TestEqual(TEXT("Wall complex-as-simple"),
+					(int32)Wall->GetBodySetup()->CollisionTraceFlag, (int32)CTF_UseComplexAsSimple);
+			}
+
+			// --- Preuve physique : monde de jeu dedie + scene physique initialisee. ---
+			FStaticMeshCompilingManager::Get().FinishAllCompilation();
+			UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, TEXT("BldgColTraceWorld"));
+			if (!TestNotNull(TEXT("Monde de test"), World))
+			{
+				return;
+			}
+			FWorldContext& Ctx = GEngine->CreateNewWorldContext(EWorldType::Game);
+			Ctx.SetCurrentWorld(World);
+			World->InitializeActorsForPlay(FURL());
+			World->BeginPlay();
+
+			AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(
+				FVector::ZeroVector, FRotator::ZeroRotator);
+			Actor->GetStaticMeshComponent()->SetMobility(EComponentMobility::Movable);
+			Actor->GetStaticMeshComponent()->SetStaticMesh(Col);
+			Actor->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			Actor->GetStaticMeshComponent()->RecreatePhysicsState();
+			// Un tick pousse les corps statiques dans la structure d'acceleration SQ.
+			World->Tick(LEVELTICK_All, 0.016f);
+
+			FCollisionQueryParams Params(FName(TEXT("BldgColSentinel")), /*bTraceComplex=*/true);
+			FHitResult Hit;
+
+			// 1. Facade ouest du batiment A (plan x = 1000 cm), rayon +X a mi-hauteur.
+			bool bHit = World->LineTraceSingleByChannel(Hit,
+				FVector(-500, 2000, 600), FVector(2500, 2000, 600), ECC_Visibility, Params);
+			TestTrue(TEXT("Facade : HIT"), bHit);
+			if (bHit)
+			{
+				TestTrue(FString::Printf(TEXT("Facade touchee a x=%.1f (attendu 1000 +/- 50)"), Hit.Location.X),
+					FMath::Abs(Hit.Location.X - 1000.f) <= 50.f);
+			}
+			// 2. Axe de la rue (x = 40 m) : 70 m sans obstacle.
+			bHit = World->LineTraceSingleByChannel(Hit,
+				FVector(4000, -2000, 600), FVector(4000, 5000, 600), ECC_Visibility, Params);
+			TestFalse(TEXT("Rue : MISS"), bHit);
+			// 3. Toits : rayons verticaux, Z attendus 1200 (A) et 900 (B).
+			bHit = World->LineTraceSingleByChannel(Hit,
+				FVector(2000, 2000, 5000), FVector(2000, 2000, -200), ECC_Visibility, Params);
+			TestTrue(TEXT("Toit A : HIT"), bHit);
+			if (bHit)
+			{
+				TestTrue(FString::Printf(TEXT("Toit A a z=%.1f (attendu 1200 +/- 1)"), Hit.Location.Z),
+					FMath::Abs(Hit.Location.Z - 1200.f) <= 1.f);
+			}
+			bHit = World->LineTraceSingleByChannel(Hit,
+				FVector(6000, 2000, 5000), FVector(6000, 2000, -200), ECC_Visibility, Params);
+			TestTrue(TEXT("Toit B : HIT"), bHit);
+			if (bHit)
+			{
+				TestTrue(FString::Printf(TEXT("Toit B a z=%.1f (attendu 900 +/- 1)"), Hit.Location.Z),
+					FMath::Abs(Hit.Location.Z - 900.f) <= 1.f);
+			}
+
+			GEngine->DestroyWorldContext(World);
+			World->DestroyWorld(false);
+		});
+
+		It("raises when the cell has no building", [this, WriteFixture, DesktopFlat]()
+		{
+			const FString Path = WriteFixture();
+			AddExpectedError(TEXT("No building centroid in cell"), EAutomationExpectedErrorFlags::Contains);
+			UCityImportTools::GenerateBuildingCollisionCell(
+				Path, TEXT("/Game/Dev/Test/City"), 100.f, 9, 9, DesktopFlat());
+		});
+
+		It("raises when the file does not exist", [this, DesktopFlat]()
+		{
+			AddExpectedError(TEXT("Cannot read district file"), EAutomationExpectedErrorFlags::Contains);
+			UCityImportTools::GenerateBuildingCollisionCell(
+				TEXT("Z:/nope.json"), TEXT("/Game/Dev/Test/City"), 100.f, 0, 0, DesktopFlat());
 		});
 	});
 }

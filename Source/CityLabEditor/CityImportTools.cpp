@@ -2297,6 +2297,195 @@ namespace
 				FVector3f(0, 0, 1), RoofShaded);
 		}
 	}
+
+	// Prisme de collision FERME d'un batiment (Verrou 2) : emprise triangulee en
+	// plancher ET toit + un quad lateral par arete, aux Z EXACTS de la pose Lot A
+	// (toit = ZBase + h, pied = ZBase - socle). ~30 tris par batiment. Raison
+	// d'etre : les murs Nanite ne doivent JAMAIS servir de collision — leur
+	// fallback decime (~0,1 %) laisse les facades traversables (sonde 2026-07-25).
+	// Collision pure : ni teinte utile, ni UV, jamais rendu (pattern _Col du sol).
+	void BuildCollisionPrism(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm,
+		float TopZCm, float BottomZCm)
+	{
+		const FVector3f White(1.f, 1.f, 1.f);
+		const int32 N = PtsCm.Num();
+		for (int32 e = 0; e < N; ++e)
+		{
+			const FVector2D A2 = PtsCm[e];
+			const FVector2D B2 = PtsCm[(e + 1) % N];
+			if ((B2 - A2).Size() < 1.0)
+			{
+				continue;
+			}
+			const FVector2D T2 = (B2 - A2).GetSafeNormal();
+			const FVector3f Nout(T2.Y, -T2.X, 0.f);
+			QM.AddQuad(QM.WallGroup,
+				FVector3f(A2.X, A2.Y, BottomZCm), FVector3f(B2.X, B2.Y, BottomZCm),
+				FVector3f(B2.X, B2.Y, TopZCm), FVector3f(A2.X, A2.Y, TopZCm), Nout, White);
+		}
+		TArray<int32> Tris;
+		TriangulateRing(PtsCm, Tris);
+		for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
+		{
+			const FVector2D& P0 = PtsCm[Tris[t]];
+			const FVector2D& P1 = PtsCm[Tris[t + 1]];
+			const FVector2D& P2 = PtsCm[Tris[t + 2]];
+			QM.AddTri(QM.WallGroup, FVector3f(P0.X, P0.Y, TopZCm), FVector3f(P1.X, P1.Y, TopZCm),
+				FVector3f(P2.X, P2.Y, TopZCm), FVector3f(0, 0, 1), White);
+			QM.AddTri(QM.WallGroup, FVector3f(P0.X, P0.Y, BottomZCm), FVector3f(P1.X, P1.Y, BottomZCm),
+				FVector3f(P2.X, P2.Y, BottomZCm), FVector3f(0, 0, -1), White);
+		}
+	}
+
+	// Coeur commun des deux outils de collision batiments : parse le JSON UNE fois,
+	// construit les prismes par cellule (memes conventions que ImportCityStreamed :
+	// pts x100, CCW, cellule du centroide, ZBase/socle drapes), cree chaque
+	// SM_Bldg_<x>_<y>_Col (complex-as-simple, sans Nanite, materiau par defaut),
+	// le cable en ComplexCollisionMesh du SM_Bldg_<x>_<y>_Wall s'il existe, et
+	// sauvegarde les packages AU FIL DE L'EAU (un kill ne perd que la cellule en
+	// cours). OnlyCell non nul = une seule cellule.
+	bool GenerateBuildingCollisionForCells(const FString& JsonFilePath, const FString& AssetFolder,
+		float CellSizeM, const FCityGenProfile& Profile, const FIntPoint* OnlyCell,
+		TMap<FIntPoint, FCityBldgColSummary>& OutCells)
+	{
+		if (AssetFolder.IsEmpty() || !AssetFolder.StartsWith(TEXT("/")))
+		{
+			RaiseError(TEXT("AssetFolder must be a package path such as /Game/City."));
+			return false;
+		}
+		if (CellSizeM < 20.f)
+		{
+			RaiseError(TEXT("CellSizeM must be >= 20."));
+			return false;
+		}
+		const FCityGenProfile Gen = Profile.Resolved();
+		FDrapeContext Drape;
+		if (!MakeDrapeContext(Gen, Drape))
+		{
+			return false;
+		}
+		FString Json;
+		if (!FFileHelper::LoadFileToString(Json, *JsonFilePath))
+		{
+			RaiseError(FString::Printf(TEXT("Cannot read district file '%s'."), *JsonFilePath));
+			return false;
+		}
+		TSharedPtr<FJsonObject> Root;
+		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) || !Root.IsValid())
+		{
+			RaiseError(TEXT("District file is not valid JSON."));
+			return false;
+		}
+		const TArray<TSharedPtr<FJsonValue>>* BuildingsJson = nullptr;
+		if (!Root->TryGetArrayField(TEXT("buildings"), BuildingsJson) || BuildingsJson->Num() == 0)
+		{
+			RaiseError(TEXT("District file has no 'buildings' array."));
+			return false;
+		}
+
+		const float Cell = CellSizeM * 100.f;
+		TMap<FIntPoint, TUniquePtr<FCityMeshBuilder>> ColCells;
+		TMap<FIntPoint, int32> CellBuildings;
+		for (const TSharedPtr<FJsonValue>& V : *BuildingsJson)
+		{
+			const TSharedPtr<FJsonObject>& O = V->AsObject();
+			TArray<FVector2D> Pts;
+			for (const TSharedPtr<FJsonValue>& PV : O->GetArrayField(TEXT("pts")))
+			{
+				const TArray<TSharedPtr<FJsonValue>>& C = PV->AsArray();
+				if (C.Num() >= 2)
+				{
+					Pts.Add(FVector2D(C[0]->AsNumber() * 100.0, C[1]->AsNumber() * 100.0));
+				}
+			}
+			if (Pts.Num() < 3)
+			{
+				continue;
+			}
+			if (SignedArea(Pts) < 0)
+			{
+				Algo::Reverse(Pts);
+			}
+			FVector2D Centroid(0, 0);
+			for (const FVector2D& P : Pts) { Centroid += P; }
+			Centroid /= Pts.Num();
+			const FIntPoint Key(FMath::FloorToInt(Centroid.X / Cell), FMath::FloorToInt(Centroid.Y / Cell));
+			if (OnlyCell && Key != *OnlyCell)
+			{
+				continue;
+			}
+			const float Hcm = O->GetNumberField(TEXT("h")) * 100.f;
+			float ZBase = 0.f, SocleDepth = 0.f;
+			if (Drape.IsActive())
+			{
+				const float MinAlt = Drape.Sampler->MinAltCmInPolygon(Pts);
+				const float MaxAlt = Drape.Sampler->MaxAltCmInPolygon(Pts);
+				ZBase = MinAlt - Drape.AltCapCm;
+				SocleDepth = (MaxAlt - MinAlt) + Gen.SocleCm;
+			}
+			TUniquePtr<FCityMeshBuilder>& Builder = ColCells.FindOrAdd(Key);
+			if (!Builder)
+			{
+				Builder = MakeUnique<FCityMeshBuilder>();
+			}
+			BuildCollisionPrism(*Builder, Pts, ZBase + Hcm, ZBase - SocleDepth);
+			++CellBuildings.FindOrAdd(Key);
+		}
+		if (ColCells.Num() == 0)
+		{
+			RaiseError(OnlyCell
+				? FString::Printf(TEXT("No building centroid in cell (%d, %d)."), OnlyCell->X, OnlyCell->Y)
+				: TEXT("No usable building footprint in the district file."));
+			return false;
+		}
+
+		UMaterialInterface* DefaultMat = UMaterial::GetDefaultMaterial(MD_Surface);
+		int32 Done = 0;
+		for (auto& Pair : ColCells)
+		{
+			const FString Name = FString::Printf(TEXT("SM_Bldg_%d_%d"), Pair.Key.X, Pair.Key.Y);
+			UStaticMesh* ColMesh = CreateMeshAsset(AssetFolder / (Name + TEXT("_Col")), *Pair.Value,
+				DefaultMat, DefaultMat, true);
+			// Attendre la compilation du _Col avant cablage/sauvegarde (meme piege que
+			// le sol : le cook physique lit sa SectionInfoMap depuis un worker).
+			FStaticMeshCompilingManager::Get().FinishCompilation(
+				TArrayView<UStaticMesh* const>(&ColMesh, 1));
+			FCityBldgColSummary& Out = OutCells.FindOrAdd(Pair.Key);
+			Out.Buildings = CellBuildings[Pair.Key];
+			const FMeshDescription* ColDesc = ColMesh->GetMeshDescription(0);
+			Out.Triangles = ColDesc ? ColDesc->Triangles().Num() : 0;
+
+			TArray<UPackage*> ToSave = { ColMesh->GetPackage() };
+			const FString WallName = Name + TEXT("_Wall");
+			UStaticMesh* Wall = LoadObject<UStaticMesh>(nullptr,
+				*(AssetFolder / WallName + TEXT(".") + WallName), nullptr, LOAD_NoWarn | LOAD_Quiet);
+			if (Wall)
+			{
+				Wall->Modify();
+				Wall->ComplexCollisionMesh = ColMesh;
+				if (!Wall->GetBodySetup())
+				{
+					Wall->CreateBodySetup();
+				}
+				Wall->GetBodySetup()->CollisionTraceFlag = CTF_UseComplexAsSimple;
+				// GUID physique regenere : le trimesh cuit (DDC) doit repartir du _Col,
+				// pas du fallback Nanite decime. Pas de Build() complet : la geometrie de
+				// rendu du Wall ne change pas, seule la source de collision change.
+				Wall->GetBodySetup()->InvalidatePhysicsData();
+				Wall->MarkPackageDirty();
+				ToSave.Add(Wall->GetPackage());
+				Out.bWallWired = true;
+			}
+			// Sauvegarde FORCEE (bOnlyDirty=false) au fil de l'eau.
+			Out.bSaved = UEditorLoadingAndSavingUtils::SavePackages(ToSave, /*bOnlyDirty=*/false);
+			++Done;
+			UE_LOG(LogCityImport, Display,
+				TEXT("Collision batiments %d/%d : %s_Col — %d batiments, %d tris, wall %s, save %s"),
+				Done, ColCells.Num(), *Name, Out.Buildings, Out.Triangles,
+				Out.bWallWired ? TEXT("cable") : TEXT("ABSENT"), Out.bSaved ? TEXT("OK") : TEXT("ECHEC"));
+		}
+		return true;
+	}
 }
 
 FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFilePath,
@@ -2398,7 +2587,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	const float Cell = CellSizeM * 100.f;
 	const float ProxyCell = ProxyCellSizeM * 100.f;
 	const float Block = BlockSizeM * 100.f;
-	TMap<FIntPoint, TUniquePtr<FCityMeshBuilder>> BldgCells, BldgGlassCells, GroundCells, ProxyCells;
+	TMap<FIntPoint, TUniquePtr<FCityMeshBuilder>> BldgCells, BldgGlassCells, BldgColCells, GroundCells, ProxyCells;
 	TSet<FIntPoint> SlabKeys;
 	// bLinear / bUV1 (Lot B) : appliques a la CREATION du builder de cellule —
 	// encodage lineaire des couleurs et canal UV1 monde. Defauts = mobile inchange.
@@ -2473,6 +2662,10 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 					? GetIn(BldgGlassCells, Centroid, Cell, bLinearColors, false) : WallB;
 				BuildPolygonBuildingDesktop(WallB, GlassB, Pts, Hcm, Tint, UsageTile(Usage, Index),
 					ZBase, SocleDepth, Gen.bWindowReveals, bBakedShade);
+				// Verrou 2 : prisme de collision dedie, meme pose — les murs Nanite ne
+				// servent JAMAIS de collision (fallback decime = facades traversables).
+				BuildCollisionPrism(GetIn(BldgColCells, Centroid, Cell), Pts,
+					ZBase + Hcm, ZBase - SocleDepth);
 			}
 			else
 			{
@@ -2757,10 +2950,28 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 					? GetOrCreateWallPBRMaterial(AssetFolder, Gen.AtlasSizePx) : WallMat;
 				UMaterialInterface* BldgGlassMat = Gen.bPBRMaterials
 					? GetOrCreateGlassPBRMaterial(AssetFolder) : GlassMat;
+				// Verrou 2 : le mesh de collision dedie (prismes) est cree d'abord puis
+				// cable en ComplexCollisionMesh du mesh opaque — pattern _Col du sol.
+				// Sans lui, la collision du Wall Nanite viendrait du fallback decime.
+				UStaticMesh* ColMesh = nullptr;
+				if (TUniquePtr<FCityMeshBuilder>* ColB = BldgColCells.Find(CellKey))
+				{
+					UMaterialInterface* DefaultMat = UMaterial::GetDefaultMaterial(MD_Surface);
+					ColMesh = CreateMeshAsset(AssetFolder / (Name + TEXT("_Col")), **ColB,
+						DefaultMat, DefaultMat, true);
+					// Finir sa compilation TOUT DE SUITE : a la regeneration en place, le
+					// chargement du Wall deja cable sur disque peut survenir pendant un
+					// flush de chargement — finir la compilation du _Col DEPUIS ce contexte
+					// declenche l'ensure « Overriding GIsEditorLoadingPackage » (attrape
+					// par le test sentinelle au 2e run).
+					FStaticMeshCompilingManager::Get().FinishCompilation(
+						TArrayView<UStaticMesh* const>(&ColMesh, 1));
+					++Summary.BuildingColMeshes;
+				}
 				if (Gen.bSplitWallGlass)
 				{
 					SpawnBldg(Name + TEXT("_Wall"), CreateMeshAsset(AssetFolder / (Name + TEXT("_Wall")),
-						*BldgCells[CellKey], BldgWallMat, BldgWallMat, true, false, 0.f, nullptr, bNanite));
+						*BldgCells[CellKey], BldgWallMat, BldgWallMat, true, false, 0.f, ColMesh, bNanite));
 					TUniquePtr<FCityMeshBuilder>* GlassB = BldgGlassCells.Find(CellKey);
 					if (GlassB && (*GlassB)->QuadCount > 0)
 					{
@@ -2771,7 +2982,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				else
 				{
 					SpawnBldg(Name, CreateMeshAsset(AssetFolder / Name, *BldgCells[CellKey],
-						BldgWallMat, BldgGlassMat, true, false, 0.f, nullptr, bNanite));
+						BldgWallMat, BldgGlassMat, true, false, 0.f, ColMesh, bNanite));
 				}
 			}
 			else
@@ -2839,8 +3050,44 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	FEditorFileUtils::SaveDirtyPackages(/*bPromptUserToSave=*/false, /*bSaveMapPackages=*/true,
 		/*bSaveContentPackages=*/true);
 	UE_LOG(LogCityImport, Display,
-		TEXT("Ville streamee : %d batiments, %d routes, %d arbres — %d sols, %d proxys, %d meshes detail, %d blocs. Tout est sauve."),
+		TEXT("Ville streamee : %d batiments, %d routes, %d arbres — %d sols, %d proxys, %d meshes detail, %d collisions batiments, %d blocs. Tout est sauve."),
 		Summary.Buildings, Summary.Roads, Summary.Trees, Summary.GroundMeshes, Summary.ProxyMeshes,
-		Summary.BuildingMeshes, Summary.StreamingBlocks);
+		Summary.BuildingMeshes, Summary.BuildingColMeshes, Summary.StreamingBlocks);
+	return Summary;
+}
+
+FCityBldgColSummary UCityImportTools::GenerateBuildingCollisionCell(const FString& JsonFilePath,
+	const FString& AssetFolder, float CellSizeM, int32 CellX, int32 CellY,
+	const FCityGenProfile& Profile)
+{
+	FCityBldgColSummary Summary;
+	const FIntPoint Cell(CellX, CellY);
+	TMap<FIntPoint, FCityBldgColSummary> Cells;
+	if (GenerateBuildingCollisionForCells(JsonFilePath, AssetFolder, CellSizeM, Profile, &Cell, Cells))
+	{
+		Summary = Cells.FindRef(Cell);
+	}
+	return Summary;
+}
+
+FCityBldgColBatchSummary UCityImportTools::GenerateBuildingCollisionAll(const FString& JsonFilePath,
+	const FString& AssetFolder, float CellSizeM, const FCityGenProfile& Profile)
+{
+	FCityBldgColBatchSummary Summary;
+	TMap<FIntPoint, FCityBldgColSummary> Cells;
+	if (!GenerateBuildingCollisionForCells(JsonFilePath, AssetFolder, CellSizeM, Profile, nullptr, Cells))
+	{
+		return Summary;
+	}
+	for (const auto& Pair : Cells)
+	{
+		++Summary.Cells;
+		Summary.Buildings += Pair.Value.Buildings;
+		Summary.WiredWalls += Pair.Value.bWallWired ? 1 : 0;
+		Summary.MissingWalls += Pair.Value.bWallWired ? 0 : 1;
+	}
+	UE_LOG(LogCityImport, Display,
+		TEXT("Collision batiments : %d cellules, %d batiments, %d walls cables, %d walls absents."),
+		Summary.Cells, Summary.Buildings, Summary.WiredWalls, Summary.MissingWalls);
 	return Summary;
 }
