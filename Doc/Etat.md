@@ -180,6 +180,11 @@ la BD ORTHO, streaming ×5-10, HLOD auto). Données terrain prêtes :
   un load_map PAR bloc + destruction des labels mobiles exacts + resauvegarde.
   À corriger dans l'outil si une régénération headless doit redevenir mono-passe.
 
+- 2026-07-25 (nuit) : **flag d'usage Nanite posé sur les 4 M_City*_PBR** — générateur (`SetUsageByFlag(MATUSAGE_Nanite)`
+  dans GetOrCreatePBRMaterial, accès direct bUsedWithNanite déprécié 5.8) + assets via `Tools/fix_nanite_usage.py` (piège :
+  set_editor_property ne dirty pas le package, save_asset only_if_is_dirty par défaut n'écrivait RIEN) ; finit le
+  « missing usage flag Nanite » en -game (fallback décimé en Default Material, toits fondus). 32/32 tests.
+
 - **Chronologie complète, mesures device et procédures de reprise : voir
   `../DroneCity/Doc/Journal-Toulouse10.md`** (LE document de référence de la
   campagne Toulouse 10 km, v1→v14b : RAM, GPU, miroir nord=-Y, routes texturées,

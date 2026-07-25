@@ -1838,6 +1838,13 @@ namespace
 		UMaterial* M = NewObject<UMaterial>(Package, *ObjectName, RF_Public | RF_Standalone);
 		M->MaterialDomain = MD_Surface;
 		M->SetShadingModel(MSM_DefaultLit);
+		// Flag d'usage Nanite : les meshes Lot B opaques (et le verre opaque J2e)
+		// sont Nanite ; sans ce flag, -game refuse le materiau (« missing usage
+		// flag Nanite ») et rend le fallback decime 0,1 % en Default Material
+		// (toits fondus). L'acces direct a bUsedWithNanite est deprecie en 5.8 :
+		// SetUsageByFlag pose le flag sans recompiler, le PostEditChange final
+		// compile avec l'usage inclus.
+		M->SetUsageByFlag(MATUSAGE_Nanite, true);
 		UMaterialExpression* Base = nullptr;
 		if (TexOrNull)
 		{
