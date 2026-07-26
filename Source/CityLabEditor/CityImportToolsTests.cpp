@@ -128,6 +128,49 @@ void FCityImportToolsSpec::Define()
 			TestEqual(TEXT("Deux blocs de streaming"), Summary.StreamingBlocks, 2);
 		});
 
+		It("J3b : toit en pente depuis le squelette precalcule, fallback plat si bloc invalide", [this]()
+		{
+			// Batiment 1 : rectangle 12x10, egout 5,5 m, delta 2 m — squelette du
+			// self-test de Tools/j3b_prep_toits.py (2 noeuds a d=5). Faitage attendu
+			// a 550 + 200 = 750. Batiment 2 (cellule 2_0) : delta 99 m ABERRANT ->
+			// rejete par ParseRoof, toit plat historique a h = 800.
+			const FString BldPath = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_bati_toits.json"));
+			const FString BldJson = TEXT(R"({"buildings":[)")
+				TEXT(R"({"pts":[[0,0],[12,0],[12,10],[0,10]],"h":8,"u":"res","roof":{)")
+				TEXT(R"("eave":5.5,"delta":2,"mat":"ardoise",)")
+				TEXT(R"("sv":[[5,5,5],[7,5,5]],)")
+				TEXT(R"("f":[[0,1,5,4],[1,2,5],[2,3,4,5],[3,0,4]]}},)")
+				TEXT(R"({"pts":[[250,0],[262,0],[262,10],[250,10]],"h":8,"u":"res","roof":{)")
+				TEXT(R"("eave":5.5,"delta":99,"mat":"tuile","sv":[[256,5,5]],"f":[[0,1,4],[1,2,4],[2,3,4]]}}]})");
+			FFileHelper::SaveStringToFile(BldJson, *BldPath);
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_toits_main.json"));
+			FFileHelper::SaveStringToFile(TEXT(R"({"buildings":[]})"), *Path);
+
+			FCityGenProfile Profile;
+			Profile.bWindowReveals = true;   // chemin batiments desktop, sans MNT (ZBase = 0)
+			Profile.bSplitWallGlass = true;
+			Profile.BuildingsJsonPath = BldPath;
+			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, Profile);
+			TestEqual(TEXT("Batiments (source dediee)"), Summary.Buildings, 2);
+			TestEqual(TEXT("Un seul toit en pente (delta aberrant rejete)"), Summary.RoofsPitched, 1);
+
+			float MinZ = 0.f, MaxZ = 0.f;
+			UStaticMesh* Pitched = LoadTestMesh(TEXT("SM_Bldg_0_0_Wall"));
+			if (TestTrue(TEXT("SM_Bldg_0_0_Wall lisible"), GetMeshZBounds(Pitched, MinZ, MaxZ)))
+			{
+				TestTrue(FString::Printf(TEXT("Faitage %.1f = egout 550 + delta 200"), MaxZ),
+					FMath::Abs(MaxZ - 750.f) <= 1.f);
+			}
+			UStaticMesh* Flat = LoadTestMesh(TEXT("SM_Bldg_2_0_Wall"));
+			if (TestTrue(TEXT("SM_Bldg_2_0_Wall lisible"), GetMeshZBounds(Flat, MinZ, MaxZ)))
+			{
+				TestTrue(FString::Printf(TEXT("Fallback plat %.1f = h 800"), MaxZ),
+					FMath::Abs(MaxZ - 800.f) <= 1.f);
+			}
+		});
+
 		It("raises when the file does not exist", [this]()
 		{
 			AddExpectedError(TEXT("Cannot read district file"), EAutomationExpectedErrorFlags::Contains);

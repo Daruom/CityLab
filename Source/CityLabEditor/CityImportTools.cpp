@@ -1820,6 +1820,102 @@ namespace
 		return 8;                                              // moderne
 	}
 
+	// -----------------------------------------------------------------------------
+	// J3b — toits en pente ANCRES. Le squelette droit est PRECALCULE par
+	// Tools/j3b_prep_toits.py (bpypolyskel) et livre dans le JSON batiments
+	// (bloc "roof") : le C++ ne fait que mailler, z = egout + delta * d / maxd
+	// (la pente est lineaire en d par construction du squelette). Tout bloc
+	// incoherent -> toit plat historique, jamais d'erreur fatale.
+	struct FRoofData
+	{
+		float EaveCm = 0.f;          // egout - sol (IGN alt_min_toit - alt_min_sol)
+		float DeltaCm = 0.f;         // faitage - egout (borne [0,3 ; 30] m au prep)
+		int32 Tile = 10;             // sous-tuile atlas (10 tuile, 11 ardoise/zinc, 13 beton)
+		TArray<FVector3f> Skel;      // noeuds du squelette : x,y en cm, Z = retrait d en cm
+		TArray<TArray<int32>> Faces; // versants ; idx < N = anneau, sinon Skel[idx - N]
+		float MaxDcm = 0.f;
+	};
+
+	int32 RoofTileFromMat(const FString& Mat)
+	{
+		if (Mat == TEXT("ardoise") || Mat == TEXT("zinc")) { return 11; }
+		if (Mat == TEXT("beton")) { return 13; }
+		return 10; // tuile terre cuite — defaut toulousain (verrou 1 : ~79 % tuile)
+	}
+
+	// Lit et VALIDE le bloc "roof" d'un batiment (N = nombre de points de l'anneau).
+	// false = pas de toit en pente (l'appelant retombe sur le toit plat).
+	bool ParseRoof(const TSharedPtr<FJsonObject>& Bldg, int32 N, FRoofData& Out)
+	{
+		const TSharedPtr<FJsonObject>* RoofObj = nullptr;
+		if (!Bldg->TryGetObjectField(TEXT("roof"), RoofObj))
+		{
+			return false;
+		}
+		double Eave = 0.0, Delta = 0.0;
+		if (!(*RoofObj)->TryGetNumberField(TEXT("eave"), Eave) ||
+			!(*RoofObj)->TryGetNumberField(TEXT("delta"), Delta) ||
+			Eave < 2.0 || Delta < 0.3 || Delta > 30.0)
+		{
+			return false;
+		}
+		const TArray<TSharedPtr<FJsonValue>>* Sv = nullptr;
+		const TArray<TSharedPtr<FJsonValue>>* Fa = nullptr;
+		if (!(*RoofObj)->TryGetArrayField(TEXT("sv"), Sv) || Sv->Num() == 0 ||
+			!(*RoofObj)->TryGetArrayField(TEXT("f"), Fa) || Fa->Num() < 3)
+		{
+			return false;
+		}
+		Out.EaveCm = (float)(Eave * 100.0);
+		Out.DeltaCm = (float)(Delta * 100.0);
+		FString Mat;
+		(*RoofObj)->TryGetStringField(TEXT("mat"), Mat);
+		Out.Tile = RoofTileFromMat(Mat);
+		Out.Skel.Reset(Sv->Num());
+		Out.MaxDcm = 0.f;
+		for (const TSharedPtr<FJsonValue>& V : *Sv)
+		{
+			const TArray<TSharedPtr<FJsonValue>>& C = V->AsArray();
+			if (C.Num() < 3)
+			{
+				return false;
+			}
+			const FVector3f P((float)(C[0]->AsNumber() * 100.0),
+				(float)(C[1]->AsNumber() * 100.0), (float)(C[2]->AsNumber() * 100.0));
+			if (!FMath::IsFinite(P.X) || !FMath::IsFinite(P.Y) || P.Z < 0.f)
+			{
+				return false;
+			}
+			Out.MaxDcm = FMath::Max(Out.MaxDcm, P.Z);
+			Out.Skel.Add(P);
+		}
+		if (Out.MaxDcm < 1.f)
+		{
+			return false;
+		}
+		Out.Faces.Reset(Fa->Num());
+		for (const TSharedPtr<FJsonValue>& FV : *Fa)
+		{
+			TArray<int32> Face;
+			for (const TSharedPtr<FJsonValue>& IV : FV->AsArray())
+			{
+				const int32 Idx = (int32)IV->AsNumber();
+				if (Idx < 0 || Idx >= N + Out.Skel.Num())
+				{
+					return false;
+				}
+				Face.Add(Idx);
+			}
+			// Contrat du prep : la 1re arete de chaque versant = une arete de l'anneau.
+			if (Face.Num() < 3 || Face[0] >= N || Face[1] >= N || (Face[1] - Face[0] + N) % N != 1)
+			{
+				return false;
+			}
+			Out.Faces.Add(MoveTemp(Face));
+		}
+		return true;
+	}
+
 	// Fabrique commune des materiaux PBR Lot B : DefaultLit (PAS unlit — Lumen
 	// eclaire, spec §3.3), BaseColor = [Texture x] VertexColor ou constante,
 	// Roughness/Metallic constants. Meme patron code que GetOrCreateFacadeMaterial.
@@ -1938,7 +2034,8 @@ namespace
 	// bBakedShade=false (PBR) : teintes brutes, Lumen eclaire (plus de Shade cuit).
 	void BuildPolygonBuildingDesktop(FCityMeshBuilder& Wall, FCityMeshBuilder& Glass,
 		const TArray<FVector2D>& PtsCm, float Hcm, const FVector3f& Tint, int32 WallTile,
-		float ZBaseCm, float SocleDepthCm, bool bReveals, bool bBakedShade)
+		float ZBaseCm, float SocleDepthCm, bool bReveals, bool bBakedShade,
+		const FRoofData* Roof = nullptr)
 	{
 		const int32 Floors = FMath::Clamp(FMath::RoundToInt32(Hcm / 290.f), 1, 40);
 		const float FloorH = Hcm / Floors;
@@ -2071,8 +2168,78 @@ namespace
 			}
 		}
 
-		// Toit plat : sous-tuile toit terre cuite (10), quasi blanc en vertex color
-		// (la tuile porte la couleur), UV0 = emprise normalisee dans la sous-tuile.
+		// Toit : versants du squelette droit si fournis (J3b), sinon plat historique.
+		// Quasi blanc en vertex color (la sous-tuile porte la couleur du materiau).
+		const FVector3f RoofTint(0.95f, 0.95f, 0.95f);
+		if (Roof)
+		{
+			// Ici Hcm = hauteur d'EGOUT (les murs s'arretent a l'egout), le versant
+			// monte de delta * d / maxd. UV0 : U le long de l'arete d'egout (1re
+			// arete du versant, contrat du prep), V le long du rampant (longueur
+			// reelle) — les rangees de tuiles restent paralleles a l'egout.
+			const float SlopeLen = FMath::Sqrt(1.f + FMath::Square(Roof->DeltaCm / Roof->MaxDcm));
+			for (const TArray<int32>& Face : Roof->Faces)
+			{
+				const int32 Nf = Face.Num();
+				TArray<FVector3f> C;
+				TArray<FVector2D> C2;
+				TArray<float> D;
+				C.Reserve(Nf);
+				C2.Reserve(Nf);
+				D.Reserve(Nf);
+				for (const int32 Idx : Face)
+				{
+					const bool bRing = Idx < N;
+					const FVector2D XY = bRing ? PtsCm[Idx]
+						: FVector2D(Roof->Skel[Idx - N].X, Roof->Skel[Idx - N].Y);
+					const float d = bRing ? 0.f : Roof->Skel[Idx - N].Z;
+					C.Add(FVector3f((float)XY.X, (float)XY.Y,
+						ZBaseCm + Hcm + Roof->DeltaCm * d / Roof->MaxDcm));
+					C2.Add(XY);
+					D.Add(d);
+				}
+				const FVector2D EaveDir = (C2[1] - C2[0]).GetSafeNormal();
+				float U0 = FLT_MAX, U1 = -FLT_MAX, VMax = 1.f;
+				TArray<FVector2f> UV;
+				UV.Reserve(Nf);
+				for (int32 i = 0; i < Nf; ++i)
+				{
+					const float U = (float)FVector2D::DotProduct(C2[i] - C2[0], EaveDir);
+					U0 = FMath::Min(U0, U);
+					U1 = FMath::Max(U1, U);
+					VMax = FMath::Max(VMax, D[i] * SlopeLen);
+					UV.Add(FVector2f(U, D[i] * SlopeLen));
+				}
+				const float USpan = FMath::Max(U1 - U0, 1.f);
+				for (FVector2f& T : UV)
+				{
+					T = AtlasUV(Roof->Tile, (T.X - U0) / USpan, T.Y / VMax);
+				}
+				// Normale vraie du versant (Z force vers le haut). Tris par
+				// ear-clipping de la projection XY : un toit est un champ de hauteur,
+				// la projection d'un versant est donc un polygone simple (et le fan
+				// des n-gons ne gere pas les versants non convexes).
+				FVector3f Nrm = FVector3f::CrossProduct(C[1] - C[0], C[2] - C[0]).GetSafeNormal();
+				if (Nrm.Z < 0.f)
+				{
+					Nrm = -Nrm;
+				}
+				if (Nrm.IsNearlyZero())
+				{
+					Nrm = FVector3f(0, 0, 1);
+				}
+				TArray<int32> Tris;
+				TriangulateRing(C2, Tris);
+				for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
+				{
+					const FVector3f P[3] = { C[Tris[t]], C[Tris[t + 1]], C[Tris[t + 2]] };
+					const FVector2f TUV[3] = { UV[Tris[t]], UV[Tris[t + 1]], UV[Tris[t + 2]] };
+					Wall.AddPoly(Wall.WallGroup, P, 3, Nrm, TUV, Col(RoofTint, Nrm, Hcm));
+				}
+			}
+			return;
+		}
+		// Toit plat : sous-tuile toit terre cuite (10), UV0 = emprise normalisee.
 		TArray<int32> Tris;
 		TriangulateRing(PtsCm, Tris);
 		FBox2D RoofBox(ForceInit);
@@ -2081,7 +2248,6 @@ namespace
 			RoofBox += P;
 		}
 		const FVector2D RoofSize = RoofBox.GetSize();
-		const FVector3f RoofTint(0.95f, 0.95f, 0.95f);
 		const FVector3f Up(0, 0, 1);
 		for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
 		{
@@ -2515,6 +2681,23 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		RaiseError(TEXT("District file is not valid JSON."));
 		return Summary;
 	}
+	// J3b : source batiments dediee (anneaux nettoyes CCW + toits precalcules du
+	// prep). Routes, arbres et surfaces restent dans le JSON principal.
+	TSharedPtr<FJsonObject> BldRoot = Root;
+	if (!Gen.BuildingsJsonPath.IsEmpty())
+	{
+		FString BldJson;
+		if (!FFileHelper::LoadFileToString(BldJson, *Gen.BuildingsJsonPath))
+		{
+			RaiseError(FString::Printf(TEXT("Cannot read buildings file '%s'."), *Gen.BuildingsJsonPath));
+			return Summary;
+		}
+		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(BldJson), BldRoot) || !BldRoot.IsValid())
+		{
+			RaiseError(TEXT("Buildings file is not valid JSON."));
+			return Summary;
+		}
+	}
 	if (AssetFolder.IsEmpty() || !AssetFolder.StartsWith(TEXT("/")) ||
 		BlocksFolder.IsEmpty() || !BlocksFolder.StartsWith(TEXT("/")))
 	{
@@ -2548,6 +2731,22 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	const bool bBakedShade = !Gen.bPBRMaterials;
 	const bool bWorldUVs = Gen.bPBRMaterials;
 	const bool bNanite = Gen.bNanite;
+
+	// J3b : sous-niveaux de blocs VISIBLES en editeur AVANT la purge — DestroyActor
+	// echoue en silence sur un niveau invisible (constate sur le proto : generations
+	// empilees 8 -> 16), et un niveau sauve invisible rend la ville « proxys seuls »
+	// dans l'editeur CityLab (3 sessions de diagnostic payees le 25/07).
+	for (ULevelStreaming* S : World->GetStreamingLevels())
+	{
+		if (S && S->GetWorldAssetPackageName().StartsWith(BlocksFolder))
+		{
+			S->SetShouldBeVisibleInEditor(true);
+			if (ULevel* Lvl = S->GetLoadedLevel())
+			{
+				UEditorLevelUtils::SetLevelVisibility(Lvl, true, false);
+			}
+		}
+	}
 
 	// Idempotence : couches precedentes + heritage monolithique SM_City_*.
 	TArray<AActor*> ToDestroy;
@@ -2621,7 +2820,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 
 	// --- Batiments : detail (cellules) + proxy (grandes cellules), meme teinte ---
 	const TArray<TSharedPtr<FJsonValue>>* BuildingsJson = nullptr;
-	if (Root->TryGetArrayField(TEXT("buildings"), BuildingsJson))
+	if (BldRoot->TryGetArrayField(TEXT("buildings"), BuildingsJson))
 	{
 		int32 Index = 0;
 		for (const TSharedPtr<FJsonValue>& V : *BuildingsJson)
@@ -2633,9 +2832,13 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			{
 				continue;
 			}
+			bool bReversed = false;
 			if (SignedArea(Pts) < 0)
 			{
+				// Un JSON du prep J3b est deja CCW ; un anneau legacy peut ne pas
+				// l'etre — dans ce cas les indices de toit seraient invalides.
 				Algo::Reverse(Pts);
+				bReversed = true;
 			}
 			FVector2D Centroid(0, 0);
 			for (const FVector2D& P : Pts) { Centroid += P; }
@@ -2655,13 +2858,25 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			}
 			if (bDesktopBldg)
 			{
+				// J3b : toit en pente si le bloc "roof" est present et coherent — les
+				// murs s'arretent alors a l'EGOUT et le versant monte au faitage
+				// (coherent avec h = faitage - sol de la BD TOPO). Le prisme de
+				// collision reste a ZBase + h (plan du faitage).
+				FRoofData Roof;
+				const bool bPitched = !bReversed && ParseRoof(O, Pts.Num(), Roof)
+					&& Roof.EaveCm <= Hcm + 50.f;
+				const float WallHcm = bPitched ? FMath::Min(Roof.EaveCm, Hcm) : Hcm;
 				// Lot B : fenetres geometriques (en creux si bWindowReveals) ; les
 				// vitres partent dans un builder SEPARE si bSplitWallGlass (Q3).
 				FCityMeshBuilder& WallB = GetIn(BldgCells, Centroid, Cell, bLinearColors, bWorldUVs);
 				FCityMeshBuilder& GlassB = Gen.bSplitWallGlass
 					? GetIn(BldgGlassCells, Centroid, Cell, bLinearColors, false) : WallB;
-				BuildPolygonBuildingDesktop(WallB, GlassB, Pts, Hcm, Tint, UsageTile(Usage, Index),
-					ZBase, SocleDepth, Gen.bWindowReveals, bBakedShade);
+				BuildPolygonBuildingDesktop(WallB, GlassB, Pts, WallHcm, Tint, UsageTile(Usage, Index),
+					ZBase, SocleDepth, Gen.bWindowReveals, bBakedShade, bPitched ? &Roof : nullptr);
+				if (bPitched)
+				{
+					++Summary.RoofsPitched;
+				}
 				// Verrou 2 : prisme de collision dedie, meme pose — les murs Nanite ne
 				// servent JAMAIS de collision (fallback decime = facades traversables).
 				BuildCollisionPrism(GetIn(BldgColCells, Centroid, Cell), Pts,
@@ -2912,11 +3127,18 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			Dyn->bInitiallyLoaded = false;
 			Dyn->bInitiallyVisible = false;
 		}
+		// J3b : visibilite EDITEUR distincte des flags runtime ci-dessus — elle se
+		// sauve avec la map ; invisible, la ville n'affiche que ses proxys.
+		Streaming->SetShouldBeVisibleInEditor(true);
 		ULevel* BlockLevel = Streaming->GetLoadedLevel();
 		if (!BlockLevel)
 		{
 			World->FlushLevelStreaming(EFlushLevelStreamingType::Full);
 			BlockLevel = Streaming->GetLoadedLevel();
+		}
+		if (BlockLevel)
+		{
+			UEditorLevelUtils::SetLevelVisibility(BlockLevel, true, false);
 		}
 		if (!BlockLevel)
 		{

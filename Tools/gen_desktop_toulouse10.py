@@ -47,11 +47,15 @@ t_all = time.time()
 # set_editor_property est refuse sur les UPROPERTY() nus (« protected ») : on passe
 # par import_text (ImportText reflexion, aucun controle de flags d'edition).
 profile = unreal.CityGenProfile()
-if not profile.import_text('(bDesktop=True)'):
+# J3b : source batiments dediee (anneaux nettoyes + toits squelette droit du prep).
+BATI = os.path.join(SD, 'toulouse10_bati.json').replace('\\', '/')
+if not profile.import_text('(bDesktop=True,BuildingsJsonPath="%s")' % BATI):
     raise RuntimeError('GEN10: import_text a echoue sur CityGenProfile')
 if 'bDesktop=True' not in profile.export_text():
     raise RuntimeError('GEN10: bDesktop non pose sur CityGenProfile (export: %s)'
                        % profile.export_text())
+if 'toulouse10_bati' not in profile.export_text():
+    raise RuntimeError('GEN10: BuildingsJsonPath non pose (export: %s)' % profile.export_text())
 unreal.BuildingTools.get_default_object().call_method('ExecConsoleCommand', args=('stat None',))
 log('smoke test call_method + CityGenProfile(bDesktop) OK')
 
@@ -70,6 +74,9 @@ s = counts(cdo.call_method('ImportCityStreamed', args=(
 log('ImportCityStreamed %.0f s : %s' % (time.time() - t, s))
 if s.get('StreamingBlocks', 0) == 0 or s.get('Buildings', 0) == 0:
     raise RuntimeError('GEN10: ImportCityStreamed a echoue (comptes a zero) : %s' % s)
+# J3b : ~103 333 toits en pente attendus (78,7 % du bati, cf. prep). Zero = regression.
+if s.get('RoofsPitched', 0) < 90000:
+    raise RuntimeError('GEN10: RoofsPitched anormalement bas (%d < 90000)' % s.get('RoofsPitched', 0))
 
 # --- 3. Surfaces (eau plane p10, verts/rails drapes) ---
 t = time.time()

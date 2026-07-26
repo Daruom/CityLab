@@ -12,3 +12,7 @@ PackagedBuilds/
 
 # Donnees MNT brutes (regenerables via SourceData/Fetch-Toulouse10-MNT.ps1, ~400 Mo)
 SourceData/MNT/
+
+# Proto jetable du verrou 3 J3b (regenerable via Tools/j3b_prep_toits.py + import)
+Content/Dev/ProtoToits/
+Tools/__pycache__/

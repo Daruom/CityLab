@@ -75,6 +75,15 @@ struct FCityGenProfile
 	/** Cote en pixels de l'atlas de facades T_CityAtlas (grille 4x4 sous-tuiles). */
 	UPROPERTY() int32 AtlasSizePx = 2048;
 
+	/**
+	 * J3b : chemin d'un JSON batiments dedie (toulouse10_bati.json, produit par
+	 * Tools/j3b_prep_toits.py) — anneaux nettoyes CCW + bloc "roof" optionnel
+	 * (egout/delta/materiau + faces du squelette droit precalcule). Vide = la
+	 * section "buildings" du JSON principal (toits plats historiques). Les routes,
+	 * arbres et surfaces restent dans le JSON principal.
+	 */
+	UPROPERTY() FString BuildingsJsonPath;
+
 	/** Prereglage desktop complet : 64x64 drape, collision 16x16, pas routes 15 m. */
 	static FCityGenProfile Desktop();
 
@@ -130,6 +139,9 @@ struct FCityStreamedSummary
 
 	/** Streaming sublevels created or refilled. */
 	UPROPERTY() int32 StreamingBlocks = 0;
+
+	/** J3b : batiments generes avec un toit en pente (squelette droit precalcule). */
+	UPROPERTY() int32 RoofsPitched = 0;
 };
 
 /** Counts of what GenerateBuildingCollisionCell produced for one cell. */

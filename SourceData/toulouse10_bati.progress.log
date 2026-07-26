@@ -1,0 +1,37 @@
+2026-07-25 22:32:42  chargement C:\Users\User\Documents\Unreal Projects\CityLab\Tools\..\SourceData\GrandFetch\bati_enrichi.json
+2026-07-25 22:32:43  batiments : 131357 (exclusions : aucune)
+2026-07-25 22:32:47    5000/131357 (pentes 2894, plats 2106)
+2026-07-25 22:32:51    10000/131357 (pentes 6658, plats 3342)
+2026-07-25 22:32:56    15000/131357 (pentes 10920, plats 4080)
+2026-07-25 22:33:01    20000/131357 (pentes 14693, plats 5307)
+2026-07-25 22:33:05    25000/131357 (pentes 18814, plats 6186)
+2026-07-25 22:33:10    30000/131357 (pentes 23106, plats 6894)
+2026-07-25 22:33:15    35000/131357 (pentes 27655, plats 7345)
+2026-07-25 22:33:20    40000/131357 (pentes 32077, plats 7923)
+2026-07-25 22:33:25    45000/131357 (pentes 36266, plats 8734)
+2026-07-25 22:33:31    50000/131357 (pentes 40564, plats 9436)
+2026-07-25 22:33:37    55000/131357 (pentes 44893, plats 10107)
+2026-07-25 22:33:43    60000/131357 (pentes 49119, plats 10881)
+2026-07-25 22:33:48    65000/131357 (pentes 53485, plats 11515)
+2026-07-25 22:33:53    70000/131357 (pentes 57880, plats 12120)
+2026-07-25 22:33:57    75000/131357 (pentes 62130, plats 12870)
+2026-07-25 22:34:04    80000/131357 (pentes 66017, plats 13983)
+2026-07-25 22:34:10    85000/131357 (pentes 70057, plats 14943)
+2026-07-25 22:34:14    90000/131357 (pentes 73797, plats 16203)
+2026-07-25 22:34:19    95000/131357 (pentes 77826, plats 17174)
+2026-07-25 22:34:24    100000/131357 (pentes 81806, plats 18194)
+2026-07-25 22:34:30    105000/131357 (pentes 85500, plats 19500)
+2026-07-25 22:34:34    110000/131357 (pentes 89465, plats 20535)
+2026-07-25 22:34:41    115000/131357 (pentes 93700, plats 21300)
+2026-07-25 22:34:47    120000/131357 (pentes 97569, plats 22431)
+2026-07-25 22:34:52    125000/131357 (pentes 101111, plats 23889)
+2026-07-25 22:34:55    130000/131357 (pentes 103296, plats 26704)
+2026-07-25 22:34:55  FIN : 131357 batiments ecrits, 103333 toits en pente (78.7 %), 28024 plats, 132 s (1.0 ms/bat), 49.2 Mo
+2026-07-25 22:34:55    plat : alts absentes x13094
+2026-07-25 22:34:55    plat : quasi plat x11476
+2026-07-25 22:34:55    plat : egout trop bas x3408
+2026-07-25 22:34:55    plat : delta aberrant x35
+2026-07-25 22:34:55    plat : squelette : 1re arete hors emprise x5
+2026-07-25 22:34:55    plat : squelette : list.remove(x): x not in list x2
+2026-07-25 22:34:55    plat : squelette : (Infinite loop) circular reference detec x2
+2026-07-25 22:34:55    plat : squelette : 'NoneType' object is not iterable x2
