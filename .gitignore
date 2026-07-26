@@ -16,3 +16,11 @@ SourceData/MNT/
 # Proto jetable du verrou 3 J3b (regenerable via Tools/j3b_prep_toits.py + import)
 Content/Dev/ProtoToits/
 Tools/__pycache__/
+
+# Ortho BD ORTHO (regenerable via SourceData/Fetch-Toulouse10-Ortho.ps1 -All, ~380 Mo)
+SourceData/Ortho/
+# Backup pre-teintes (regenerable via j3b_prep_toits.py)
+SourceData/*.avant_tint.json
+# Dependance pip vendorisee reinstallable (python -m pip install --target Tools/pylib Pillow)
+Tools/pylib/PIL/
+Tools/pylib/[Pp]illow*

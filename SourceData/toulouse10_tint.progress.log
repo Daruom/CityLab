@@ -1,0 +1,45 @@
+2026-07-26 16:40:53  chargement C:\Users\User\Documents\Unreal Projects\CityLab\Tools\..\SourceData\toulouse10_bati.json
+2026-07-26 16:40:54  batiments : 4000/131357, tuiles ortho sur disque : 109 (DRY-RUN)
+2026-07-26 16:40:54  index : 333 tuiles concernees, 0 batiments hors dalle
+2026-07-26 16:41:26    25/333 tuiles traitees (2277 batiments touches, 0.1 M pixels)
+2026-07-26 16:41:30    50/333 tuiles traitees (2392 batiments touches, 0.1 M pixels)
+2026-07-26 16:41:36    75/333 tuiles traitees (2538 batiments touches, 0.1 M pixels)
+2026-07-26 16:41:40    100/333 tuiles traitees (2709 batiments touches, 0.1 M pixels)
+2026-07-26 16:41:41  gris de reference (p50 de 1737 toits en pente) : R=145.0 G=123.0 B=114.0
+2026-07-26 16:41:41  teintes : 2737 batiments (68.4 %), dont 1737 en pente (84.0 % des 2067 pentes) et 1000 plats
+2026-07-26 16:41:41  sans teinte : 0 hors dalle, 1281 touches par une tuile manquante, 224 tuiles manquantes sur la dalle
+2026-07-26 16:41:41    tuiles manquantes : [(-10, -4), (-10, -3), (-10, -2), (-10, -1), (-10, 0), (-10, 1), (-10, 2), (-10, 3), (-10, 4), (-10, 5), (-10, 6), (-10, 7)] ...
+2026-07-26 16:41:41    canal R : min 0.400  p10 0.714  p50 0.962  p90 1.390  max 1.600
+2026-07-26 16:41:41    canal G : min 0.400  p10 0.756  p50 0.992  p90 1.439  max 1.600
+2026-07-26 16:41:41    canal B : min 0.509  p10 0.825  p50 1.009  p90 1.425  max 1.600
+2026-07-26 16:41:41    canaux ecretes par le script : 16 a 0.4, 403 a 1.6 (sur 8211)
+2026-07-26 16:41:41    canaux > 1/0,95 (plafonnes par Encode au rendu) : 3352 (40.8 % de 8211)
+2026-07-26 16:41:41  DRY-RUN : JSON non reecrit. 49 s
+2026-07-26 17:03:55  chargement C:\Users\User\Documents\Unreal Projects\CityLab\Tools\..\SourceData\toulouse10_bati.json
+2026-07-26 17:03:56  batiments : 131357/131357, tuiles ortho sur disque : 400
+2026-07-26 17:03:56  index : 398 tuiles concernees, 13 batiments hors dalle
+2026-07-26 17:05:22    25/398 tuiles traitees (8445 batiments touches, 0.3 M pixels)
+2026-07-26 17:07:28    50/398 tuiles traitees (17306 batiments touches, 0.7 M pixels)
+2026-07-26 17:09:05    75/398 tuiles traitees (21001 batiments touches, 0.8 M pixels)
+2026-07-26 17:10:43    100/398 tuiles traitees (28370 batiments touches, 1.1 M pixels)
+2026-07-26 17:13:08    125/398 tuiles traitees (34848 batiments touches, 1.4 M pixels)
+2026-07-26 17:16:17    150/398 tuiles traitees (45774 batiments touches, 1.8 M pixels)
+2026-07-26 17:18:52    175/398 tuiles traitees (54857 batiments touches, 2.2 M pixels)
+2026-07-26 17:21:39    200/398 tuiles traitees (63816 batiments touches, 2.5 M pixels)
+2026-07-26 17:25:24    225/398 tuiles traitees (76812 batiments touches, 3.0 M pixels)
+2026-07-26 17:29:38    250/398 tuiles traitees (91343 batiments touches, 3.6 M pixels)
+2026-07-26 17:32:48    275/398 tuiles traitees (103427 batiments touches, 4.0 M pixels)
+2026-07-26 17:34:51    300/398 tuiles traitees (112192 batiments touches, 4.3 M pixels)
+2026-07-26 17:36:34    325/398 tuiles traitees (117891 batiments touches, 4.5 M pixels)
+2026-07-26 17:38:04    350/398 tuiles traitees (122464 batiments touches, 4.7 M pixels)
+2026-07-26 17:39:22    375/398 tuiles traitees (127631 batiments touches, 4.8 M pixels)
+2026-07-26 17:40:07  gris de reference (p50 de 103270 toits en pente) : R=132.0 G=111.0 B=104.0
+2026-07-26 17:40:08  teintes : 131273 batiments (99.9 %), dont 103270 en pente (99.9 % des 103333 pentes) et 28003 plats
+2026-07-26 17:40:08  sans teinte : 13 hors dalle, 0 touches par une tuile manquante, 0 tuiles manquantes sur la dalle
+2026-07-26 17:40:08    canal R : min 0.400  p10 0.701  p50 1.000  p90 1.443  max 1.600
+2026-07-26 17:40:08    canal G : min 0.400  p10 0.757  p50 1.014  p90 1.495  max 1.600
+2026-07-26 17:40:08    canal B : min 0.400  p10 0.817  p50 1.010  p90 1.462  max 1.600
+2026-07-26 17:40:08    canaux ecretes par le script : 2579 a 0.4, 24172 a 1.6 (sur 393819)
+2026-07-26 17:40:08    canaux > 1/0,95 (plafonnes par Encode au rendu) : 168977 (42.9 % de 393819)
+2026-07-26 17:40:08  sauvegarde C:\Users\User\Documents\Unreal Projects\CityLab\Tools\..\SourceData\toulouse10_bati.avant_tint.json (49.2 Mo)
+2026-07-26 17:40:10  FIN : toulouse10_bati.json 49.2 -> 52.7 Mo, 131357 batiments, 5.0 M pixels lus, 2175 s

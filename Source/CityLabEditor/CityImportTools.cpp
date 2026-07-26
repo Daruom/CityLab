@@ -1834,6 +1834,10 @@ namespace
 		TArray<FVector3f> Skel;      // noeuds du squelette : x,y en cm, Z = retrait d en cm
 		TArray<TArray<int32>> Faces; // versants ; idx < N = anneau, sinon Skel[idx - N]
 		float MaxDcm = 0.f;
+		// J3c — teinte de vertex du toit : couleur REELLE echantillonnee dans la BD
+		// ORTHO par Tools/j3c_tint_toits.py (mediane robuste / gris de reference),
+		// deja multipliee par le quasi-blanc historique. Defaut = ancien RoofTint.
+		FVector3f Tint = FVector3f(0.95f, 0.95f, 0.95f);
 	};
 
 	int32 RoofTileFromMat(const FString& Mat)
@@ -1912,6 +1916,29 @@ namespace
 				return false;
 			}
 			Out.Faces.Add(MoveTemp(Face));
+		}
+		// J3c — "tint":[r,g,b] OPTIONNEL au niveau du batiment (l'ortho couvre aussi
+		// les toits plats, qui n'ont pas de bloc roof). Absent ou aberrant -> quasi
+		// blanc historique : aucune regression si le champ n'est pas la.
+		const TArray<TSharedPtr<FJsonValue>>* TintArr = nullptr;
+		if (Bldg->TryGetArrayField(TEXT("tint"), TintArr) && TintArr->Num() >= 3)
+		{
+			FVector3f T(0.f, 0.f, 0.f);
+			bool bOk = true;
+			for (int32 i = 0; i < 3; ++i)
+			{
+				const float V = (float)(*TintArr)[i]->AsNumber();
+				if (!FMath::IsFinite(V))
+				{
+					bOk = false;
+					break;
+				}
+				T[i] = FMath::Clamp(V, 0.3f, 2.0f) * 0.95f;
+			}
+			if (bOk)
+			{
+				Out.Tint = T;
+			}
 		}
 		return true;
 	}
@@ -2170,6 +2197,8 @@ namespace
 
 		// Toit : versants du squelette droit si fournis (J3b), sinon plat historique.
 		// Quasi blanc en vertex color (la sous-tuile porte la couleur du materiau).
+		// J3c : les VERSANTS prennent Roof->Tint (couleur ortho reelle du toit) ; le
+		// toit plat garde ce quasi blanc — non-regression mobile intouchable.
 		const FVector3f RoofTint(0.95f, 0.95f, 0.95f);
 		if (Roof)
 		{
@@ -2234,7 +2263,8 @@ namespace
 				{
 					const FVector3f P[3] = { C[Tris[t]], C[Tris[t + 1]], C[Tris[t + 2]] };
 					const FVector2f TUV[3] = { UV[Tris[t]], UV[Tris[t + 1]], UV[Tris[t + 2]] };
-					Wall.AddPoly(Wall.WallGroup, P, 3, Nrm, TUV, Col(RoofTint, Nrm, Hcm));
+					// J3c : teinte ortho du toit (Roof->Tint vaut RoofTint si absente).
+					Wall.AddPoly(Wall.WallGroup, P, 3, Nrm, TUV, Col(Roof->Tint, Nrm, Hcm));
 				}
 			}
 			return;

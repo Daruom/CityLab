@@ -67,6 +67,31 @@ namespace
 		}
 		return true;
 	}
+
+	// Maximum par canal des couleurs d'INSTANCE de sommet du mesh (J3c : la teinte
+	// ortho du toit y arrive apres Encode, donc bornee a [0 ; 1]).
+	bool GetMeshMaxVertexColor(UStaticMesh* Mesh, FVector3f& OutMax)
+	{
+		FMeshDescription* MeshDesc = Mesh ? Mesh->GetMeshDescription(0) : nullptr;
+		if (!MeshDesc || MeshDesc->VertexInstances().Num() == 0)
+		{
+			return false;
+		}
+		TVertexInstanceAttributesRef<FVector4f> Colors =
+			FStaticMeshAttributes(*MeshDesc).GetVertexInstanceColors();
+		if (!Colors.IsValid())
+		{
+			return false;
+		}
+		OutMax = FVector3f(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+		for (const FVertexInstanceID VI : MeshDesc->VertexInstances().GetElementIDs())
+		{
+			const FVector4f& C = Colors[VI];
+			OutMax = FVector3f(FMath::Max(OutMax.X, C.X), FMath::Max(OutMax.Y, C.Y),
+				FMath::Max(OutMax.Z, C.Z));
+		}
+		return true;
+	}
 }
 
 void FCityImportToolsSpec::Define()
@@ -134,9 +159,10 @@ void FCityImportToolsSpec::Define()
 			// self-test de Tools/j3b_prep_toits.py (2 noeuds a d=5). Faitage attendu
 			// a 550 + 200 = 750. Batiment 2 (cellule 2_0) : delta 99 m ABERRANT ->
 			// rejete par ParseRoof, toit plat historique a h = 800.
+			// J3c : le batiment 1 porte "tint" (teinte ortho) nettement rouge.
 			const FString BldPath = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_bati_toits.json"));
 			const FString BldJson = TEXT(R"({"buildings":[)")
-				TEXT(R"({"pts":[[0,0],[12,0],[12,10],[0,10]],"h":8,"u":"res","roof":{)")
+				TEXT(R"({"pts":[[0,0],[12,0],[12,10],[0,10]],"h":8,"u":"res","tint":[1.3,0.7,0.7],"roof":{)")
 				TEXT(R"("eave":5.5,"delta":2,"mat":"ardoise",)")
 				TEXT(R"("sv":[[5,5,5],[7,5,5]],)")
 				TEXT(R"("f":[[0,1,5,4],[1,2,5],[2,3,4,5],[3,0,4]]}},)")
@@ -162,6 +188,17 @@ void FCityImportToolsSpec::Define()
 			{
 				TestTrue(FString::Printf(TEXT("Faitage %.1f = egout 550 + delta 200"), MaxZ),
 					FMath::Abs(MaxZ - 750.f) <= 1.f);
+			}
+			// J3c : la teinte [1,3 ; 0,7 ; 0,7] rend le versant nettement rouge. Sans
+			// elle le toit est le quasi blanc (0,95 ; 0,95 ; 0,95) -> max R == max G et
+			// la marge tombe a 0 : le critere discrimine bien la teinte.
+			FVector3f MaxCol;
+			if (TestTrue(TEXT("Couleurs de sommet lisibles"), GetMeshMaxVertexColor(Pitched, MaxCol)))
+			{
+				AddInfo(FString::Printf(TEXT("J3c teinte ortho : max vertex color R=%.3f G=%.3f B=%.3f"),
+					MaxCol.X, MaxCol.Y, MaxCol.Z));
+				TestTrue(FString::Printf(TEXT("Teinte ortho rouge : max R %.3f > max G %.3f"),
+					MaxCol.X, MaxCol.Y), MaxCol.X > MaxCol.Y + 0.1f);
 			}
 			UStaticMesh* Flat = LoadTestMesh(TEXT("SM_Bldg_2_0_Wall"));
 			if (TestTrue(TEXT("SM_Bldg_2_0_Wall lisible"), GetMeshZBounds(Flat, MinZ, MaxZ)))
