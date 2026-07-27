@@ -76,6 +76,51 @@ struct FCityGenProfile
 	UPROPERTY() int32 AtlasSizePx = 2048;
 
 	/**
+	 * J3c point 2 « builder sols » : revetements Megascans par CLASSE de surface.
+	 * Chaque route et chaque polygone vert part dans un groupe de polygones dedie
+	 * (un slot de materiau par classe) avec une UV0 EN METRES ; le materiau
+	 * <SurfacesFolder>/<slug>/M_Surf_<slug> divise par la taille physique du scan.
+	 * Materiau absent = repli silencieux sur le materiau historique du slot :
+	 * le golden path mobile et les tests sans assets Megascans sont inchanges.
+	 */
+	UPROPERTY() bool bSurfaceMaterials = false;
+
+	/** Dossier des packs de revetements importes. Vide = /Game/City/Surfaces. */
+	UPROPERTY() FString SurfacesFolder;
+
+	/**
+	 * J3c point 3 « voirie », assainissement des espaces verts. Par DEFAUT (false) :
+	 * UNE SEULE herbe (grass_cut) pour tous les polygones verts — verdict utilisateur
+	 * sur le proto v4b, « spaghetti des espaces verts » : l'alternance uncut/wild par
+	 * graine de polygone, cumulee aux chevauchements de polygones OSM, faisait de
+	 * chaque parc un patchwork de trois herbes differentes. true : l'alternance
+	 * historique revient (classes conservees en code pour un usage futur berges et
+	 * friches, ou la variete se justifiera).
+	 */
+	UPROPERTY() bool bVariedGrass = false;
+
+	/**
+	 * J3c « maquette du sol » : LE SOL EST PEINT, LE RELIEF EST MAILLE.
+	 * La dalle d'une cellule qui possede un masque cuit (Tools/j3c_sols_masks.py)
+	 * recoit l'instance <GroundMasksAssetFolder>/MI_CityGround_<x>_<y>, laquelle
+	 * melange trottoir / chaussee / voirie privee / gravier d'apres le masque de
+	 * la cellule. En echange, PLUS AUCUN ruban de chaussee n'est genere au niveau
+	 * du sol : la chaussee n'est plus un film pose sur la dalle, elle EST la dalle.
+	 * Les PONTS gardent leur ruban (un tablier ne se peint pas sur le terrain), et
+	 * le relief se reduit a ce qui merite de la geometrie — bordures, passages
+	 * pietons, tirets de ligne axiale — lu dans le JSON de la cellule.
+	 * Masque ou JSON absent pour une cellule = comportement actuel pour elle
+	 * (le golden path mobile, lui, n'entre jamais dans cette branche).
+	 */
+	UPROPERTY() bool bMaskedGround = false;
+
+	/** Dossier des masques cuits (sols_<x>_<y>.json). Vide = <projet>/SourceData/Sols. */
+	UPROPERTY() FString GroundMasksPath;
+
+	/** Dossier des instances de materiau de sol (MI_CityGround_<x>_<y>). Vide = /Game/City/Ground. */
+	UPROPERTY() FString GroundMasksAssetFolder;
+
+	/**
 	 * J3b : chemin d'un JSON batiments dedie (toulouse10_bati.json, produit par
 	 * Tools/j3b_prep_toits.py) — anneaux nettoyes CCW + bloc "roof" optionnel
 	 * (egout/delta/materiau + faces du squelette droit precalcule). Vide = la
@@ -142,6 +187,33 @@ struct FCityStreamedSummary
 
 	/** J3b : batiments generes avec un toit en pente (squelette droit precalcule). */
 	UPROPERTY() int32 RoofsPitched = 0;
+
+	/** J3c v2 : disques du revetement dominant poses sur les carrefours. */
+	UPROPERTY() int32 JunctionPatches = 0;
+
+	/** J3c point 3 : quads de BORDURE poses (face verticale + chant), toutes rues. */
+	UPROPERTY() int32 CurbQuads = 0;
+
+	/** J3c point 3 : passages pietons poses (un par noeud chaussee x voie pietonne). */
+	UPROPERTY() int32 Crossings = 0;
+
+	/** J3c point 3 : passages REPORTES — un patch de carrefour couvrait deja le noeud. */
+	UPROPERTY() int32 CrossingsDeferred = 0;
+
+	/** J3c point 3 : rubans ORPHELINS ecartes (< 25 m et aucun noeud partage). */
+	UPROPERTY() int32 OrphanRibbons = 0;
+
+	/** J3c maquette : cellules dont la dalle a recu son instance de materiau masquee. */
+	UPROPERTY() int32 MaskedCells = 0;
+
+	/** J3c maquette : rubans de chaussee au sol supprimes — la peinture les remplace. */
+	UPROPERTY() int32 GroundRibbonsSkipped = 0;
+
+	/** J3c maquette : rubans de PONT conserves (un tablier ne se peint pas sur le sol). */
+	UPROPERTY() int32 BridgeRibbons = 0;
+
+	/** J3c maquette : tirets de ligne axiale poses (quads de 15 cm). */
+	UPROPERTY() int32 AxialDashes = 0;
 };
 
 /** Counts of what GenerateBuildingCollisionCell produced for one cell. */

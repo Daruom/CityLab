@@ -10,6 +10,7 @@
 #include "Engine/World.h"
 #include "HAL/PlatformFileManager.h"
 #include "Materials/Material.h"
+#include "Materials/MaterialInstanceConstant.h"
 #include "Materials/MaterialInterface.h"
 #include "MeshDescription.h"
 #include "Misc/AutomationTest.h"
@@ -17,6 +18,7 @@
 #include "Misc/Paths.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "StaticMeshAttributes.h"
+#include "StaticMeshResources.h"
 #include "StaticMeshCompiler.h"
 
 BEGIN_DEFINE_SPEC(
@@ -517,8 +519,13 @@ void FCityImportToolsSpec::Define()
 				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, FCityGenProfile::Desktop());
 			TestEqual(TEXT("Roads"), Summary.Roads, 1);
 
-			// Le ruban est construit dans la cellule du premier point ; tablier =
-			// interpolation lineaire entre les culees + empilement 55 (index 0).
+			// Le ruban est construit dans la cellule du premier point. Le tablier est
+			// l'interpolation lineaire entre culees PLUS un offset d'empilement
+			// CONSTANT — depuis J3c v2 cet offset depend de la classe de revetement
+			// (55 cm de plancher + 0 a 25 cm selon la classe) : le test ne le code
+			// PLUS en dur, il verifie qu'il est constant sur tout le tablier (c'est
+			// exactement ce qui distingue une droite d'un drapage) et plausible.
+			const float FloorCm = 55.f, CeilCm = 90.f;
 			const int32 CX = FMath::FloorToInt(AXm * 100.f / 10000.f);
 			float MinZ = 0.f, MaxZ = 0.f;
 			UStaticMesh* Road = LoadTestMesh(FString::Printf(TEXT("SM_Ground_%d_0"), CX));
@@ -526,24 +533,48 @@ void FCityImportToolsSpec::Define()
 			{
 				return;
 			}
-			TestTrue(FString::Printf(TEXT("Tablier %.1f >= culee basse %.1f"), MinZ, FMath::Min(ZA, ZB) + 55.f - 1.f),
-				MinZ >= FMath::Min(ZA, ZB) + 55.f - 1.f);
-			TestTrue(FString::Printf(TEXT("Tablier %.1f <= culee haute %.1f"), MaxZ, FMath::Max(ZA, ZB) + 55.f + 1.f),
-				MaxZ <= FMath::Max(ZA, ZB) + 55.f + 1.f);
-			// Chaque sommet du ruban (X = abscisse re-echantillonnee, la route est
-			// alignee sur X) doit etre sur la DROITE entre culees + empilement 55 :
-			// un drapage MNT donnerait >= BestDev (>= 3 m) d'ecart au point critique.
+			TestTrue(FString::Printf(TEXT("Tablier %.1f >= culee basse %.1f"), MinZ, FMath::Min(ZA, ZB) + FloorCm - 1.f),
+				MinZ >= FMath::Min(ZA, ZB) + FloorCm - 1.f);
+			TestTrue(FString::Printf(TEXT("Tablier %.1f <= culee haute %.1f"), MaxZ, FMath::Max(ZA, ZB) + CeilCm + 1.f),
+				MaxZ <= FMath::Max(ZA, ZB) + CeilCm + 1.f);
+			// Chaque sommet de la CHAUSSEE (X = abscisse re-echantillonnee, la route est
+			// alignee sur X) est a la MEME hauteur au-dessus de la droite des culees :
+			// un drapage MNT donnerait >= BestDev (>= 3 m) de dispersion.
+			// v5 « voirie » : la mesure se limite au slot de CHAUSSEE. Le ruban porte
+			// desormais aussi ses bordures et ses rives, posees 12 cm plus haut PAR
+			// CONSTRUCTION — les compter ici ferait dire au test « tablier drape » alors
+			// qu'il mesurerait la hauteur du trottoir.
 			FMeshDescription* RoadDesc = Road->GetMeshDescription(0);
-			TVertexAttributesRef<FVector3f> Positions = FStaticMeshAttributes(*RoadDesc).GetVertexPositions();
-			float MaxErr = 0.f;
-			for (const FVertexID V : RoadDesc->Vertices().GetElementIDs())
+			FStaticMeshAttributes RoadAttr(*RoadDesc);
+			TVertexAttributesRef<FVector3f> Positions = RoadAttr.GetVertexPositions();
+			TPolygonGroupAttributesRef<FName> RoadSlots = RoadAttr.GetPolygonGroupMaterialSlotNames();
+			float MinOff = FLT_MAX, MaxOff = -FLT_MAX;
+			for (const FPolygonGroupID G : RoadDesc->PolygonGroups().GetElementIDs())
 			{
-				const float T = (Positions[V].X - AXm * 100.f) / ((BXm - AXm) * 100.f);
-				const float Expected = FMath::Lerp(ZA, ZB, T) + 55.f;
-				MaxErr = FMath::Max(MaxErr, FMath::Abs(Positions[V].Z - Expected));
+				if (RoadSlots[G] != FName(TEXT("asphalt_road_tiggcjdo")))
+				{
+					continue;
+				}
+				for (const FPolygonID P : RoadDesc->GetPolygonGroupPolygons(G))
+				{
+					for (const FVertexInstanceID VI : RoadDesc->GetPolygonVertexInstances(P))
+					{
+						const FVector3f Pos = Positions[RoadDesc->GetVertexInstanceVertex(VI)];
+						const float T = (Pos.X - AXm * 100.f) / ((BXm - AXm) * 100.f);
+						const float Off = Pos.Z - FMath::Lerp(ZA, ZB, T);
+						MinOff = FMath::Min(MinOff, Off);
+						MaxOff = FMath::Max(MaxOff, Off);
+					}
+				}
 			}
-			TestTrue(FString::Printf(TEXT("Tablier interpole lineairement (ecart max %.2f cm ; drape = %.0f cm)"),
-				MaxErr, BestDev), MaxErr <= 1.f);
+			if (!TestTrue(TEXT("Slot de chaussee trouve sur le tablier"), MinOff < FLT_MAX))
+			{
+				return;
+			}
+			TestTrue(FString::Printf(TEXT("Tablier interpole lineairement (dispersion %.2f cm ; drape = %.0f cm)"),
+				MaxOff - MinOff, BestDev), MaxOff - MinOff <= 1.f);
+			TestTrue(FString::Printf(TEXT("Offset d'empilement plausible (%.1f cm)"), MinOff),
+				MinOff >= FloorCm - 1.f && MaxOff <= CeilCm + 1.f);
 		});
 	});
 
@@ -707,6 +738,811 @@ void FCityImportToolsSpec::Define()
 		});
 	});
 
+	// J3c point 2 « builder sols » : chaque route et chaque polygone vert part dans un
+	// GROUPE DE POLYGONES dedie a sa classe de revetement (un slot de materiau par
+	// classe, donc une section de mesh par classe), avec une UV0 EN METRES que le
+	// materiau M_Surf_<slug> divise par la taille physique du scan. Les materiaux
+	// Megascans ne sont PAS requis ici : absents, le repli garde le materiau
+	// historique du slot — c'est le decoupage geometrique qui est teste.
+	Describe("RevetementsSols", [this]()
+	{
+		auto SurfaceProfile = []()
+		{
+			// Matiere desktop SANS relief (pas de bDesktop : le drapage MNT ferait
+			// dependre le test du MNT) + revetements par classe.
+			FCityGenProfile P;
+			P.bWindowReveals = true;
+			P.bSplitWallGlass = true;
+			P.bNanite = true;
+			P.bPBRMaterials = true;
+			P.bSurfaceMaterials = true;
+			return P;
+		};
+		// Trois routes, toutes dans la cellule (0,0) — la cellule d'un ruban est celle
+		// de son PREMIER point, d'ou des coordonnees franchement positives : la
+		// premiere porte le tag OSM surface="sett" (rue pavee), la deuxieme est une
+		// secondaire de 9 m a 2 files (chaussee marquee large), la troisieme un
+		// sentier pieton. v4 : la rue pavee est une CHAUSSEE (asphalte) et le sentier
+		// ne produit PLUS DE RUBAN DU TOUT : son sol, c'est la dalle desormais.
+		auto WriteFixture = [this]()
+		{
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_surfaces.json"));
+			const FString Json =
+				TEXT(R"({"roads":[{"pts":[[10,10],[90,10]],"t":"residential","w":6,"surface":"sett"},)")
+				TEXT(R"({"pts":[[10,30],[90,30]],"t":"secondary","w":9,"surface":"asphalt","lanes":2},)")
+				TEXT(R"({"pts":[[10,50],[90,50]],"t":"footway","w":2.5}]})");
+			FFileHelper::SaveStringToFile(Json, *Path);
+			return Path;
+		};
+		auto NonEmptyGroups = [](UStaticMesh* Mesh) -> int32
+		{
+			FMeshDescription* Desc = Mesh ? Mesh->GetMeshDescription(0) : nullptr;
+			if (!Desc)
+			{
+				return 0;
+			}
+			int32 Count = 0;
+			for (const FPolygonGroupID G : Desc->PolygonGroups().GetElementIDs())
+			{
+				if (Desc->GetNumPolygonGroupPolygons(G) > 0)
+				{
+					++Count;
+				}
+			}
+			return Count;
+		};
+		auto HasSlot = [](UStaticMesh* Mesh, const TCHAR* SlotName)
+		{
+			if (!Mesh)
+			{
+				return false;
+			}
+			for (const FStaticMaterial& M : Mesh->GetStaticMaterials())
+			{
+				if (M.MaterialSlotName == FName(SlotName))
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+
+		It("route surface=sett : cellule de sol a >= 2 sections, un slot par classe de revetement",
+			[this, WriteFixture, SurfaceProfile, NonEmptyGroups, HasSlot]()
+		{
+			const FString Path = WriteFixture();
+			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, SurfaceProfile());
+			// v4 : le sentier ne compte plus — 3 voies au JSON, 2 rubans generes.
+			TestEqual(TEXT("Roads : le sentier pieton ne produit plus de ruban"),
+				Summary.Roads, 2);
+
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			if (!TestNotNull(TEXT("SM_Ground_0_0 genere"), Ground))
+			{
+				return;
+			}
+			TestTrue(FString::Printf(TEXT("Cellule de sol a >= 2 sections (%d groupes non vides)"),
+				NonEmptyGroups(Ground)), NonEmptyGroups(Ground) >= 2);
+			TestTrue(TEXT("Slot asphalte (rue pavee = chaussee, plus de revetement pave)"),
+				HasSlot(Ground, TEXT("asphalt_road_tiggcjdo")));
+			TestTrue(TEXT("Slot chaussee marquee large (secondaire 9 m, 2 files -> fine_road)"),
+				HasSlot(Ground, TEXT("fine_road_vgdlejpew")));
+			// v3/v4 : les scans sortis de la palette ne reviennent JAMAIS sur un ruban.
+			TestFalse(TEXT("Plus jamais de paves cobblestone"),
+				HasSlot(Ground, TEXT("cobblestone_thjldijbw")));
+			TestFalse(TEXT("Plus jamais de marked_rough_road"),
+				HasSlot(Ground, TEXT("marked_rough_road_vh1lbhqs")));
+			TestFalse(TEXT("Plus de revetement pave herringbone"),
+				HasSlot(Ground, TEXT("herringbone_brick_pavement_ue3gbepkw")));
+			// v5 : le revetement de DALLE arrive AUSSI sur la cellule de rubans — c'est
+			// la matiere des RIVES (les 1,70 m de trottoir de part et d'autre de chaque
+			// chaussee). Jusqu'a la v4b il n'avait rien a y faire ; l'y voir est
+			// desormais la preuve que les rives sont bien posees.
+			TestTrue(TEXT("Cellule de rubans : slot de dalle = les rives des rues"),
+				HasSlot(Ground, TEXT("dirty_sidewalk_tiles_ugxjcdpn")));
+			TestTrue(TEXT("Cellule de rubans : slot de bordure"), HasSlot(Ground, TEXT("curb")));
+
+			// Sections de rendu : une par classe presente (preuve cote materiau).
+			if (const FStaticMeshRenderData* RD = Ground->GetRenderData())
+			{
+				if (RD->LODResources.Num() > 0)
+				{
+					TestTrue(FString::Printf(TEXT("Rendu : %d sections"), RD->LODResources[0].Sections.Num()),
+						RD->LODResources[0].Sections.Num() >= 2);
+				}
+			}
+
+			// UV0 EN METRES : le ruban le plus long fait 80 m, donc U depasse
+			// largement 1 (une UV normalisee [0,1] serait le bug a attraper).
+			FMeshDescription* Desc = Ground->GetMeshDescription(0);
+			if (TestNotNull(TEXT("MeshDescription du sol"), Desc))
+			{
+				TVertexInstanceAttributesRef<FVector2f> UVs =
+					FStaticMeshAttributes(*Desc).GetVertexInstanceUVs();
+				float MaxU = 0.f;
+				for (const FVertexInstanceID I : Desc->VertexInstances().GetElementIDs())
+				{
+					const FVector2f UV0 = UVs.Get(I, 0);
+					MaxU = FMath::Max(MaxU, FMath::Max(FMath::Abs(UV0.X), FMath::Abs(UV0.Y)));
+				}
+				TestTrue(FString::Printf(TEXT("UV0 en metres le long du ruban (max %.1f >= 70)"), MaxU),
+					MaxU >= 70.f);
+			}
+		});
+
+		// v4 — LA DALLE PORTE LA MATIERE (verdict DA v3 : « grand puzzle », le fond
+		// blanc-bleu de J2 faisait de chaque ruban un autocollant sur du papier).
+		// Preuve en deux points : le mesh de dalle a bien le slot du revetement
+		// mineral, et son UV0 est EN METRES MONDE (une UV [0,1] par quad, l'historique,
+		// tuilerait le scan une fois par carreau de grille : le bug a attraper).
+		It("la dalle SM_Slab_ porte le revetement mineral en UV0 metrique",
+			[this, WriteFixture, SurfaceProfile, HasSlot]()
+		{
+			const FString Path = WriteFixture();
+			UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, SurfaceProfile());
+
+			UStaticMesh* Slab = LoadTestMesh(TEXT("SM_Slab_0_0"));
+			if (!TestNotNull(TEXT("SM_Slab_0_0 genere"), Slab))
+			{
+				return;
+			}
+			TestTrue(TEXT("Slot de revetement mineral sur la dalle"),
+				HasSlot(Slab, TEXT("dirty_sidewalk_tiles_ugxjcdpn")));
+
+			// La cellule fait 100 m de cote : une UV0 metrique monte donc a ~100.
+			FMeshDescription* Desc = Slab->GetMeshDescription(0);
+			if (TestNotNull(TEXT("MeshDescription de la dalle"), Desc))
+			{
+				TVertexInstanceAttributesRef<FVector2f> UVs =
+					FStaticMeshAttributes(*Desc).GetVertexInstanceUVs();
+				float MaxUV0 = 0.f;
+				bool bUV1In01 = UVs.GetNumChannels() >= 2;
+				for (const FVertexInstanceID I : Desc->VertexInstances().GetElementIDs())
+				{
+					const FVector2f UV0 = UVs.Get(I, 0);
+					MaxUV0 = FMath::Max(MaxUV0, FMath::Max(FMath::Abs(UV0.X), FMath::Abs(UV0.Y)));
+					if (UVs.GetNumChannels() >= 2)
+					{
+						const FVector2f UV1 = UVs.Get(I, 1);
+						if (UV1.X < -0.001f || UV1.X > 1.001f || UV1.Y < -0.001f || UV1.Y > 1.001f)
+						{
+							bUV1In01 = false;
+						}
+					}
+				}
+				TestTrue(FString::Printf(TEXT("Dalle : UV0 en metres monde (max %.1f >= 70)"), MaxUV0),
+					MaxUV0 >= 70.f);
+				// L'UV1 monde (ortho J3) survit a l'ajout de l'UV0 metrique.
+				TestTrue(TEXT("Dalle : UV1 monde toujours dans [0,1]"), bUV1In01);
+			}
+		});
+
+		It("sans le drapeau : la dalle garde son UV0 [0,1] par quad et aucun revetement",
+			[this, WriteFixture, HasSlot]()
+		{
+			const FString Path = WriteFixture();
+			UCityImportTools::ImportCityStreamed(Path, FString(), TEXT("/Game/Dev/Test/City"),
+				TEXT("/Game/Dev/Test/Blocks"), FString(), FString(), 100.f, 200.f, 400.f,
+				FVector::ZeroVector, FCityGenProfile());
+
+			UStaticMesh* Slab = LoadTestMesh(TEXT("SM_Slab_0_0"));
+			if (!TestNotNull(TEXT("SM_Slab_0_0 genere"), Slab))
+			{
+				return;
+			}
+			TestFalse(TEXT("Mobile : aucun revetement sur la dalle"),
+				HasSlot(Slab, TEXT("dirty_sidewalk_tiles_ugxjcdpn")));
+			FMeshDescription* Desc = Slab->GetMeshDescription(0);
+			if (TestNotNull(TEXT("MeshDescription de la dalle"), Desc))
+			{
+				TVertexInstanceAttributesRef<FVector2f> UVs =
+					FStaticMeshAttributes(*Desc).GetVertexInstanceUVs();
+				float MaxUV0 = 0.f;
+				for (const FVertexInstanceID I : Desc->VertexInstances().GetElementIDs())
+				{
+					const FVector2f UV0 = UVs.Get(I, 0);
+					MaxUV0 = FMath::Max(MaxUV0, FMath::Max(FMath::Abs(UV0.X), FMath::Abs(UV0.Y)));
+				}
+				TestTrue(FString::Printf(TEXT("Mobile : UV0 dalle reste dans [0,1] (max %.2f)"), MaxUV0),
+					MaxUV0 <= 1.001f);
+			}
+		});
+
+		It("sans le drapeau : cellule de sol a exactement les 2 slots historiques (non-regression)",
+			[this, WriteFixture, HasSlot]()
+		{
+			const FString Path = WriteFixture();
+			UCityImportTools::ImportCityStreamed(Path, FString(), TEXT("/Game/Dev/Test/City"),
+				TEXT("/Game/Dev/Test/Blocks"), FString(), FString(), 100.f, 200.f, 400.f,
+				FVector::ZeroVector, FCityGenProfile());
+
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			if (!TestNotNull(TEXT("SM_Ground_0_0 genere"), Ground))
+			{
+				return;
+			}
+			TestEqual(TEXT("Mobile : 2 slots (Wall, Glass) et rien d'autre"),
+				Ground->GetStaticMaterials().Num(), 2);
+			TestFalse(TEXT("Mobile : aucun slot de revetement"),
+				HasSlot(Ground, TEXT("herringbone_brick_pavement_ue3gbepkw")));
+		});
+
+		// v2 (verdict utilisateur : « les revetements se rencontrent sans harmonie »).
+		// Z minimal des sommets d'un slot donne : sert a prouver l'ordre d'empilement.
+		auto SlotMinZ = [](UStaticMesh* Mesh, const TCHAR* SlotName) -> float
+		{
+			FMeshDescription* Desc = Mesh ? Mesh->GetMeshDescription(0) : nullptr;
+			if (!Desc)
+			{
+				return FLT_MAX;
+			}
+			FStaticMeshAttributes Attr(*Desc);
+			TPolygonGroupAttributesRef<FName> Names = Attr.GetPolygonGroupMaterialSlotNames();
+			TVertexAttributesRef<FVector3f> Pos = Attr.GetVertexPositions();
+			float MinZ = FLT_MAX;
+			for (const FPolygonGroupID G : Desc->PolygonGroups().GetElementIDs())
+			{
+				if (Names[G] != FName(SlotName))
+				{
+					continue;
+				}
+				for (const FPolygonID P : Desc->GetPolygonGroupPolygons(G))
+				{
+					for (const FVertexInstanceID VI : Desc->GetPolygonVertexInstances(P))
+					{
+						MinZ = FMath::Min(MinZ, Pos[Desc->GetVertexInstanceVertex(VI)].Z);
+					}
+				}
+			}
+			return MinZ;
+		};
+
+		It("carrefour AUTO : patch du revetement dominant NU pose au-dessus de tous les rubans",
+			[this, SurfaceProfile, HasSlot]()
+		{
+			// v3 : un patch exige DEUX chaussees auto au noeud. Une secondaire de 9 m a
+			// 2 files (fine_road large, marquee) croisee par une residentielle de 6 m a
+			// 2 files (fine_road medium, marquee) ; noeud commun (50,50) INTERIEUR aux
+			// deux polylignes : vrai carrefour, et vraie zone de roulement.
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_carrefour.json"));
+			const FString Json =
+				TEXT(R"({"roads":[{"pts":[[10,50],[50,50],[90,50]],"t":"secondary","w":9,"lanes":2},)")
+				TEXT(R"({"pts":[[50,10],[50,50],[50,90]],"t":"residential","w":6,"lanes":2}]})");
+			FFileHelper::SaveStringToFile(Json, *Path);
+
+			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, SurfaceProfile());
+			TestEqual(TEXT("Un seul patch de carrefour"), Summary.JunctionPatches, 1);
+
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			if (!TestNotNull(TEXT("SM_Ground_0_0 genere"), Ground))
+			{
+				return;
+			}
+			// La dominante (secondaire) est une classe MARQUEE : le patch prend son
+			// equivalent nu — et les segments du ruban au contact du noeud aussi.
+			TestTrue(TEXT("Slot asphalte nu present (patch + tirets effaces au carrefour)"),
+				HasSlot(Ground, TEXT("asphalt_road_tiggcjdo")));
+
+			// Patch = 55 + Z de classe la plus haute du noeud (fine_road large, 13)
+			// + 5 = 73 ; le ruban le plus haut culmine a 55 + 13 + 1,2 de micro-jitter.
+			float MinZ = 0.f, MaxZ = 0.f;
+			if (TestTrue(TEXT("Bornes Z lisibles"), GetMeshZBounds(Ground, MinZ, MaxZ)))
+			{
+				TestTrue(FString::Printf(TEXT("Patch au-dessus des rubans (Z max %.1f >= 72)"), MaxZ),
+					MaxZ >= 72.f);
+			}
+		});
+
+		// v3 (verdict DA : « peau de leopard » dans le lacis pieton du centre). Le
+		// patch de carrefour est reserve aux rencontres de VOITURES : ni un croisement
+		// de sentiers, ni une rue traversee par un sentier n'en recoivent.
+		// v4 : le lacis pieton ne produit meme plus de geometrie — la preuve la plus
+		// forte est desormais Roads == 0 sur une zone 100 % pietonne.
+		It("zero ruban et zero patch sur un noeud pieton ou a une seule chaussee auto",
+			[this, SurfaceProfile]()
+		{
+			const FString PedPath = FPaths::Combine(FPaths::ProjectSavedDir(),
+				TEXT("Tests/mini_carrefour_pieton.json"));
+			// Deux sentiers qui se croisent + une place pietonne qui passe par le meme
+			// noeud : trois voies partagees, un vrai carrefour geometrique... et zero
+			// chaussee auto.
+			FFileHelper::SaveStringToFile(FString(
+				TEXT(R"({"roads":[{"pts":[[10,50],[50,50],[90,50]],"t":"footway","w":3},)")
+				TEXT(R"({"pts":[[50,10],[50,50],[50,90]],"t":"path","w":2.5},)")
+				TEXT(R"({"pts":[[20,20],[50,50],[80,80]],"t":"pedestrian","w":8}]})")), *PedPath);
+			const FCityStreamedSummary PedSummary = UCityImportTools::ImportCityStreamed(
+				PedPath, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, SurfaceProfile());
+			TestEqual(TEXT("Zone 100 % pietonne : aucun ruban genere"), PedSummary.Roads, 0);
+			TestEqual(TEXT("Carrefour purement pieton : aucun patch"),
+				PedSummary.JunctionPatches, 0);
+
+			// Mixte : une secondaire a 2 files traversee par un sentier. La dominante
+			// est bien une chaussee auto, mais elle est SEULE : pas de patch non plus.
+			const FString MixPath = FPaths::Combine(FPaths::ProjectSavedDir(),
+				TEXT("Tests/mini_carrefour_mixte.json"));
+			FFileHelper::SaveStringToFile(FString(
+				TEXT(R"({"roads":[{"pts":[[10,50],[50,50],[90,50]],"t":"secondary","w":9,"lanes":2},)")
+				TEXT(R"({"pts":[[50,10],[50,50],[50,90]],"t":"footway","w":2.5}]})")), *MixPath);
+			const FCityStreamedSummary MixSummary = UCityImportTools::ImportCityStreamed(
+				MixPath, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, SurfaceProfile());
+			TestEqual(TEXT("Mixte : seule la chaussee auto produit un ruban"),
+				MixSummary.Roads, 1);
+			TestEqual(TEXT("Une seule chaussee auto au noeud : aucun patch"),
+				MixSummary.JunctionPatches, 0);
+		});
+
+		It("ordre z : dalle sous gravier sous asphalte, et plus aucun ruban pieton",
+			[this, SurfaceProfile, SlotMinZ]()
+		{
+			// Trois rubans PARALLELES (aucun noeud partage : pas de carrefour, pas de
+			// patch) — seul l'empilement par classe est teste. Le ruban du milieu a un
+			// sommet INTERIEUR volontaire : c'est le piege qui a coute une generation
+			// de proto (un sommet interieur d'une route SEULE passait pour un
+			// carrefour — 3 042 faux carrefours sur 3 920 noeuds).
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_ordrez.json"));
+			const FString Json =
+				TEXT(R"({"roads":[{"pts":[[10,10],[90,10]],"t":"service","w":4,"surface":"gravel"},)")
+				TEXT(R"({"pts":[[10,30],[50,30],[90,30]],"t":"service","w":4},)")
+				TEXT(R"({"pts":[[10,50],[90,50]],"t":"footway","w":2.5}]})");
+			FFileHelper::SaveStringToFile(Json, *Path);
+
+			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, SurfaceProfile());
+			TestEqual(TEXT("Aucun carrefour : rubans paralleles, sommet interieur non partage"),
+				Summary.JunctionPatches, 0);
+
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			if (!TestNotNull(TEXT("SM_Ground_0_0 genere"), Ground))
+			{
+				return;
+			}
+			const float ZGravel = SlotMinZ(Ground, TEXT("gravel_on_soil_okosdmp0"));
+			const float ZAsphalt = SlotMinZ(Ground, TEXT("asphalt_road_tiggcjdo"));
+			if (!TestTrue(TEXT("Les deux classes de ruban sont presentes"),
+				ZGravel < FLT_MAX && ZAsphalt < FLT_MAX))
+			{
+				return;
+			}
+			// v4 : le sentier pieton du JSON ne produit plus rien du tout.
+			TestTrue(TEXT("Aucun ruban pieton (le sentier est devenu la dalle)"),
+				SlotMinZ(Ground, TEXT("herringbone_brick_pavement_ue3gbepkw")) == FLT_MAX);
+			TestTrue(FString::Printf(TEXT("gravier %.1f < asphalte %.1f"), ZGravel, ZAsphalt),
+				ZGravel < ZAsphalt);
+			// Determinisme : les valeurs sont les offsets de classe (55 + 0/4) au
+			// micro-jitter pres (< 1,2 cm), PAS l'ancien ordre d'arrivee.
+			TestTrue(FString::Printf(TEXT("gravier a 55 (%.1f)"), ZGravel),
+				ZGravel >= 55.f && ZGravel < 56.5f);
+			TestTrue(FString::Printf(TEXT("asphalte a 59 (%.1f)"), ZAsphalt),
+				ZAsphalt >= 59.f && ZAsphalt < 60.5f);
+
+			// v4 point 3 — JONCTION DALLE / GRAVIER. La dalle porteuse est SOUS tous
+			// les rubans : l'allee de gravier se lit par-dessus, jamais l'inverse.
+			UStaticMesh* Slab = LoadTestMesh(TEXT("SM_Slab_0_0"));
+			if (TestNotNull(TEXT("SM_Slab_0_0 genere"), Slab))
+			{
+				const float ZSlab = SlotMinZ(Slab, TEXT("dirty_sidewalk_tiles_ugxjcdpn"));
+				if (TestTrue(TEXT("La dalle porte bien son revetement"), ZSlab < FLT_MAX))
+				{
+					TestTrue(FString::Printf(TEXT("dalle %.1f < gravier %.1f"), ZSlab, ZGravel),
+						ZSlab < ZGravel);
+				}
+			}
+		});
+	});
+
+	// J3c point 3 « VOIRIE » — la structure de la rue. Verdict utilisateur sur la
+	// v4b : « il manque la structure des rues (rives) » et « morceaux perdus ». Trois
+	// chantiers, tous testes ici :
+	//   1. le ruban de chaussee se RE-PARTITIONNE en chaussee + 2 bordures en relief
+	//      (face verticale 12 cm + chant 15 cm) + 2 rives de 1,70 m en classe dalle ;
+	//   2. un PASSAGE PIETON par noeud partage entre une chaussee auto et une voie
+	//      pietonne (reporte si un patch de carrefour couvre deja le noeud) ;
+	//   3. les rubans ORPHELINS (< 25 m, aucun noeud partage) ne sont plus generes.
+	// Les materiaux Megascans ne sont pas requis : c'est le decoupage geometrique et
+	// le comptage qui sont testes, le repli materiau ne change aucune geometrie.
+	Describe("Voirie", [this]()
+	{
+		auto SurfaceProfile = []()
+		{
+			FCityGenProfile P;
+			P.bWindowReveals = true;
+			P.bSplitWallGlass = true;
+			P.bNanite = true;
+			P.bPBRMaterials = true;
+			P.bSurfaceMaterials = true;
+			return P;
+		};
+		auto WriteJson = [](const TCHAR* Name, const FString& Json)
+		{
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(),
+				FString::Printf(TEXT("Tests/%s"), Name));
+			FFileHelper::SaveStringToFile(Json, *Path);
+			return Path;
+		};
+		// Polygones d'un slot donne : c'est LE compteur du point 1 (une section de
+		// mesh par classe, un quad par bande et par cote).
+		auto SlotPolys = [](UStaticMesh* Mesh, const TCHAR* SlotName) -> int32
+		{
+			FMeshDescription* Desc = Mesh ? Mesh->GetMeshDescription(0) : nullptr;
+			if (!Desc)
+			{
+				return 0;
+			}
+			TPolygonGroupAttributesRef<FName> Names =
+				FStaticMeshAttributes(*Desc).GetPolygonGroupMaterialSlotNames();
+			int32 Count = 0;
+			for (const FPolygonGroupID G : Desc->PolygonGroups().GetElementIDs())
+			{
+				if (Names[G] == FName(SlotName))
+				{
+					Count += Desc->GetNumPolygonGroupPolygons(G);
+				}
+			}
+			return Count;
+		};
+		// Bornes Z des sommets d'un slot : preuve du relief de la bordure et de
+		// l'altitude du passage pieton (entre la chaussee et le chant).
+		auto SlotZBounds = [](UStaticMesh* Mesh, const TCHAR* SlotName, float& OutMin, float& OutMax) -> bool
+		{
+			FMeshDescription* Desc = Mesh ? Mesh->GetMeshDescription(0) : nullptr;
+			if (!Desc)
+			{
+				return false;
+			}
+			FStaticMeshAttributes Attr(*Desc);
+			TPolygonGroupAttributesRef<FName> Names = Attr.GetPolygonGroupMaterialSlotNames();
+			TVertexAttributesRef<FVector3f> Pos = Attr.GetVertexPositions();
+			OutMin = FLT_MAX;
+			OutMax = -FLT_MAX;
+			for (const FPolygonGroupID G : Desc->PolygonGroups().GetElementIDs())
+			{
+				if (Names[G] != FName(SlotName))
+				{
+					continue;
+				}
+				for (const FPolygonID P : Desc->GetPolygonGroupPolygons(G))
+				{
+					for (const FVertexInstanceID VI : Desc->GetPolygonVertexInstances(P))
+					{
+						const float Z = Pos[Desc->GetVertexInstanceVertex(VI)].Z;
+						OutMin = FMath::Min(OutMin, Z);
+						OutMax = FMath::Max(OutMax, Z);
+					}
+				}
+			}
+			return OutMin < FLT_MAX;
+		};
+		// Distance 2D minimale entre un point et les sommets d'un slot : c'est ainsi
+		// qu'on prouve que la bordure S'INTERROMPT sur l'emprise d'un patch.
+		auto SlotMinDistTo = [](UStaticMesh* Mesh, const TCHAR* SlotName, const FVector2D& P) -> float
+		{
+			FMeshDescription* Desc = Mesh ? Mesh->GetMeshDescription(0) : nullptr;
+			if (!Desc)
+			{
+				return -1.f;
+			}
+			FStaticMeshAttributes Attr(*Desc);
+			TPolygonGroupAttributesRef<FName> Names = Attr.GetPolygonGroupMaterialSlotNames();
+			TVertexAttributesRef<FVector3f> Pos = Attr.GetVertexPositions();
+			float Best = FLT_MAX;
+			for (const FPolygonGroupID G : Desc->PolygonGroups().GetElementIDs())
+			{
+				if (Names[G] != FName(SlotName))
+				{
+					continue;
+				}
+				for (const FPolygonID Poly : Desc->GetPolygonGroupPolygons(G))
+				{
+					for (const FVertexInstanceID VI : Desc->GetPolygonVertexInstances(Poly))
+					{
+						const FVector3f V = Pos[Desc->GetVertexInstanceVertex(VI)];
+						Best = FMath::Min(Best, (float)FVector2D::Distance(FVector2D(V.X, V.Y), P));
+					}
+				}
+			}
+			return Best < FLT_MAX ? Best : -1.f;
+		};
+
+		It("bordures : une rue droite donne 7 quads par section (1 chaussee, 4 bordure, 2 rives)",
+			[this, SurfaceProfile, WriteJson, SlotPolys, SlotZBounds]()
+		{
+			// UNE rue, UN segment, aucun noeud partage : le comptage est exact et
+			// lisible a la main. Residentielle de 6 m annoncee a 2 files -> classe
+			// fine_road_viciaalew (ZClassCm = 10), la seule ou l'ecart chaussee/chant
+			// se verifie sans ambiguite.
+			const FString Path = WriteJson(TEXT("voirie_rue.json"),
+				TEXT(R"({"roads":[{"pts":[[10,50],[90,50]],"t":"residential","w":6,"lanes":2}]})"));
+			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, SurfaceProfile());
+			TestEqual(TEXT("Un ruban"), Summary.Roads, 1);
+			TestEqual(TEXT("4 quads de bordure = 2 cotes x (face + chant)"), Summary.CurbQuads, 4);
+
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			if (!TestNotNull(TEXT("SM_Ground_0_0 genere"), Ground))
+			{
+				return;
+			}
+			TestEqual(TEXT("Chaussee : 1 quad"), SlotPolys(Ground, TEXT("fine_road_viciaalew")), 1);
+			TestEqual(TEXT("Bordure : 4 quads"), SlotPolys(Ground, TEXT("curb")), 4);
+			TestEqual(TEXT("Rives : 2 quads de dalle"),
+				SlotPolys(Ground, TEXT("dirty_sidewalk_tiles_ugxjcdpn")), 2);
+
+			// Relief : la bordure part du niveau de la chaussee et monte de 12 cm ;
+			// les rives sont de plain-pied avec le chant, donc a son Z maximal.
+			float RoadMin = 0.f, RoadMax = 0.f, CurbMin = 0.f, CurbMax = 0.f;
+			float WalkMin = 0.f, WalkMax = 0.f;
+			if (SlotZBounds(Ground, TEXT("fine_road_viciaalew"), RoadMin, RoadMax) &&
+				SlotZBounds(Ground, TEXT("curb"), CurbMin, CurbMax) &&
+				SlotZBounds(Ground, TEXT("dirty_sidewalk_tiles_ugxjcdpn"), WalkMin, WalkMax))
+			{
+				TestTrue(FString::Printf(TEXT("Bordure : pied au niveau de la chaussee (%.1f vs %.1f)"),
+					CurbMin, RoadMin), FMath::IsNearlyEqual(CurbMin, RoadMin, 0.05f));
+				TestTrue(FString::Printf(TEXT("Bordure : relief de 12 cm (%.2f)"), CurbMax - CurbMin),
+					FMath::IsNearlyEqual(CurbMax - CurbMin, 12.f, 0.05f));
+				TestTrue(FString::Printf(TEXT("Rives de plain-pied avec le chant (%.1f vs %.1f)"),
+					WalkMin, CurbMax), FMath::IsNearlyEqual(WalkMin, CurbMax, 0.05f) &&
+					FMath::IsNearlyEqual(WalkMax, CurbMax, 0.05f));
+			}
+
+			// Emprise transversale : chaussee 6 m -> ruban total 2 x (300 + 15 + 170).
+			float MinY = FLT_MAX, MaxY = -FLT_MAX;
+			if (FMeshDescription* Desc = Ground->GetMeshDescription(0))
+			{
+				TVertexAttributesRef<FVector3f> Pos = FStaticMeshAttributes(*Desc).GetVertexPositions();
+				for (const FVertexID V : Desc->Vertices().GetElementIDs())
+				{
+					MinY = FMath::Min(MinY, Pos[V].Y);
+					MaxY = FMath::Max(MaxY, Pos[V].Y);
+				}
+				TestTrue(FString::Printf(TEXT("Emprise du ruban : %.1f m (attendu 9,70)"),
+					(MaxY - MinY) * 0.01f), FMath::IsNearlyEqual(MaxY - MinY, 970.f, 1.f));
+			}
+		});
+
+		It("gravier et profil mobile : aucune bordure, aucune rive (golden path)",
+			[this, SurfaceProfile, WriteJson, SlotPolys]()
+		{
+			// (a) Allee de gravier : ce n'est pas une chaussee auto — elle garde son
+			//     ruban d'un seul tenant, sans bordure (une bordure autour d'un chemin
+			//     de terre serait un contresens).
+			const FString Path = WriteJson(TEXT("voirie_gravier.json"),
+				TEXT(R"({"roads":[{"pts":[[10,50],[90,50]],"t":"service","w":4,"surface":"gravel"},)")
+				TEXT(R"({"pts":[[10,20],[90,20]],"t":"service","w":4,"surface":"gravel"}]})"));
+			const FCityStreamedSummary Gravel = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, SurfaceProfile());
+			TestEqual(TEXT("Gravier : aucun quad de bordure"), Gravel.CurbQuads, 0);
+			UStaticMesh* GravelGround = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			TestEqual(TEXT("Gravier : aucun quad de bordure sur le mesh"),
+				SlotPolys(GravelGround, TEXT("curb")), 0);
+
+			// (b) GOLDEN PATH MOBILE : la meme rue, profil par defaut. Rien de la v5 ne
+			//     doit apparaitre — ni bande, ni bordure, ni passage.
+			const FString Street = WriteJson(TEXT("voirie_rue_mobile.json"),
+				TEXT(R"({"roads":[{"pts":[[10,50],[90,50]],"t":"residential","w":6,"lanes":2},)")
+				TEXT(R"({"pts":[[50,10],[50,90]],"t":"footway","w":2.5}]})"));
+			const FCityStreamedSummary Mobile = UCityImportTools::ImportCityStreamed(
+				Street, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, FCityGenProfile());
+			TestEqual(TEXT("Mobile : aucune bordure"), Mobile.CurbQuads, 0);
+			TestEqual(TEXT("Mobile : aucun passage pieton"), Mobile.Crossings, 0);
+			TestEqual(TEXT("Mobile : aucun ruban ecarte"), Mobile.OrphanRibbons, 0);
+			TestEqual(TEXT("Mobile : le sentier garde son ruban historique"), Mobile.Roads, 2);
+			UStaticMesh* MobileGround = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			if (TestNotNull(TEXT("SM_Ground_0_0 genere"), MobileGround))
+			{
+				TestEqual(TEXT("Mobile : 2 slots (Wall, Glass) et rien d'autre"),
+					MobileGround->GetStaticMaterials().Num(), 2);
+			}
+		});
+
+		It("la bordure s'interrompt sur l'emprise du patch de carrefour",
+			[this, SurfaceProfile, WriteJson, SlotPolys, SlotMinDistTo]()
+		{
+			// Meme carrefour que la spec des patchs : secondaire 9 m x residentielle
+			// 6 m, noeud INTERIEUR aux deux polylignes en (50,50). Rayon du patch =
+			// demi-ruban max (450 + 15 + 170 = 635) + 1 m = 735 cm.
+			const FString Path = WriteJson(TEXT("voirie_carrefour.json"),
+				TEXT(R"({"roads":[{"pts":[[10,50],[50,50],[90,50]],"t":"secondary","w":9,"lanes":2},)")
+				TEXT(R"({"pts":[[50,10],[50,50],[50,90]],"t":"residential","w":6,"lanes":2}]})"));
+			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, SurfaceProfile());
+			TestEqual(TEXT("Un seul patch de carrefour"), Summary.JunctionPatches, 1);
+			TestTrue(FString::Printf(TEXT("Des bordures ailleurs qu'au carrefour (%d quads)"),
+				Summary.CurbQuads), Summary.CurbQuads > 0);
+
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			if (!TestNotNull(TEXT("SM_Ground_0_0 genere"), Ground))
+			{
+				return;
+			}
+			TestTrue(TEXT("Slot de bordure present"), SlotPolys(Ground, TEXT("curb")) > 0);
+			// Sans decoupage, la bordure passerait a 450 cm du noeud (sa demi-chaussee).
+			// Avec, le sommet de bordure le plus proche est repousse hors du disque.
+			const float Dist = SlotMinDistTo(Ground, TEXT("curb"), FVector2D(5000.0, 5000.0));
+			TestTrue(FString::Printf(TEXT("Bordure repoussee hors du patch (%.0f cm du noeud, rayon 735)"), Dist),
+				Dist > 600.f);
+		});
+
+		It("passage pieton : un quad en travers de la chaussee au noeud partage avec une voie pietonne",
+			[this, SurfaceProfile, WriteJson, SlotPolys, SlotZBounds]()
+		{
+			// Une residentielle a 2 files traversee par un sentier au milieu. Une SEULE
+			// chaussee auto au noeud : pas de patch (regle v3), donc le passage se pose.
+			const FString Path = WriteJson(TEXT("voirie_passage.json"),
+				TEXT(R"({"roads":[{"pts":[[10,50],[50,50],[90,50]],"t":"residential","w":6,"lanes":2},)")
+				TEXT(R"({"pts":[[50,10],[50,50],[50,90]],"t":"footway","w":2.5}]})"));
+			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, SurfaceProfile());
+			TestEqual(TEXT("Aucun patch (une seule chaussee auto au noeud)"),
+				Summary.JunctionPatches, 0);
+			TestEqual(TEXT("Un passage pose"), Summary.Crossings, 1);
+			TestEqual(TEXT("Aucun passage reporte"), Summary.CrossingsDeferred, 0);
+			TestEqual(TEXT("Le sentier ne produit toujours aucun ruban"), Summary.Roads, 1);
+
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			if (!TestNotNull(TEXT("SM_Ground_0_0 genere"), Ground))
+			{
+				return;
+			}
+			TestEqual(TEXT("Un seul quad de passage"),
+				SlotPolys(Ground, TEXT("pedestrian_crossing_lines_veggecd")), 1);
+
+			// Altitude : au-dessus de la chaussee, SOUS le chant des bordures — un
+			// passage s'arrete au pied du trottoir, il n'y monte pas.
+			float RoadMin = 0.f, RoadMax = 0.f, CurbMin = 0.f, CurbMax = 0.f, CrossMin = 0.f, CrossMax = 0.f;
+			if (SlotZBounds(Ground, TEXT("fine_road_viciaalew"), RoadMin, RoadMax) &&
+				SlotZBounds(Ground, TEXT("curb"), CurbMin, CurbMax) &&
+				SlotZBounds(Ground, TEXT("pedestrian_crossing_lines_veggecd"), CrossMin, CrossMax))
+			{
+				TestTrue(FString::Printf(TEXT("Passage (%.1f) au-dessus de la chaussee (%.1f)"),
+					CrossMin, RoadMax), CrossMin > RoadMax);
+				TestTrue(FString::Printf(TEXT("Passage (%.1f) sous le chant (%.1f)"), CrossMax, CurbMax),
+					CrossMax < CurbMax);
+			}
+
+			// Emprise : 4 m dans l'axe de la rue, la largeur de CHAUSSEE en travers
+			// (jamais sur les rives) — le quad est centre sur le noeud (50,50).
+			FMeshDescription* Desc = Ground->GetMeshDescription(0);
+			if (TestNotNull(TEXT("MeshDescription du sol"), Desc))
+			{
+				FStaticMeshAttributes Attr(*Desc);
+				TPolygonGroupAttributesRef<FName> Names = Attr.GetPolygonGroupMaterialSlotNames();
+				TVertexAttributesRef<FVector3f> Pos = Attr.GetVertexPositions();
+				FBox2D Box(ForceInit);
+				for (const FPolygonGroupID G : Desc->PolygonGroups().GetElementIDs())
+				{
+					if (Names[G] != FName(TEXT("pedestrian_crossing_lines_veggecd")))
+					{
+						continue;
+					}
+					for (const FPolygonID P : Desc->GetPolygonGroupPolygons(G))
+					{
+						for (const FVertexInstanceID VI : Desc->GetPolygonVertexInstances(P))
+						{
+							const FVector3f V = Pos[Desc->GetVertexInstanceVertex(VI)];
+							Box += FVector2D(V.X, V.Y);
+						}
+					}
+				}
+				if (TestTrue(TEXT("Emprise du passage lisible"), Box.bIsValid != 0))
+				{
+					const FVector2D Size = Box.GetSize();
+					TestTrue(FString::Printf(TEXT("4 m dans l'axe de la rue (%.0f cm)"), Size.X),
+						FMath::IsNearlyEqual((float)Size.X, 400.f, 1.f));
+					TestTrue(FString::Printf(TEXT("Largeur de CHAUSSEE en travers (%.0f cm, attendu 600)"),
+						Size.Y), FMath::IsNearlyEqual((float)Size.Y, 600.f, 1.f));
+					TestTrue(FString::Printf(TEXT("Centre sur le noeud (%.0f, %.0f)"),
+						Box.GetCenter().X, Box.GetCenter().Y),
+						FVector2D::Distance(Box.GetCenter(), FVector2D(5000.0, 5000.0)) < 1.0);
+				}
+			}
+		});
+
+		It("passage REPORTE quand un patch de carrefour couvre deja le noeud",
+			[this, SurfaceProfile, WriteJson]()
+		{
+			// Deux chaussees auto + un sentier au meme noeud : le carrefour l'emporte,
+			// le passage est compte a part (le raccord bord-de-patch est au backlog).
+			const FString Path = WriteJson(TEXT("voirie_passage_patch.json"),
+				TEXT(R"({"roads":[{"pts":[[10,50],[50,50],[90,50]],"t":"secondary","w":9,"lanes":2},)")
+				TEXT(R"({"pts":[[50,10],[50,50],[50,90]],"t":"residential","w":6,"lanes":2},)")
+				TEXT(R"({"pts":[[20,20],[50,50],[80,80]],"t":"footway","w":2.5}]})"));
+			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, SurfaceProfile());
+			TestEqual(TEXT("Le carrefour est bien patche"), Summary.JunctionPatches, 1);
+			TestEqual(TEXT("Aucun passage pose sous le patch"), Summary.Crossings, 0);
+			TestEqual(TEXT("Un passage reporte"), Summary.CrossingsDeferred, 1);
+		});
+
+		It("fragment orphelin : un ruban court et deconnecte n'est plus genere",
+			[this, SurfaceProfile, WriteJson]()
+		{
+			// Deux rues qui se rejoignent (reseau) + un moignon de 15 m pose a l'ecart,
+			// sans le moindre noeud commun : c'est le « morceau perdu » de la v4b.
+			const FString Path = WriteJson(TEXT("voirie_orphelin.json"),
+				TEXT(R"({"roads":[{"pts":[[10,50],[50,50],[90,50]],"t":"secondary","w":9,"lanes":2},)")
+				TEXT(R"({"pts":[[50,10],[50,50],[50,90]],"t":"residential","w":6,"lanes":2},)")
+				TEXT(R"({"pts":[[200,200],[215,200]],"t":"service","w":4}]})"));
+			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, SurfaceProfile());
+			TestEqual(TEXT("Seules les deux rues du reseau sont generees"), Summary.Roads, 2);
+			TestEqual(TEXT("Un ruban orphelin ecarte"), Summary.OrphanRibbons, 1);
+
+			// Contre-epreuve : un moignon de la MEME longueur, mais raccroche au
+			// reseau par un noeud partage, reste genere (le critere est la solitude,
+			// pas la brievete).
+			const FString Linked = WriteJson(TEXT("voirie_orphelin_lie.json"),
+				TEXT(R"({"roads":[{"pts":[[10,50],[50,50],[90,50]],"t":"secondary","w":9,"lanes":2},)")
+				TEXT(R"({"pts":[[50,10],[50,50],[50,90]],"t":"residential","w":6,"lanes":2},)")
+				TEXT(R"({"pts":[[90,50],[105,50]],"t":"service","w":4}]})"));
+			const FCityStreamedSummary LinkedSummary = UCityImportTools::ImportCityStreamed(
+				Linked, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, SurfaceProfile());
+			TestEqual(TEXT("Moignon RACCROCHE : genere"), LinkedSummary.Roads, 3);
+			TestEqual(TEXT("Moignon raccroche : aucun ruban ecarte"), LinkedSummary.OrphanRibbons, 0);
+		});
+
+		It("espaces verts : UNE seule herbe pour parcs et bois (fin du spaghetti)",
+			[this, SurfaceProfile, WriteJson]()
+		{
+			auto HasSurfaceSlot = [](const TCHAR* SlotName)
+			{
+				UStaticMesh* Mesh = LoadTestMesh(TEXT("SM_Surface_0_0"));
+				if (!Mesh)
+				{
+					return false;
+				}
+				for (const FStaticMaterial& M : Mesh->GetStaticMaterials())
+				{
+					if (M.MaterialSlotName == FName(SlotName))
+					{
+						return true;
+					}
+				}
+				return false;
+			};
+			// Quatre verts qui se CHEVAUCHENT dans la meme cellule, dont deux bois :
+			// l'alternance historique en aurait fait un patchwork de 3 herbes.
+			const FString Path = WriteJson(TEXT("voirie_verts.json"),
+				TEXT(R"({"green":[{"k":"park","pts":[[10,10],[90,10],[90,90],[10,90]]},)")
+				TEXT(R"({"k":"forest","pts":[[20,20],[80,20],[80,80],[20,80]]},)")
+				TEXT(R"({"k":"forest","pts":[[30,30],[70,30],[70,70],[30,70]]},)")
+				TEXT(R"({"k":"grass","pts":[[40,40],[60,40],[60,60],[40,60]]}]})"));
+			const FCitySurfacesSummary Summary = UCityImportTools::ImportCitySurfaces(
+				Path, TEXT("/Game/Dev/Test/City"), FString(), 100.f, FVector::ZeroVector,
+				SurfaceProfile());
+			TestEqual(TEXT("Les 4 polygones verts sont generes"), Summary.Green, 4);
+			TestTrue(TEXT("Herbe tondue : la seule herbe posee"),
+				HasSurfaceSlot(TEXT("grass_cut_pjxmz0")));
+			TestFalse(TEXT("Plus d'herbe haute"), HasSurfaceSlot(TEXT("uncut_grass_oilpt20")));
+			TestFalse(TEXT("Plus d'herbe folle"), HasSurfaceSlot(TEXT("wild_grass_sfknaeoa")));
+
+			// Le flag de profil rend l'alternance (usage futur berges/friches) : la
+			// mecanique reste en code, seule sa valeur par defaut a change.
+			FCityGenProfile Varied = SurfaceProfile();
+			Varied.bVariedGrass = true;
+			UCityImportTools::ImportCitySurfaces(Path, TEXT("/Game/Dev/Test/City"), FString(),
+				100.f, FVector::ZeroVector, Varied);
+			TestTrue(TEXT("bVariedGrass : les herbes de bois reviennent"),
+				HasSurfaceSlot(TEXT("uncut_grass_oilpt20")) || HasSurfaceSlot(TEXT("wild_grass_sfknaeoa")));
+		});
+	});
+
 	// Verrou 2 « collision batiments » : les murs Nanite ne servent JAMAIS de
 	// collision (fallback decime ~0,1 % = facades traversables, sonde 2026-07-25) —
 	// chaque cellule desktop recoit un SM_Bldg_*_Col en prismes fermes, cable en
@@ -845,6 +1681,357 @@ void FCityImportToolsSpec::Define()
 			AddExpectedError(TEXT("Cannot read district file"), EAutomationExpectedErrorFlags::Contains);
 			UCityImportTools::GenerateBuildingCollisionCell(
 				TEXT("Z:/nope.json"), TEXT("/Game/Dev/Test/City"), 100.f, 0, 0, DesktopFlat());
+		});
+	});
+
+	// -------------------------------------------------------------------------
+	// J3c « MAQUETTE DU SOL » — LE SOL EST PEINT, LE RELIEF EST MAILLE.
+	// Ce qui se verifie ici est la BASCULE, pas le rendu :
+	//   - la dalle de la cellule prend son instance de materiau (slot ground_masked) ;
+	//   - le ruban de chaussee au niveau du sol DISPARAIT (il ferait doublon avec la
+	//     peinture) mais le PONT reste (aucun masque de sol ne peut rendre un tablier) ;
+	//   - bordures, passages et tirets arrivent du JSON de la cellule, deja decoupes,
+	//     et s'empilent aux bons Z les uns par rapport aux autres ;
+	//   - sans masque, sans instance de materiau ou sur une taille de cellule qui ne
+	//     correspond pas, RIEN ne bascule : effacer la chaussee sans rien mettre a la
+	//     place serait pire que de ne rien faire.
+	// -------------------------------------------------------------------------
+	Describe("Maquette du sol", [this]()
+	{
+		auto MaskDir = []()
+		{
+			return FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/SolsMasques"));
+		};
+		auto WriteJson = [](const FString& Path, const FString& Json)
+		{
+			FFileHelper::SaveStringToFile(Json, *Path);
+			return Path;
+		};
+		// Un dossier de masques NEUF a chaque test : un sols_*.json oublie par le test
+		// precedent ferait basculer (ou non) le suivant au hasard.
+		auto FreshMaskDir = [MaskDir]()
+		{
+			const FString Dir = MaskDir();
+			IFileManager::Get().DeleteDirectory(*Dir, false, true);
+			IFileManager::Get().MakeDirectory(*Dir, true);
+			return Dir;
+		};
+		// L'instance de materiau de la cellule, fabriquee EN MEMOIRE au bon chemin de
+		// package : le generateur la trouve par LoadObject sans qu'il faille ecrire un
+		// uasset ni dependre de Tools/import_ground_masks.py.
+		auto MakeCellMaterial = [](int32 CellX, int32 CellY)
+		{
+			const FString Name = FString::Printf(TEXT("MI_CityGround_%d_%d"), CellX, CellY);
+			const FString Pkg = FString::Printf(TEXT("/Game/Dev/Test/Ground/%s"), *Name);
+			if (UMaterialInterface* Existing = LoadObject<UMaterialInterface>(nullptr,
+				*FString::Printf(TEXT("%s.%s"), *Pkg, *Name), nullptr, LOAD_NoWarn | LOAD_Quiet))
+			{
+				return Existing;
+			}
+			UPackage* Package = CreatePackage(*Pkg);
+			UMaterialInstanceConstant* MIC = NewObject<UMaterialInstanceConstant>(
+				Package, *Name, RF_Public | RF_Standalone);
+			MIC->Parent = UMaterial::GetDefaultMaterial(MD_Surface);
+			return Cast<UMaterialInterface>(MIC);
+		};
+		auto MaskedProfile = [MaskDir]()
+		{
+			FCityGenProfile P;
+			P.bWindowReveals = true;
+			P.bSplitWallGlass = true;
+			P.bNanite = true;
+			P.bPBRMaterials = true;
+			P.bSurfaceMaterials = true;
+			P.bMaskedGround = true;
+			P.GroundMasksPath = MaskDir();
+			P.GroundMasksAssetFolder = TEXT("/Game/Dev/Test/Ground");
+			return P;
+		};
+		auto SlotPolys = [](UStaticMesh* Mesh, const TCHAR* SlotName) -> int32
+		{
+			FMeshDescription* Desc = Mesh ? Mesh->GetMeshDescription(0) : nullptr;
+			if (!Desc)
+			{
+				return 0;
+			}
+			TPolygonGroupAttributesRef<FName> Names =
+				FStaticMeshAttributes(*Desc).GetPolygonGroupMaterialSlotNames();
+			int32 Count = 0;
+			for (const FPolygonGroupID G : Desc->PolygonGroups().GetElementIDs())
+			{
+				if (Names[G] == FName(SlotName))
+				{
+					Count += Desc->GetNumPolygonGroupPolygons(G);
+				}
+			}
+			return Count;
+		};
+		auto SlotZBounds = [](UStaticMesh* Mesh, const TCHAR* SlotName, float& OutMin, float& OutMax) -> bool
+		{
+			FMeshDescription* Desc = Mesh ? Mesh->GetMeshDescription(0) : nullptr;
+			if (!Desc)
+			{
+				return false;
+			}
+			FStaticMeshAttributes Attr(*Desc);
+			TPolygonGroupAttributesRef<FName> Names = Attr.GetPolygonGroupMaterialSlotNames();
+			TVertexAttributesRef<FVector3f> Pos = Attr.GetVertexPositions();
+			OutMin = FLT_MAX;
+			OutMax = -FLT_MAX;
+			for (const FPolygonGroupID G : Desc->PolygonGroups().GetElementIDs())
+			{
+				if (Names[G] != FName(SlotName))
+				{
+					continue;
+				}
+				for (const FPolygonID P : Desc->GetPolygonGroupPolygons(G))
+				{
+					for (const FVertexInstanceID VI : Desc->GetPolygonVertexInstances(P))
+					{
+						const float Z = Pos[Desc->GetVertexInstanceVertex(VI)].Z;
+						OutMin = FMath::Min(OutMin, Z);
+						OutMax = FMath::Max(OutMax, Z);
+					}
+				}
+			}
+			return OutMin <= OutMax;
+		};
+		// UNE rue au sol + UN pont, cellule de 100 m : chaque compte du test se relit
+		// a la main sur ces deux lignes.
+		auto WriteCity = [WriteJson]()
+		{
+			return WriteJson(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/maquette_ville.json")),
+				TEXT(R"({"roads":[{"pts":[[10,50],[90,50]],"t":"residential","w":6,"lanes":2},)")
+				TEXT(R"({"pts":[[10,20],[90,20]],"t":"secondary","w":8,"lanes":2,"bridge":true}]})"));
+		};
+		// La MEME ville sans le pont : le relief du masque s'y compte a l'unite, sans
+		// se melanger aux bordures que le tablier du pont porte legitimement.
+		auto WriteCityNoBridge = [WriteJson]()
+		{
+			return WriteJson(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/maquette_ville_sans_pont.json")),
+				TEXT(R"({"roads":[{"pts":[[10,50],[90,50]],"t":"residential","w":6,"lanes":2}]})"));
+		};
+		// Bordure a y = 47 : la chaussee (centree en y = 50, large de 6 m) est donc A
+		// GAUCHE du sens de parcours +X — exactement la convention du prep.
+		auto WriteMask = [WriteJson](const FString& Dir, float CellSizeM)
+		{
+			return WriteJson(FPaths::Combine(Dir, TEXT("sols_0_0.json")),
+				FString::Printf(TEXT(R"({"cell":[0,0],"cellSizeM":%.1f,"origin":[0,0],)"), CellSizeM) +
+				TEXT(R"("curbs":[[[20,47],[80,47]]],)")
+				TEXT(R"("crossings":[{"p":[50,50],"d":[1,0],"halfW":3}],)")
+				TEXT(R"("axial":[[30,50,33,50]]})"));
+		};
+
+		It("sol peint : dalle masquee, ruban de chaussee supprime, pont conserve",
+			[this, MaskedProfile, FreshMaskDir, MakeCellMaterial, WriteCity, WriteMask, SlotPolys]()
+		{
+			const FString Dir = FreshMaskDir();
+			WriteMask(Dir, 100.f);
+			MakeCellMaterial(0, 0);
+			const FCityStreamedSummary S = UCityImportTools::ImportCityStreamed(
+				WriteCity(), FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, MaskedProfile());
+
+			TestEqual(TEXT("Une cellule peinte"), S.MaskedCells, 1);
+			TestEqual(TEXT("Le ruban de chaussee au sol est supprime"), S.GroundRibbonsSkipped, 1);
+			TestEqual(TEXT("Le pont garde son ruban"), S.BridgeRibbons, 1);
+			TestEqual(TEXT("Un seul ruban genere : le pont"), S.Roads, 1);
+
+			UStaticMesh* Slab = LoadTestMesh(TEXT("SM_Slab_0_0"));
+			if (TestNotNull(TEXT("SM_Slab_0_0 genere"), Slab))
+			{
+				TestTrue(TEXT("La dalle porte le slot ground_masked"),
+					SlotPolys(Slab, TEXT("ground_masked")) > 0);
+				TestEqual(TEXT("La dalle n'a plus le revetement de dalle simple"),
+					SlotPolys(Slab, TEXT("dirty_sidewalk_tiles_ugxjcdpn")), 0);
+			}
+
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			if (TestNotNull(TEXT("SM_Ground_0_0 genere"), Ground))
+			{
+				TestEqual(TEXT("Un quad de chaussee, celui du pont"),
+					SlotPolys(Ground, TEXT("fine_road_viciaalew")), 1);
+				TestEqual(TEXT("Aucun quad d'asphalte au sol"),
+					SlotPolys(Ground, TEXT("asphalt_road_tiggcjdo")), 0);
+			}
+			// Le TABLIER du pont garde ses propres bordures et ses rives : c'est un
+			// ruban complet, pas un morceau de sol peint. 4 quads (2 cotes x face +
+			// chant) s'ajoutent donc aux 3 quads de la bordure du masque.
+			TestEqual(TEXT("4 quads de bordure du tablier + 3 du masque"), S.CurbQuads, 7);
+			TestEqual(TEXT("Rives du tablier"),
+				SlotPolys(LoadTestMesh(TEXT("SM_Ground_0_0")),
+					TEXT("dirty_sidewalk_tiles_ugxjcdpn")), 2);
+		});
+
+		It("relief : 3 quads de bordure tournes vers la chaussee, passage et tiret sous le chant",
+			[this, MaskedProfile, FreshMaskDir, MakeCellMaterial, WriteCityNoBridge, WriteMask,
+			 SlotPolys, SlotZBounds]()
+		{
+			const FString Dir = FreshMaskDir();
+			WriteMask(Dir, 100.f);
+			MakeCellMaterial(0, 0);
+			// Ville SANS pont : tout le relief du mesh vient du masque, les comptes
+			// et les Z se lisent donc sans melange avec un tablier.
+			const FCityStreamedSummary S = UCityImportTools::ImportCityStreamed(
+				WriteCityNoBridge(), FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, MaskedProfile());
+
+			TestEqual(TEXT("Aucun ruban : tout est peint"), S.Roads, 0);
+			TestEqual(TEXT("3 quads pour un segment de bordure"), S.CurbQuads, 3);
+			TestEqual(TEXT("Un passage pieton"), S.Crossings, 1);
+			TestEqual(TEXT("Un tiret axial"), S.AxialDashes, 1);
+
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			if (!TestNotNull(TEXT("SM_Ground_0_0 genere"), Ground))
+			{
+				return;
+			}
+			TestEqual(TEXT("Bordure : 3 quads sur le mesh"), SlotPolys(Ground, TEXT("curb")), 3);
+			TestEqual(TEXT("Passage : 1 quad"),
+				SlotPolys(Ground, TEXT("pedestrian_crossing_lines_veggecd")), 1);
+			TestEqual(TEXT("Tiret : 1 quad"), SlotPolys(Ground, TEXT("marking")), 1);
+
+			float CurbMin = 0.f, CurbMax = 0.f, CrossMin = 0.f, CrossMax = 0.f;
+			float DashMin = 0.f, DashMax = 0.f;
+			if (SlotZBounds(Ground, TEXT("curb"), CurbMin, CurbMax) &&
+				SlotZBounds(Ground, TEXT("pedestrian_crossing_lines_veggecd"), CrossMin, CrossMax) &&
+				SlotZBounds(Ground, TEXT("marking"), DashMin, DashMax))
+			{
+				TestTrue(FString::Printf(TEXT("Bordure : chant a 12 cm (%.2f)"), CurbMax),
+					FMath::IsNearlyEqual(CurbMax, 12.f, 0.05f));
+				TestTrue(FString::Printf(TEXT("Bordure : pied enterre a -10 cm (%.2f)"), CurbMin),
+					FMath::IsNearlyEqual(CurbMin, -10.f, 0.05f));
+				TestTrue(FString::Printf(TEXT("Passage a 4 cm (%.2f)"), CrossMax),
+					FMath::IsNearlyEqual(CrossMax, 4.f, 0.05f));
+				TestTrue(FString::Printf(TEXT("Tiret a 6 cm, sous le chant (%.2f)"), DashMax),
+					FMath::IsNearlyEqual(DashMax, 6.f, 0.05f) && DashMax < CurbMax);
+			}
+
+			// ORIENTATION : la polyligne va vers +X avec la chaussee A GAUCHE, donc
+			// vers +Y. Une face verticale doit regarder +Y (la chaussee), l'autre -Y.
+			if (FMeshDescription* Desc = Ground->GetMeshDescription(0))
+			{
+				FStaticMeshAttributes Attr(*Desc);
+				TPolygonGroupAttributesRef<FName> Names = Attr.GetPolygonGroupMaterialSlotNames();
+				TVertexInstanceAttributesRef<FVector3f> Normals = Attr.GetVertexInstanceNormals();
+				float TowardRoad = 0.f, TowardWalk = 0.f;
+				int32 Vertical = 0;
+				for (const FPolygonGroupID G : Desc->PolygonGroups().GetElementIDs())
+				{
+					if (Names[G] != FName(TEXT("curb")))
+					{
+						continue;
+					}
+					for (const FPolygonID P : Desc->GetPolygonGroupPolygons(G))
+					{
+						const FVector3f N = Normals[Desc->GetPolygonVertexInstances(P)[0]];
+						if (FMath::Abs(N.Z) > 0.5f)
+						{
+							continue; // le chant, horizontal
+						}
+						++Vertical;
+						TowardRoad = FMath::Max(TowardRoad, N.Y);
+						TowardWalk = FMath::Min(TowardWalk, N.Y);
+					}
+				}
+				TestEqual(TEXT("Deux faces verticales"), Vertical, 2);
+				TestTrue(FString::Printf(TEXT("Une face regarde la chaussee, +Y (%.2f)"), TowardRoad),
+					TowardRoad > 0.9f);
+				TestTrue(FString::Printf(TEXT("L'autre regarde le trottoir, -Y (%.2f)"), TowardWalk),
+					TowardWalk < -0.9f);
+			}
+		});
+
+		It("aucun masque cuit : la chaussee reste un ruban (on n'efface jamais sans remplacer)",
+			[this, MaskedProfile, FreshMaskDir, MakeCellMaterial, WriteCity, SlotPolys]()
+		{
+			FreshMaskDir();
+			MakeCellMaterial(0, 0);
+			AddExpectedMessagePlain(TEXT("aucun masque"), ELogVerbosity::Warning,
+				EAutomationExpectedMessageFlags::Contains);
+			const FCityStreamedSummary S = UCityImportTools::ImportCityStreamed(
+				WriteCity(), FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, MaskedProfile());
+			TestEqual(TEXT("Aucune cellule peinte"), S.MaskedCells, 0);
+			TestEqual(TEXT("Les deux rubans sont generes"), S.Roads, 2);
+			TestEqual(TEXT("Aucun ruban supprime"), S.GroundRibbonsSkipped, 0);
+			TestEqual(TEXT("Aucun tiret"), S.AxialDashes, 0);
+			UStaticMesh* Slab = LoadTestMesh(TEXT("SM_Slab_0_0"));
+			TestTrue(TEXT("La dalle garde son revetement simple"),
+				SlotPolys(Slab, TEXT("dirty_sidewalk_tiles_ugxjcdpn")) > 0);
+		});
+
+		It("instance de cellule absente : bascule ANNULEE, la voirie n'est pas perdue",
+			[this, MaskedProfile, FreshMaskDir, WriteCity, WriteMask]()
+		{
+			const FString Dir = FreshMaskDir();
+			WriteMask(Dir, 100.f);
+			// Cellule 1,0 : masque cuit, mais aucune instance de materiau fabriquee.
+			// Le basculement est GLOBAL : une seule cellule orpheline l'annule.
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"cell":[1,0],"cellSizeM":100.0,"origin":[100,0],"curbs":[],"crossings":[],"axial":[]})"),
+				*FPaths::Combine(Dir, TEXT("sols_1_0.json")));
+			AddExpectedMessagePlain(TEXT("bascule ANNULEE"), ELogVerbosity::Warning,
+				EAutomationExpectedMessageFlags::Contains);
+			const FCityStreamedSummary S = UCityImportTools::ImportCityStreamed(
+				WriteCity(), FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, MaskedProfile());
+			TestEqual(TEXT("Aucune cellule peinte"), S.MaskedCells, 0);
+			TestEqual(TEXT("Les deux rubans survivent"), S.Roads, 2);
+			TestTrue(TEXT("Bordures de RUBAN, pas de masque"), S.CurbQuads > 0);
+			TestEqual(TEXT("Aucun tiret axial"), S.AxialDashes, 0);
+		});
+
+		It("masque cuit pour une autre taille de cellule : refuse plutot que peindre a cote",
+			[this, MaskedProfile, FreshMaskDir, MakeCellMaterial, WriteCity, WriteMask]()
+		{
+			const FString Dir = FreshMaskDir();
+			WriteMask(Dir, 500.f);   // cuit a 500 m, import a 100 m
+			MakeCellMaterial(0, 0);
+			AddExpectedError(TEXT("was baked for"), EAutomationExpectedErrorFlags::Contains);
+			AddExpectedMessagePlain(TEXT("aucun masque"), ELogVerbosity::Warning,
+				EAutomationExpectedMessageFlags::Contains);
+			const FCityStreamedSummary S = UCityImportTools::ImportCityStreamed(
+				WriteCity(), FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, MaskedProfile());
+			TestEqual(TEXT("Aucune cellule peinte"), S.MaskedCells, 0);
+			TestEqual(TEXT("Les deux rubans survivent"), S.Roads, 2);
+		});
+
+		It("golden path : sans bMaskedGround, rien ne change (non-regression)",
+			[this, FreshMaskDir, MakeCellMaterial, WriteCity, WriteMask, SlotPolys]()
+		{
+			const FString Dir = FreshMaskDir();
+			WriteMask(Dir, 100.f);
+			MakeCellMaterial(0, 0);
+			// Meme masque sur le disque, meme instance de materiau — mais le profil ne
+			// demande PAS la maquette : le generateur ne doit meme pas aller regarder.
+			FCityGenProfile P;
+			P.bWindowReveals = true;
+			P.bSplitWallGlass = true;
+			P.bNanite = true;
+			P.bPBRMaterials = true;
+			P.bSurfaceMaterials = true;
+			const FCityStreamedSummary S = UCityImportTools::ImportCityStreamed(
+				WriteCity(), FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, P);
+			TestEqual(TEXT("Aucune cellule peinte"), S.MaskedCells, 0);
+			TestEqual(TEXT("Les deux rubans sont generes"), S.Roads, 2);
+			TestEqual(TEXT("Aucun tiret axial"), S.AxialDashes, 0);
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			TestEqual(TEXT("Aucun quad de marquage"), SlotPolys(Ground, TEXT("marking")), 0);
+
+			// Et le profil MOBILE : bMaskedGround exige les revetements, il ne bascule
+			// donc jamais — le golden path mobile ne peut pas etre atteint par erreur.
+			FCityGenProfile Mobile;
+			Mobile.bMaskedGround = true;
+			Mobile.GroundMasksPath = Dir;
+			Mobile.GroundMasksAssetFolder = TEXT("/Game/Dev/Test/Ground");
+			const FCityStreamedSummary M = UCityImportTools::ImportCityStreamed(
+				WriteCity(), FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, Mobile);
+			TestEqual(TEXT("Mobile : aucune cellule peinte"), M.MaskedCells, 0);
+			TestEqual(TEXT("Mobile : les deux rubans sont generes"), M.Roads, 2);
 		});
 	});
 }

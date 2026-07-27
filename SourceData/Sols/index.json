@@ -1,0 +1,92 @@
+{
+ "cellSizeM": 500.0,
+ "maskPx": 1024,
+ "sdfRangeM": 2.0,
+ "cells": [
+  {
+   "cell": [
+    -1,
+    -1
+   ],
+   "png": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\mask_-1_-1.png",
+   "json": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\sols_-1_-1.json",
+   "curbs": 143,
+   "crossings": 74,
+   "axial": 4,
+   "curbLenM": 8214.5,
+   "pngBytes": 137211,
+   "jsonBytes": 17769,
+   "areasM2": {
+    "corridor": 48553.4,
+    "chaussee": 16594.5,
+    "privee": 1364.6,
+    "gravier": 0.0,
+    "cellule": 250000.0
+   }
+  },
+  {
+   "cell": [
+    -1,
+    0
+   ],
+   "png": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\mask_-1_0.png",
+   "json": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\sols_-1_0.json",
+   "curbs": 133,
+   "crossings": 69,
+   "axial": 27,
+   "curbLenM": 9394.8,
+   "pngBytes": 140946,
+   "jsonBytes": 18927,
+   "areasM2": {
+    "corridor": 47738.2,
+    "chaussee": 18827.6,
+    "privee": 1661.3,
+    "gravier": 0.0,
+    "cellule": 250000.0
+   }
+  },
+  {
+   "cell": [
+    0,
+    -1
+   ],
+   "png": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\mask_0_-1.png",
+   "json": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\sols_0_-1.json",
+   "curbs": 266,
+   "crossings": 157,
+   "axial": 206,
+   "curbLenM": 12469.6,
+   "pngBytes": 163653,
+   "jsonBytes": 34186,
+   "areasM2": {
+    "corridor": 92126.4,
+    "chaussee": 32113.0,
+    "privee": 147.3,
+    "gravier": 0.0,
+    "cellule": 250000.0
+   }
+  },
+  {
+   "cell": [
+    0,
+    0
+   ],
+   "png": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\mask_0_0.png",
+   "json": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\sols_0_0.json",
+   "curbs": 169,
+   "crossings": 90,
+   "axial": 183,
+   "curbLenM": 10480.4,
+   "pngBytes": 117918,
+   "jsonBytes": 23612,
+   "areasM2": {
+    "corridor": 62944.9,
+    "chaussee": 25169.0,
+    "privee": 344.2,
+    "gravier": 0.0,
+    "cellule": 250000.0
+   }
+  }
+ ],
+ "generatedAt": "2026-07-27T01:03:14"
+}

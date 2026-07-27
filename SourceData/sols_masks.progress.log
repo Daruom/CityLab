@@ -1,0 +1,229 @@
+2026-07-27 00:55:49  selftest SDF centre du disque (sature)      attendu    10.5000  obtenu    10.5000  OK
+2026-07-27 00:55:49  selftest SDF a 5 px du bord (dedans)        attendu     5.0000  obtenu     4.5990  OK
+2026-07-27 00:55:49  selftest SDF a 5 px du bord (dehors)        attendu    -5.0000  obtenu    -4.5000  OK
+2026-07-27 00:55:49  selftest SDF signe dedans                   attendu       True  obtenu       True  OK
+2026-07-27 00:55:49  selftest SDF signe dehors                   attendu       True  obtenu       True  OK
+2026-07-27 00:55:49  selftest encodage frontiere -> 128          attendu   128.0000  obtenu   127.0000  OK
+2026-07-27 00:55:49  selftest encodage -2 m -> 0                 attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:55:49  selftest encodage +2 m -> 255               attendu   255.0000  obtenu   255.0000  OK
+2026-07-27 00:55:49  selftest encodage sature en bas             attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:55:49  selftest encodage sature en haut            attendu   255.0000  obtenu   255.0000  OK
+2026-07-27 00:55:49  selftest corridor synthetique (m2)          attendu  1000.0000  obtenu  1000.0000  OK
+2026-07-27 00:55:49  selftest chaussee = corridor - pont         attendu   920.0000  obtenu   920.0000  OK
+2026-07-27 00:55:49  selftest le pont ne se peint pas            attendu       True  obtenu       True  OK
+2026-07-27 00:55:49  selftest voirie privee (m2)                 attendu   400.0000  obtenu   356.0000  ECHEC
+2026-07-27 00:55:49  selftest gravier present                    attendu       True  obtenu       True  OK
+2026-07-27 00:55:49  selftest gravier disjoint de la chaussee    attendu       True  obtenu       True  OK
+2026-07-27 00:55:49  selftest bordures produites                 attendu       True  obtenu       True  OK
+2026-07-27 00:55:49  selftest bordures mal orientees             attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:55:49  selftest bordures echantillonnees           attendu       True  obtenu      False  ECHEC
+2026-07-27 00:55:49  selftest bordures sur autoroutier           attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:55:49  selftest sites de passage                   attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 00:55:49  selftest passage : demi-largeur             attendu     5.0000  obtenu     5.0000  OK
+2026-07-27 00:55:49  selftest passage : |dy| (axe de rue)        attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 00:55:49  selftest passage : x du site                attendu    50.0000  obtenu    50.0000  OK
+2026-07-27 00:55:49  selftest bordure coupee a la traversee      attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:55:49  selftest tirets produits                    attendu       True  obtenu       True  OK
+2026-07-27 00:55:49  selftest longueur de tiret                  attendu     3.0000  obtenu     3.0000  OK
+2026-07-27 00:55:49  selftest tirets hors chaussee               attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:55:49  selftest tirets dans un carrefour           attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:55:49  selftest carrefour = moins de tirets        attendu       True  obtenu       True  OK
+2026-07-27 00:55:49  selftest rasterisation 50 x 50              attendu  2500.0000  obtenu  2601.0000  ECHEC
+2026-07-27 00:55:49  SELFTEST : FAIL
+2026-07-27 00:56:57  selftest SDF centre du disque (sature)      attendu    10.5000  obtenu    10.5000  OK
+2026-07-27 00:56:57  selftest SDF a 5 px du bord (dedans)        attendu     5.0000  obtenu     4.5990  OK
+2026-07-27 00:56:57  selftest SDF a 5 px du bord (dehors)        attendu    -5.0000  obtenu    -4.5000  OK
+2026-07-27 00:56:57  selftest SDF signe dedans                   attendu       True  obtenu       True  OK
+2026-07-27 00:56:57  selftest SDF signe dehors                   attendu       True  obtenu       True  OK
+2026-07-27 00:56:57  selftest encodage frontiere -> 128          attendu   128.0000  obtenu   127.0000  OK
+2026-07-27 00:56:57  selftest encodage -2 m -> 0                 attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:56:57  selftest encodage +2 m -> 255               attendu   255.0000  obtenu   255.0000  OK
+2026-07-27 00:56:57  selftest encodage sature en bas             attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:56:57  selftest encodage sature en haut            attendu   255.0000  obtenu   255.0000  OK
+2026-07-27 00:56:57  selftest corridor synthetique (m2)          attendu  1000.0000  obtenu  1000.0000  OK
+2026-07-27 00:56:57  selftest chaussee = corridor - pont         attendu   920.0000  obtenu   920.0000  OK
+2026-07-27 00:56:57  selftest le pont ne se peint pas            attendu       True  obtenu       True  OK
+2026-07-27 00:56:57  selftest voirie privee (m2)                 attendu   356.0000  obtenu   356.0000  OK
+2026-07-27 00:56:57  selftest gravier present                    attendu       True  obtenu       True  OK
+2026-07-27 00:56:57  selftest gravier disjoint de la chaussee    attendu       True  obtenu       True  OK
+2026-07-27 00:56:57  selftest bordures produites                 attendu       True  obtenu       True  OK
+2026-07-27 00:56:57  selftest bordures mal orientees             attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:56:57  selftest bordures echantillonnees           attendu       True  obtenu       True  OK
+2026-07-27 00:56:57  selftest bordures sur autoroutier           attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:56:57  selftest sites de passage                   attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 00:56:57  selftest passage : demi-largeur             attendu     5.0000  obtenu     5.0000  OK
+2026-07-27 00:56:57  selftest passage : |dy| (axe de rue)        attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 00:56:57  selftest passage : x du site                attendu    50.0000  obtenu    50.0000  OK
+2026-07-27 00:56:57  selftest bordure coupee a la traversee      attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:56:57  selftest tirets produits                    attendu       True  obtenu       True  OK
+2026-07-27 00:56:57  selftest longueur de tiret                  attendu     3.0000  obtenu     3.0000  OK
+2026-07-27 00:56:57  selftest tirets hors chaussee               attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:56:57  selftest tirets dans un carrefour           attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:56:57  selftest carrefour = moins de tirets        attendu       True  obtenu       True  OK
+2026-07-27 00:56:57  selftest rasterisation 50 x 50              attendu  2500.0000  obtenu  2601.0000  OK
+2026-07-27 00:56:57  SELFTEST : PASS
+2026-07-27 00:59:51  selftest SDF centre du disque (sature)      attendu    10.5000  obtenu    10.5000  OK
+2026-07-27 00:59:51  selftest SDF a 5 px du bord (dedans)        attendu     5.0000  obtenu     4.5990  OK
+2026-07-27 00:59:51  selftest SDF a 5 px du bord (dehors)        attendu    -5.0000  obtenu    -4.5000  OK
+2026-07-27 00:59:51  selftest SDF signe dedans                   attendu       True  obtenu       True  OK
+2026-07-27 00:59:51  selftest SDF signe dehors                   attendu       True  obtenu       True  OK
+2026-07-27 00:59:51  selftest encodage frontiere -> 128          attendu   128.0000  obtenu   127.0000  OK
+2026-07-27 00:59:51  selftest encodage -2 m -> 0                 attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:59:51  selftest encodage +2 m -> 255               attendu   255.0000  obtenu   255.0000  OK
+2026-07-27 00:59:51  selftest encodage sature en bas             attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:59:51  selftest encodage sature en haut            attendu   255.0000  obtenu   255.0000  OK
+2026-07-27 00:59:51  selftest corridor synthetique (m2)          attendu  1000.0000  obtenu  1000.0000  OK
+2026-07-27 00:59:51  selftest chaussee = corridor - pont         attendu   920.0000  obtenu   920.0000  OK
+2026-07-27 00:59:51  selftest le pont ne se peint pas            attendu       True  obtenu       True  OK
+2026-07-27 00:59:51  selftest voirie privee (m2)                 attendu   356.0000  obtenu   356.0000  OK
+2026-07-27 00:59:51  selftest gravier present                    attendu       True  obtenu       True  OK
+2026-07-27 00:59:51  selftest gravier disjoint de la chaussee    attendu       True  obtenu       True  OK
+2026-07-27 00:59:51  selftest bordures produites                 attendu       True  obtenu       True  OK
+2026-07-27 00:59:51  selftest bordures mal orientees             attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:59:51  selftest bordures echantillonnees           attendu       True  obtenu       True  OK
+2026-07-27 00:59:51  selftest bordures sur autoroutier           attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:59:51  selftest sites de passage                   attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 00:59:51  selftest passage : demi-largeur             attendu     5.0000  obtenu     5.0000  OK
+2026-07-27 00:59:51  selftest passage : |dy| (axe de rue)        attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 00:59:51  selftest passage : x du site                attendu    50.0000  obtenu    50.0000  OK
+2026-07-27 00:59:51  selftest bordure coupee a la traversee      attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:59:51  selftest tirets produits                    attendu       True  obtenu       True  OK
+2026-07-27 00:59:51  selftest longueur de tiret                  attendu     3.0000  obtenu     3.0000  OK
+2026-07-27 00:59:51  selftest tirets hors chaussee               attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:59:51  selftest tirets dans un carrefour           attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 00:59:51  selftest carrefour = moins de tirets        attendu       True  obtenu       True  OK
+2026-07-27 00:59:51  selftest rasterisation 50 x 50 (m2)         attendu  2500.0000  obtenu  2500.0000  OK
+2026-07-27 00:59:51  selftest largeur rendue d'une chaussee de 10 m attendu    10.0000  obtenu    10.0098  OK
+2026-07-27 00:59:51  SELFTEST : PASS
+2026-07-27 00:59:57  === MAQUETTE DU SOL : cuisson de 4 cellules -1,-1 -1,+0 +0,-1 +0,+0 ===
+2026-07-27 00:59:58  routes BD TOPO : 509 troncons dans la fenetre (509 au sol, 0 ponts exclus du masque, 0 souterrains, 64 natures pietonnes, 11 hors service) ; largeurs mesurees 509 / replis 0
+2026-07-27 00:59:59  axes pietons OSM : 1088 dans la fenetre
+2026-07-27 00:59:59  chargements : 1.3 s
+2026-07-27 01:00:00  cellule -1,-1 : chaussee 6.6 % | 150 bordures (8147 m) | 87 passages | 441 tirets | masque 0.13 Mo | json 0.03 Mo | 1.9 s
+2026-07-27 01:00:02  cellule -1,+0 : chaussee 7.5 % | 138 bordures (9306 m) | 89 passages | 497 tirets | masque 0.14 Mo | json 0.03 Mo | 1.9 s
+2026-07-27 01:00:04  cellule +0,-1 : chaussee 12.8 % | 298 bordures (12117 m) | 225 passages | 758 tirets | masque 0.16 Mo | json 0.05 Mo | 2.0 s
+2026-07-27 01:00:06  cellule +0,+0 : chaussee 10.1 % | 172 bordures (10401 m) | 103 passages | 550 tirets | masque 0.11 Mo | json 0.03 Mo | 1.9 s
+2026-07-27 01:00:06  TOTAL 9.0 s | 4 cellules | masques 0.5 Mo (0.13 Mo/cellule) | json 0.15 Mo
+2026-07-27 01:00:06  PEINT   : 92704 m2 de chaussee, 3517 m2 de voirie privee, 0 m2 de gravier
+2026-07-27 01:00:06  MAILLE  : 758 polylignes de bordure (39972 m), 504 passages, 2246 tirets
+2026-07-27 01:01:17  selftest SDF centre du disque (sature)      attendu    10.5000  obtenu    10.5000  OK
+2026-07-27 01:01:17  selftest SDF a 5 px du bord (dedans)        attendu     5.0000  obtenu     4.5990  OK
+2026-07-27 01:01:17  selftest SDF a 5 px du bord (dehors)        attendu    -5.0000  obtenu    -4.5000  OK
+2026-07-27 01:01:17  selftest SDF signe dedans                   attendu       True  obtenu       True  OK
+2026-07-27 01:01:17  selftest SDF signe dehors                   attendu       True  obtenu       True  OK
+2026-07-27 01:01:18  selftest encodage frontiere -> 128          attendu   128.0000  obtenu   127.0000  OK
+2026-07-27 01:01:18  selftest encodage -2 m -> 0                 attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:01:18  selftest encodage +2 m -> 255               attendu   255.0000  obtenu   255.0000  OK
+2026-07-27 01:01:18  selftest encodage sature en bas             attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:01:18  selftest encodage sature en haut            attendu   255.0000  obtenu   255.0000  OK
+2026-07-27 01:01:18  selftest corridor synthetique (m2)          attendu  1000.0000  obtenu  1000.0000  OK
+2026-07-27 01:01:18  selftest chaussee = corridor - pont         attendu   920.0000  obtenu   920.0000  OK
+2026-07-27 01:01:18  selftest le pont ne se peint pas            attendu       True  obtenu       True  OK
+2026-07-27 01:01:18  selftest voirie privee (m2)                 attendu   356.0000  obtenu   356.0000  OK
+2026-07-27 01:01:18  selftest gravier present                    attendu       True  obtenu       True  OK
+2026-07-27 01:01:18  selftest gravier disjoint de la chaussee    attendu       True  obtenu       True  OK
+2026-07-27 01:01:18  selftest bordures produites                 attendu       True  obtenu       True  OK
+2026-07-27 01:01:18  selftest bordures mal orientees             attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:01:18  selftest bordures echantillonnees           attendu       True  obtenu       True  OK
+2026-07-27 01:01:18  selftest bordures sur autoroutier           attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:01:18  selftest sites de passage                   attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 01:01:18  selftest passage : demi-largeur             attendu     5.0000  obtenu     5.0000  OK
+2026-07-27 01:01:18  selftest passage : |dy| (axe de rue)        attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 01:01:18  selftest passage : x du site                attendu    50.0000  obtenu    50.0000  OK
+2026-07-27 01:01:18  selftest bordure coupee a la traversee      attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:01:18  selftest tirets produits                    attendu       True  obtenu       True  OK
+2026-07-27 01:01:18  selftest longueur de tiret                  attendu     3.0000  obtenu     3.0000  OK
+2026-07-27 01:01:18  selftest tirets hors chaussee               attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:01:18  selftest tirets dans un carrefour           attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:01:18  selftest carrefour = moins de tirets        attendu       True  obtenu       True  OK
+2026-07-27 01:01:18  selftest rasterisation 50 x 50 (m2)         attendu  2500.0000  obtenu  2500.0000  OK
+2026-07-27 01:01:18  selftest largeur rendue d'une chaussee de 10 m attendu    10.0000  obtenu    10.0098  OK
+2026-07-27 01:01:18  SELFTEST : PASS
+2026-07-27 01:01:18  === MAQUETTE DU SOL : cuisson de 4 cellules -1,-1 -1,+0 +0,-1 +0,+0 ===
+2026-07-27 01:01:19  routes BD TOPO : 509 troncons dans la fenetre (509 au sol, 0 ponts exclus du masque, 0 souterrains, 64 natures pietonnes, 11 hors service) ; largeurs mesurees 509 / replis 0
+2026-07-27 01:01:19  axes pietons OSM : 1088 dans la fenetre
+2026-07-27 01:01:19  chargements : 1.4 s
+2026-07-27 01:01:21  cellule -1,-1 : chaussee 6.6 % | 143 bordures (8214 m) | 74 passages | 4 tirets | masque 0.13 Mo | json 0.02 Mo | 2.2 s
+2026-07-27 01:01:24  cellule -1,+0 : chaussee 7.5 % | 133 bordures (9395 m) | 69 passages | 27 tirets | masque 0.14 Mo | json 0.02 Mo | 2.2 s
+2026-07-27 01:01:26  cellule +0,-1 : chaussee 12.8 % | 266 bordures (12470 m) | 157 passages | 206 tirets | masque 0.16 Mo | json 0.03 Mo | 2.4 s
+2026-07-27 01:01:28  cellule +0,+0 : chaussee 10.1 % | 169 bordures (10480 m) | 90 passages | 183 tirets | masque 0.11 Mo | json 0.02 Mo | 2.2 s
+2026-07-27 01:01:28  TOTAL 10.4 s | 4 cellules | masques 0.5 Mo (0.13 Mo/cellule) | json 0.09 Mo
+2026-07-27 01:01:28  PEINT   : 92704 m2 de chaussee, 3517 m2 de voirie privee, 0 m2 de gravier
+2026-07-27 01:01:28  MAILLE  : 711 polylignes de bordure (40559 m), 390 passages, 420 tirets
+2026-07-27 01:03:03  selftest SDF centre du disque (sature)      attendu    10.5000  obtenu    10.5000  OK
+2026-07-27 01:03:03  selftest SDF a 5 px du bord (dedans)        attendu     5.0000  obtenu     4.5990  OK
+2026-07-27 01:03:03  selftest SDF a 5 px du bord (dehors)        attendu    -5.0000  obtenu    -4.5000  OK
+2026-07-27 01:03:03  selftest SDF signe dedans                   attendu       True  obtenu       True  OK
+2026-07-27 01:03:03  selftest SDF signe dehors                   attendu       True  obtenu       True  OK
+2026-07-27 01:03:03  selftest encodage frontiere -> 128          attendu   128.0000  obtenu   127.0000  OK
+2026-07-27 01:03:03  selftest encodage -2 m -> plancher 1        attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 01:03:03  selftest encodage +2 m -> 255               attendu   255.0000  obtenu   255.0000  OK
+2026-07-27 01:03:03  selftest encodage sature en bas             attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 01:03:03  selftest encodage sature en haut            attendu   255.0000  obtenu   255.0000  OK
+2026-07-27 01:03:03  selftest corridor synthetique (m2)          attendu  1000.0000  obtenu  1000.0000  OK
+2026-07-27 01:03:03  selftest chaussee = corridor - pont         attendu   920.0000  obtenu   920.0000  OK
+2026-07-27 01:03:03  selftest le pont ne se peint pas            attendu       True  obtenu       True  OK
+2026-07-27 01:03:03  selftest voirie privee (m2)                 attendu   356.0000  obtenu   356.0000  OK
+2026-07-27 01:03:03  selftest gravier present                    attendu       True  obtenu       True  OK
+2026-07-27 01:03:03  selftest gravier disjoint de la chaussee    attendu       True  obtenu       True  OK
+2026-07-27 01:03:03  selftest bordures produites                 attendu       True  obtenu       True  OK
+2026-07-27 01:03:03  selftest bordures mal orientees             attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:03:03  selftest bordures echantillonnees           attendu       True  obtenu       True  OK
+2026-07-27 01:03:03  selftest bordures sur autoroutier           attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:03:03  selftest sites de passage                   attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 01:03:03  selftest passage : demi-largeur             attendu     5.0000  obtenu     5.0000  OK
+2026-07-27 01:03:03  selftest passage : |dy| (axe de rue)        attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 01:03:03  selftest passage : x du site                attendu    50.0000  obtenu    50.0000  OK
+2026-07-27 01:03:03  selftest bordure coupee a la traversee      attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:03:03  selftest tirets produits                    attendu       True  obtenu       True  OK
+2026-07-27 01:03:03  selftest longueur de tiret                  attendu     3.0000  obtenu     3.0000  OK
+2026-07-27 01:03:03  selftest tirets hors chaussee               attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:03:03  selftest tirets dans un carrefour           attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:03:03  selftest carrefour = moins de tirets        attendu       True  obtenu       True  OK
+2026-07-27 01:03:03  selftest rasterisation 50 x 50 (m2)         attendu  2500.0000  obtenu  2500.0000  OK
+2026-07-27 01:03:03  selftest largeur rendue d'une chaussee de 10 m attendu    10.0000  obtenu    10.0098  OK
+2026-07-27 01:03:03  SELFTEST : PASS
+2026-07-27 01:03:04  selftest SDF centre du disque (sature)      attendu    10.5000  obtenu    10.5000  OK
+2026-07-27 01:03:04  selftest SDF a 5 px du bord (dedans)        attendu     5.0000  obtenu     4.5990  OK
+2026-07-27 01:03:04  selftest SDF a 5 px du bord (dehors)        attendu    -5.0000  obtenu    -4.5000  OK
+2026-07-27 01:03:04  selftest SDF signe dedans                   attendu       True  obtenu       True  OK
+2026-07-27 01:03:04  selftest SDF signe dehors                   attendu       True  obtenu       True  OK
+2026-07-27 01:03:04  selftest encodage frontiere -> 128          attendu   128.0000  obtenu   127.0000  OK
+2026-07-27 01:03:04  selftest encodage -2 m -> plancher 1        attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 01:03:04  selftest encodage +2 m -> 255               attendu   255.0000  obtenu   255.0000  OK
+2026-07-27 01:03:04  selftest encodage sature en bas             attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 01:03:04  selftest encodage sature en haut            attendu   255.0000  obtenu   255.0000  OK
+2026-07-27 01:03:04  selftest corridor synthetique (m2)          attendu  1000.0000  obtenu  1000.0000  OK
+2026-07-27 01:03:04  selftest chaussee = corridor - pont         attendu   920.0000  obtenu   920.0000  OK
+2026-07-27 01:03:04  selftest le pont ne se peint pas            attendu       True  obtenu       True  OK
+2026-07-27 01:03:04  selftest voirie privee (m2)                 attendu   356.0000  obtenu   356.0000  OK
+2026-07-27 01:03:04  selftest gravier present                    attendu       True  obtenu       True  OK
+2026-07-27 01:03:04  selftest gravier disjoint de la chaussee    attendu       True  obtenu       True  OK
+2026-07-27 01:03:04  selftest bordures produites                 attendu       True  obtenu       True  OK
+2026-07-27 01:03:04  selftest bordures mal orientees             attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:03:04  selftest bordures echantillonnees           attendu       True  obtenu       True  OK
+2026-07-27 01:03:04  selftest bordures sur autoroutier           attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:03:04  selftest sites de passage                   attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 01:03:04  selftest passage : demi-largeur             attendu     5.0000  obtenu     5.0000  OK
+2026-07-27 01:03:04  selftest passage : |dy| (axe de rue)        attendu     1.0000  obtenu     1.0000  OK
+2026-07-27 01:03:04  selftest passage : x du site                attendu    50.0000  obtenu    50.0000  OK
+2026-07-27 01:03:04  selftest bordure coupee a la traversee      attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:03:04  selftest tirets produits                    attendu       True  obtenu       True  OK
+2026-07-27 01:03:04  selftest longueur de tiret                  attendu     3.0000  obtenu     3.0000  OK
+2026-07-27 01:03:04  selftest tirets hors chaussee               attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:03:04  selftest tirets dans un carrefour           attendu     0.0000  obtenu     0.0000  OK
+2026-07-27 01:03:04  selftest carrefour = moins de tirets        attendu       True  obtenu       True  OK
+2026-07-27 01:03:04  selftest rasterisation 50 x 50 (m2)         attendu  2500.0000  obtenu  2500.0000  OK
+2026-07-27 01:03:04  selftest largeur rendue d'une chaussee de 10 m attendu    10.0000  obtenu    10.0098  OK
+2026-07-27 01:03:04  SELFTEST : PASS
+2026-07-27 01:03:04  === MAQUETTE DU SOL : cuisson de 4 cellules -1,-1 -1,+0 +0,-1 +0,+0 ===
+2026-07-27 01:03:05  routes BD TOPO : 509 troncons dans la fenetre (509 au sol, 0 ponts exclus du masque, 0 souterrains, 64 natures pietonnes, 11 hors service) ; largeurs mesurees 509 / replis 0
+2026-07-27 01:03:05  axes pietons OSM : 1088 dans la fenetre
+2026-07-27 01:03:05  chargements : 1.4 s
+2026-07-27 01:03:08  cellule -1,-1 : chaussee 6.6 % | 143 bordures (8214 m) | 74 passages | 4 tirets | masque 0.13 Mo | json 0.02 Mo | 2.2 s
+2026-07-27 01:03:10  cellule -1,+0 : chaussee 7.5 % | 133 bordures (9395 m) | 69 passages | 27 tirets | masque 0.13 Mo | json 0.02 Mo | 2.2 s
+2026-07-27 01:03:12  cellule +0,-1 : chaussee 12.8 % | 266 bordures (12470 m) | 157 passages | 206 tirets | masque 0.16 Mo | json 0.03 Mo | 2.3 s
+2026-07-27 01:03:14  cellule +0,+0 : chaussee 10.1 % | 169 bordures (10480 m) | 90 passages | 183 tirets | masque 0.11 Mo | json 0.02 Mo | 2.2 s
+2026-07-27 01:03:14  TOTAL 10.3 s | 4 cellules | masques 0.5 Mo (0.13 Mo/cellule) | json 0.09 Mo
+2026-07-27 01:03:14  PEINT   : 92704 m2 de chaussee, 3517 m2 de voirie privee, 0 m2 de gravier
+2026-07-27 01:03:14  MAILLE  : 711 polylignes de bordure (40559 m), 390 passages, 420 tirets

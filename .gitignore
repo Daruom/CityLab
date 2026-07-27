@@ -24,3 +24,4 @@ SourceData/*.avant_tint.json
 # Dependance pip vendorisee reinstallable (python -m pip install --target Tools/pylib Pillow)
 Tools/pylib/PIL/
 Tools/pylib/[Pp]illow*
+Content/Dev/ProtoSols/

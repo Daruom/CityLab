@@ -378,3 +378,52 @@ sont les données brutes UTF-8.
   du script historique — aucun objet perdu, esprit « l'acquisition ne décide rien ».
 - `capabilities_raw.xml` (5 Mo, brut du GetCapabilities) supprimé en fin de campagne ;
   l'inventaire utile est `wfs_couches.txt` (794 couches).
+## routes_bdtopo.json -- troncons de route BD TOPO (verrou 2 : largeurs MESUREES)
+- Source : WFS Geoplateforme BDTOPO_V3:troncon_de_route, fetch du 2026-07-27, Licence Ouverte 2.0 (IGN).
+- Objets : 35861 features -> 35861 polylignes (0 sans polyligne exploitable).
+- Taille : 15.2 Mo. Duree : 2.6 min.
+- VERROU largeur_de_chaussee : 30261 / 35861 features renseignes (84.4 %), moyenne 4.47 m, 27 valeurs a zero.
+- Taux de remplissage brut par attribut :
+  - nature : 35861 / 35861 (100.0 %)
+  - importance : 35861 / 35861 (100.0 %)
+  - largeur_de_chaussee : 30288 / 35861 (84.5 %)
+  - nombre_de_voies : 30271 / 35861 (84.4 %)
+  - sens_de_circulation : 35861 / 35861 (100.0 %)
+  - position_par_rapport_au_sol : 35861 / 35861 (100.0 %)
+  - fictif : 35861 / 35861 (100.0 %)
+  - prive : 35686 / 35861 (99.5 %)
+  - urbain : 35861 / 35861 (100.0 %)
+  - etat_de_l_objet : 35861 / 35861 (100.0 %)
+  - acces_vehicule_leger : 35861 / 35861 (100.0 %)
+  - acces_pieton : 1942 / 35861 (5.4 %)
+  - reserve_aux_bus : 438 / 35861 (1.2 %)
+  - vitesse_moyenne_vl : 35861 / 35861 (100.0 %)
+  - cpx_classement_administratif : 2560 / 35861 (7.1 %)
+  - cpx_numero : 2560 / 35861 (7.1 %)
+  - nom_voie_ban_gauche : 22146 / 35861 (61.8 %)
+  - nom_collaboratif_gauche : 22773 / 35861 (63.5 %)
+- Croisement par importance (N features / largeur % / nb_voies % / largeur moyenne m) :
+  - importance 1 : 379 / 98.2 % / 98.2 % / 10.09 m
+  - importance 2 : 428 / 97.2 % / 97.2 % / 7.02 m
+  - importance 3 : 3283 / 99.9 % / 99.9 % / 6.12 m
+  - importance 4 : 3409 / 99.9 % / 99.9 % / 4.99 m
+  - importance 5 : 23282 / 97.4 % / 97.4 % / 4.01 m
+  - importance 6 : 5080 / 2.0 % / 1.7 % / 3.74 m
+- Croisement par nature :
+  - Bretelle : 416 / 96.2 % / 96.2 % / 5.16 m
+  - Chemin : 187 / 0.0 % / 0.0 % / 0.00 m
+  - Escalier : 98 / 0.0 % / 0.0 % / 0.00 m
+  - Rond-point : 2032 / 100.0 % / 100.0 % / 4.89 m
+  - Route à 1 chaussée : 27092 / 95.5 % / 95.4 % / 4.32 m
+  - Route à 2 chaussées : 1656 / 100.0 % / 100.0 % / 4.83 m
+  - Route empierrée : 432 / 0.0 % / 0.0 % / 0.00 m
+  - Sentier : 3635 / 0.0 % / 0.0 % / 0.00 m
+  - Type autoroutier : 313 / 98.1 % / 98.1 % / 11.18 m
+- Bornes : X [-5690.85 ; 5352.59] m, Y [-5782.88 ; 5458.26] m (167804 pts)
+
+## parcelles.json -- parcelles cadastrales (verrou 1 des SOLS PAR LE CADASTRE)
+- Source : WFS Geoplateforme CADASTRALPARCELS.PARCELLAIRE_EXPRESS:parcelle (PCI Express), fetch du 2026-07-27, Licence Ouverte (IGN/DGFiP).
+- Objets : 87244 features -> 87092 polygones emis (0 features multipolygones, 152 sans polygone exploitable), 721 anneaux interieurs conserves.
+- Taille : 25.36 Mo. Duree : 4.5 min.
+- Sections distinctes : 52.
+- Bornes : X [-6864.95 ; 5355.24] m, Y [-5546.32 ; 5508.08] m (1042489 pts)

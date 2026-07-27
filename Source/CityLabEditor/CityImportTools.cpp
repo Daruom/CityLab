@@ -171,6 +171,32 @@ namespace
 		FPolygonGroupID GlassGroup;
 		int32 QuadCount = 0;
 
+		// J3c point 2 : groupes de polygones SUPPLEMENTAIRES nommes (un par classe de
+		// revetement). Wall = slot 0, Glass = slot 1, puis les extras dans leur ordre
+		// de creation — CreateMeshAsset ajoute un FStaticMaterial par extra, de meme
+		// nom de slot, ce qui donne une section de mesh par classe. Un builder sans
+		// extra produit exactement les deux slots historiques (golden path mobile).
+		TArray<FName> ExtraSlotNames;
+		TArray<UMaterialInterface*> ExtraSlotMaterials;
+		TMap<FName, FPolygonGroupID> ExtraGroups;
+
+		// Groupe d'une classe de revetement, cree a la PREMIERE utilisation (jamais de
+		// slot vide). MatOrNull = materiau du pack ; nul -> CreateMeshAsset retombe sur
+		// le materiau de repli du mesh.
+		FPolygonGroupID GetOrCreateGroup(FName SlotName, UMaterialInterface* MatOrNull)
+		{
+			if (const FPolygonGroupID* Found = ExtraGroups.Find(SlotName))
+			{
+				return *Found;
+			}
+			const FPolygonGroupID Group = MeshDesc.CreatePolygonGroup();
+			Attributes.GetPolygonGroupMaterialSlotNames()[Group] = SlotName;
+			ExtraGroups.Add(SlotName, Group);
+			ExtraSlotNames.Add(SlotName);
+			ExtraSlotMaterials.Add(MatOrNull);
+			return Group;
+		}
+
 		// Lot B (desktop PBR) : vertex colors encodees LINEAIRE (le pow 2.2 est un
 		// hack de lecture brute en unlit — faux pour un materiau lit, spec Q10).
 		bool bLinearColors = false;
@@ -518,6 +544,868 @@ namespace
 		}
 	}
 
+	// -----------------------------------------------------------------------------
+	// J3c point 2 « builder sols » : classes de revetement Megascans.
+	//
+	// Une classe = un pack scanne importe sous <SurfacesFolder>/<Slug>/M_Surf_<Slug>
+	// (Tools/import_surfaces.py). Le materiau divise l'UV0 par la taille PHYSIQUE du
+	// scan (lue au JSON du pack) : le generateur ecrit donc des UV0 EN METRES, et un
+	// meme UV metrique donne la bonne echelle reelle quel que soit le pack.
+	//   AcrossM    taille physique du scan EN TRAVERS de la route (m).
+	//   bFullWidth la largeur ENTIERE du ruban est mappee sur AcrossM — reserve aux
+	//              scans qui portent deja leur ligne axiale (fine_road_*, marked_*) :
+	//              la ligne tombe alors exactement au milieu du ruban. Sinon la
+	//              texture tuile aussi en travers (UV0.V = metres reels).
+	//   bSwapUV    le scan est tourne de 90 deg (son axe « le long de la route » est
+	//              V et non U) — verifie image par image, cf. fine_road_viciaalew.
+	//   ZClassCm   v2 : offset d'empilement DETERMINISTE PAR CLASSE au-dessus du
+	//              plancher des rubans (55 cm). L'ancien offset par ordre d'arrivee
+	//              (RoadIndex % 7) faisait passer un trottoir SOUS une chaussee ici
+	//              et AU-DESSUS la ou elle la recroisait : frontieres instables,
+	//              « effet bacle » (verdict utilisateur v1). Ordre impose : gravier
+	//              le plus bas, pieton le plus haut.
+	//   bAuto      v3 : la classe est une CHAUSSEE AUTOMOBILE. Sert au filtre des
+	//              patchs de carrefour (voir FJunctionNode) : un carrefour n'existe
+	//              qu'entre voitures.
+	// -----------------------------------------------------------------------------
+	struct FSurfaceClass
+	{
+		const TCHAR* Slug;
+		float AcrossM;
+		bool bFullWidth;
+		bool bSwapUV;
+		float ZClassCm;
+		bool bAuto;
+	};
+
+	const FSurfaceClass GSurfGravel{ TEXT("gravel_on_soil_okosdmp0"), 0.89f, false, false, 0.f, false };
+	const FSurfaceClass GSurfGrassCut{ TEXT("grass_cut_pjxmz0"), 1.f, false, false, 2.f, false };
+	const FSurfaceClass GSurfAsphalt{ TEXT("asphalt_road_tiggcjdo"), 2.f, false, false, 4.f, true };
+	const FSurfaceClass GSurfRoadMedium{ TEXT("fine_road_viciaalew"), 4.f, true, true, 10.f, true };
+	const FSurfaceClass GSurfRoadWide{ TEXT("fine_road_vgdlejpew"), 8.f, true, false, 13.f, true };
+	const FSurfaceClass GSurfGrassUncut{ TEXT("uncut_grass_oilpt20"), 2.f, false, false, 2.f, false };
+	const FSurfaceClass GSurfGrassWild{ TEXT("wild_grass_sfknaeoa"), 2.f, false, false, 2.f, false };
+	// v4 — LA DALLE. Ce n'est pas un ruban : c'est le sol porteur de toute la ville,
+	// pose au Z du terrain sous tout le reste. Verdict DA v3 : « grand puzzle » — la
+	// dalle etait restee a la teinte unie blanc-bleu de J2, si bien que chaque ruban
+	// texture ressemblait a un autocollant sur du papier et que les interstices entre
+	// rubans laissaient voir le vide. Aucun reglage de palette ne rattrape un fond nu.
+	// dirty_sidewalk_tiles : le scan mineral le plus NEUTRE et le plus CLAIR de la
+	// bibliotheque une fois harmonise (0,0991) — il ne raconte rien, c'est ce qu'on
+	// demande a un fond. ZClassCm ne sert pas (la dalle n'entre pas dans l'empilement
+	// des rubans).
+	const FSurfaceClass GSurfSlab{ TEXT("dirty_sidewalk_tiles_ugxjcdpn"), 2.f, false, false, 0.f, false };
+
+	// -----------------------------------------------------------------------------
+	// v5 « VOIRIE » (J3c point 3). Verdict utilisateur sur la v4b : « il manque la
+	// structure des rues (rives) » — la ville lisait comme une esplanade continue
+	// ou personne ne sait ou finit la chaussee. Le ruban de chaussee, qui couvrait
+	// historiquement chaussee + 2 x 1,70 m d'un seul tenant, est RE-PARTITIONNE :
+	//   bande centrale = classe chaussee ;
+	//   bordure       = face verticale de 12 cm + chant horizontal de 15 cm ;
+	//   bandes rives  = 1,70 m de classe DALLE (meme scan que le fond de ville :
+	//                   le trottoir n'est PAS un revetement de plus, c'est le sol
+	//                   de la ville que la bordure vient decoller de 12 cm).
+	// C'est le relief de 12 cm qui donne la lecture de la rue : deux aretes eclairees
+	// differemment de part et d'autre de la chaussee.
+	// -----------------------------------------------------------------------------
+	constexpr float GSidewalkWidthCm = 170.f; // rive, largeur historique du « trottoir »
+	constexpr float GCurbHeightCm = 12.f;     // relief de la bordure
+	constexpr float GCurbTopWidthCm = 15.f;   // chant horizontal, entre face et rive
+	// Pas de sous-decoupe des quads lateraux, sauf au voisinage d'un patch de
+	// carrefour ou la bordure doit s'interrompre au plus pres du disque.
+	constexpr float GCurbClipStepCm = 200.f;
+
+	// La BORDURE : meme matiere que la dalle, assombrie x0,92 (materiau derive
+	// M_Surf_curb fabrique par Tools/import_surfaces.py a partir des textures du
+	// pack de dalle). Un materiau dedie plutot qu'une teinte de sommet : les
+	// M_Surf_* ne lisent PAS la VertexColor (BaseColor = scan x constante).
+	const FSurfaceClass GSurfCurb{ TEXT("curb"), 2.f, false, false, 0.f, false };
+	// PASSAGE PIETON. Le scan fait 4 x 2 m : son axe de 4 m porte la REPETITION des
+	// bandes (8 bandes, pas de 50 cm) et son axe de 2 m leur LONGUEUR, avec un trait
+	// blanc en travers a mi-hauteur. L'axe de 4 m part donc EN TRAVERS de la rue
+	// (bandes de 50 cm paralleles a l'axe de la chaussee, norme francaise) et l'axe
+	// de 2 m le long de la rue, cale pour que le trait blanc tombe exactement sur les
+	// deux bords du passage. AcrossM/bFullWidth/ZClassCm ne servent pas : les UV du
+	// passage sont calculees a la main dans BuildCrossing.
+	const FSurfaceClass GSurfCrossing{ TEXT("pedestrian_crossing_lines_veggecd"), 4.f, false, false, 0.f, false };
+	constexpr float GCrossingHalfLenCm = 200.f; // 4 m dans l'axe de la rue
+	constexpr float GCrossingLiftCm = 9.f;      // au-dessus de la chaussee et du patch, sous le chant (12)
+
+	// -----------------------------------------------------------------------------
+	// J3c « MAQUETTE DU SOL » — LE SOL EST PEINT, LE RELIEF EST MAILLE.
+	//
+	// Le corridor cadastral etant desormais cuit en masques par cellule
+	// (Tools/j3c_sols_masks.py), la chaussee n'est plus un ruban pose SUR la dalle :
+	// elle EST la dalle, peinte par MI_CityGround_<x>_<y>. Ne reste en geometrie que
+	// ce qu'un masque ne peut pas rendre :
+	//   - la BORDURE, seule chose qui donne du relief a la rue (c'est elle qui prend
+	//     la lumiere autrement que le sol) ;
+	//   - le PASSAGE PIETON et les TIRETS axiaux, dont on veut le trait franc a
+	//     n'importe quelle distance ;
+	//   - les PONTS, qui restent les rubans/tabliers existants (un tablier ne se
+	//     peint pas sur le terrain qu'il survole).
+	// -----------------------------------------------------------------------------
+	// Le materiau de la dalle masquee. Pas de scan : le master melange lui-meme les
+	// quatre revetements d'apres le masque. AcrossM/bFullWidth/ZClassCm ne servent
+	// pas — l'UV0 metrique monde de la dalle est deja exactement ce qu'il attend.
+	const FSurfaceClass GSurfMaskedGround{ TEXT("ground_masked"), 1.f, false, false, 0.f, false };
+	// La peinture blanche des tirets (Tools/import_ground_masks.py).
+	const FSurfaceClass GSurfMarking{ TEXT("marking"), 1.f, false, false, 0.f, false };
+
+	constexpr float GAxialWidthCm = 15.f;      // largeur d'un tiret de ligne axiale
+	// Pied de bordure ENTERRE : la dalle est drapee sur le MNT par une grille de
+	// 7,8 m de pas, la bordure suit le MNT continu — entre deux sommets, les deux
+	// surfaces divergent de quelques centimetres. Enterrer le pied coute zero
+	// triangle et supprime tout risque de jour sous la bordure.
+	constexpr float GMaskCurbSinkCm = 10.f;
+	constexpr float GMaskCrossLiftCm = 4.f;    // passage pieton au-dessus de la peinture
+	constexpr float GMaskDashLiftCm = 6.f;     // tiret au-dessus du passage, sous le chant (12)
+
+	// Le RELIEF d'une cellule, lu dans sols_<x>_<y>.json. Tout est deja decoupe au
+	// prep (bordures orientees chaussee a gauche, tirets debites, passages
+	// dedoublonnes) : ici on ne fait que poser des quads.
+	struct FMaskCrossing
+	{
+		FVector2D PosCm = FVector2D::ZeroVector;
+		FVector2D DirCm = FVector2D::ZeroVector;
+		float HalfWCm = 0.f;
+	};
+
+	struct FGroundMaskCell
+	{
+		TArray<TArray<FVector2D>> Curbs;  // polylignes cm, chaussee A GAUCHE
+		TArray<FMaskCrossing> Crossings;
+		TArray<FVector4> Axial;           // (ax, ay, bx, by) en cm
+	};
+
+	FString GroundMasksDir(const FCityGenProfile& Gen)
+	{
+		return Gen.GroundMasksPath.IsEmpty()
+			? FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/Sols"))
+			: Gen.GroundMasksPath;
+	}
+
+	FString GroundMasksAssetDir(const FCityGenProfile& Gen)
+	{
+		return Gen.GroundMasksAssetFolder.IsEmpty()
+			? FString(TEXT("/Game/City/Ground")) : Gen.GroundMasksAssetFolder;
+	}
+
+	// Rend false SANS erreur si la cellule n'a pas de masque : une cellule sans
+	// masque garde le comportement actuel, c'est un mode de fonctionnement normal
+	// (cuisson partielle, zone proto).
+	bool LoadGroundMaskCell(const FString& Dir, int32 CellX, int32 CellY, float CellSizeM,
+		FGroundMaskCell& Out)
+	{
+		const FString Path = FPaths::Combine(Dir, FString::Printf(TEXT("sols_%d_%d.json"), CellX, CellY));
+		FString Text;
+		if (!FFileHelper::LoadFileToString(Text, *Path))
+		{
+			return false;
+		}
+		TSharedPtr<FJsonObject> Root;
+		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid())
+		{
+			RaiseError(FString::Printf(TEXT("Ground mask file '%s' is not valid JSON."), *Path));
+			return false;
+		}
+		// Le masque est cuit POUR une taille de cellule : le cuire a 500 m puis
+		// generer a 250 m decalerait chaque masque d'une demi-cellule sans que rien
+		// ne proteste. On refuse plutot que de peindre a cote.
+		double BakedCellM = 0.0;
+		if (Root->TryGetNumberField(TEXT("cellSizeM"), BakedCellM) &&
+			!FMath::IsNearlyEqual((float)BakedCellM, CellSizeM, 0.01f))
+		{
+			RaiseError(FString::Printf(
+				TEXT("Ground mask '%s' was baked for %.0f m cells but the import uses %.0f m."),
+				*Path, BakedCellM, CellSizeM));
+			return false;
+		}
+		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+		if (Root->TryGetArrayField(TEXT("curbs"), Arr))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Arr)
+			{
+				TArray<FVector2D> Line;
+				for (const TSharedPtr<FJsonValue>& PV : V->AsArray())
+				{
+					const TArray<TSharedPtr<FJsonValue>>& Comp = PV->AsArray();
+					if (Comp.Num() >= 2)
+					{
+						Line.Add(FVector2D(Comp[0]->AsNumber() * 100.0, Comp[1]->AsNumber() * 100.0));
+					}
+				}
+				if (Line.Num() >= 2)
+				{
+					Out.Curbs.Add(MoveTemp(Line));
+				}
+			}
+		}
+		if (Root->TryGetArrayField(TEXT("crossings"), Arr))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Arr)
+			{
+				const TSharedPtr<FJsonObject>& O = V->AsObject();
+				const TArray<TSharedPtr<FJsonValue>>* P = nullptr;
+				const TArray<TSharedPtr<FJsonValue>>* D = nullptr;
+				if (!O.IsValid() || !O->TryGetArrayField(TEXT("p"), P) ||
+					!O->TryGetArrayField(TEXT("d"), D) || P->Num() < 2 || D->Num() < 2)
+				{
+					continue;
+				}
+				FMaskCrossing Site;
+				Site.PosCm = FVector2D((*P)[0]->AsNumber() * 100.0, (*P)[1]->AsNumber() * 100.0);
+				Site.DirCm = FVector2D((*D)[0]->AsNumber(), (*D)[1]->AsNumber());
+				Site.HalfWCm = (float)(O->GetNumberField(TEXT("halfW")) * 100.0);
+				if (Site.HalfWCm > 0.f && !Site.DirCm.IsNearlyZero())
+				{
+					Out.Crossings.Add(Site);
+				}
+			}
+		}
+		if (Root->TryGetArrayField(TEXT("axial"), Arr))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *Arr)
+			{
+				const TArray<TSharedPtr<FJsonValue>>& S = V->AsArray();
+				if (S.Num() >= 4)
+				{
+					Out.Axial.Add(FVector4(S[0]->AsNumber() * 100.0, S[1]->AsNumber() * 100.0,
+						S[2]->AsNumber() * 100.0, S[3]->AsNumber() * 100.0));
+				}
+			}
+		}
+		return true;
+	}
+
+	// -----------------------------------------------------------------------------
+	// v4 — LE PIETON EST LA DALLE. Verdict DA v3 : « grand puzzle ». Le coupable
+	// n'etait pas la palette (deja reduite a 3 classes en v3) mais LE FOND : la dalle
+	// urbaine restait a la teinte unie de J2, et les centaines de petits rubans
+	// pietons du centre-ville s'y collaient comme des autocollants sur du papier, en
+	// laissant voir le vide dans leurs interstices. La v4 renverse le probleme :
+	//   - la DALLE recoit la matiere minerale (GSurfSlab), donc toute la ville repose
+	//     sur un sol credible ;
+	//   - les voies PIETONNES ne produisent plus AUCUN ruban (IsPedestrianRibbon,
+	//     early-continue cote generation) : marcher, c'est marcher sur la dalle. Plus
+	//     un seul interstice a boucher, plus un seul lacis a harmoniser.
+	// Il ne reste donc en rubans que ce qui se DISTINGUE vraiment du sol de la ville :
+	//   (a) CHAUSSEE AUTO — asphalt_road partout ; les fine_road_* (ligne axiale
+	//       peinte dans le scan) restent reserves aux voies annoncees lanes >= 2 ;
+	//   (b) ALLEE NATURELLE — gravel_on_soil sur tag surface non revetu (surtout les
+	//       allees de parc, qui doivent se lire sur l'herbe).
+	// Une rue pavee (sett, paving_stones...) NON pietonne est une chaussee : elle part
+	// desormais en asphalte, plus en revetement pave — cobblestone, marked_rough_road
+	// et herringbone_brick_pavement ne sont plus references nulle part.
+	// WidthCm = largeur de chaussee du JSON (hors trottoirs).
+	// -----------------------------------------------------------------------------
+
+	// Voies dont le ruban est SUPPRIME en profil revetements : leur sol, c'est la
+	// dalle. Un seul endroit de verite — la passe de releve des carrefours et la passe
+	// de generation doivent skipper exactement les memes voies (sinon un noeud
+	// purement pieton continuerait de peser sur la dominante d'un carrefour).
+	bool IsPedestrianRibbon(const FString& Type)
+	{
+		return Type == TEXT("pedestrian") || Type == TEXT("footway") || Type == TEXT("path") ||
+			Type == TEXT("sidewalk") || Type == TEXT("steps") || Type == TEXT("platform") ||
+			Type == TEXT("track");
+	}
+
+	const FSurfaceClass* SurfaceClassForRoad(const FString& Surface, const FString& Type,
+		int32 Lanes, float WidthCm)
+	{
+		// 1) Sol NATUREL annonce par la donnee : prime sur le type.
+		if (Surface == TEXT("gravel") || Surface == TEXT("fine_gravel") ||
+			Surface == TEXT("compacted") || Surface == TEXT("dirt") || Surface == TEXT("ground") ||
+			Surface == TEXT("earth") || Surface == TEXT("unpaved") || Surface == TEXT("sand"))
+		{
+			return &GSurfGravel;
+		}
+		// 2) CHAUSSEE AUTO. Les scans a ligne axiale sont reserves aux voies dont la
+		//    donnee annonce au moins 2 files ; le reste est de l'asphalte nu.
+		if (Lanes >= 3 || (Lanes >= 2 && WidthCm >= 900.f))
+		{
+			return &GSurfRoadWide;
+		}
+		if (Lanes == 2)
+		{
+			return &GSurfRoadMedium;
+		}
+		return &GSurfAsphalt;
+	}
+
+	// Classe resolue : le pack + le materiau charge (nul = repli sur l'historique).
+	struct FResolvedSurface
+	{
+		const FSurfaceClass* Class = nullptr;
+		UMaterialInterface* Material = nullptr;
+
+		FName SlotName() const { return FName(Class->Slug); }
+	};
+
+	// Cache de chargement des materiaux de revetement. L'ABSENCE d'un materiau n'est
+	// PAS une erreur : le groupe est quand meme cree (geometrie et UV metriques
+	// identiques) et CreateMeshAsset lui donne le materiau de repli du mesh.
+	struct FSurfaceLibrary
+	{
+		void Init(bool bOn, const FString& InFolder)
+		{
+			bEnabled = bOn;
+			Folder = InFolder.IsEmpty() ? TEXT("/Game/City/Surfaces") : InFolder;
+		}
+
+		// Rend nullptr si les revetements sont desactives (profil mobile) : tout
+		// appelant retombe alors sur le chemin historique, a l'octet pres.
+		// Entrees en TUniquePtr : les pointeurs rendus restent valides quand le cache
+		// grandit (le rehash d'une TMap de valeurs les invaliderait).
+		const FResolvedSurface* Resolve(const FSurfaceClass* Class)
+		{
+			if (!bEnabled || !Class)
+			{
+				return nullptr;
+			}
+			const FString Key(Class->Slug);
+			if (TUniquePtr<FResolvedSurface>* Found = Resolved.Find(Key))
+			{
+				return Found->Get();
+			}
+			const FString Path = FString::Printf(TEXT("%s/%s/M_Surf_%s.M_Surf_%s"),
+				*Folder, Class->Slug, Class->Slug, Class->Slug);
+			TUniquePtr<FResolvedSurface> Entry = MakeUnique<FResolvedSurface>();
+			Entry->Class = Class;
+			Entry->Material = LoadObject<UMaterialInterface>(nullptr, *Path, nullptr,
+				LOAD_NoWarn | LOAD_Quiet);
+			if (!Entry->Material)
+			{
+				// Display et NON Warning : le repli est un mode de fonctionnement
+				// normal (tests sans assets Megascans, generation avant import) —
+				// et l'automation eleve les warnings en erreurs de test.
+				UE_LOG(LogCityImport, Display,
+					TEXT("Revetement '%s' absent (%s) : repli sur le materiau historique."),
+					Class->Slug, *Path);
+			}
+			const FResolvedSurface* Out = Entry.Get();
+			Resolved.Add(Key, MoveTemp(Entry));
+			return Out;
+		}
+
+	private:
+		FString Folder;
+		bool bEnabled = false;
+		TMap<FString, TUniquePtr<FResolvedSurface>> Resolved;
+	};
+
+	// -----------------------------------------------------------------------------
+	// v2 — CARREFOURS. Verdict utilisateur sur le proto v1 : « les revetements se
+	// rencontrent sans harmonie, coupes franches, superpositions ». La cause est aux
+	// noeuds : N rubans de classes differentes s'y empilent et les tirets axiaux
+	// traversent le croisement. Parade en deux temps :
+	//   1. un PATCH polygonal du revetement dominant recouvre le disque de rencontre ;
+	//   2. les segments de ruban a moins de GJunctionPlainCm d'un noeud passent en
+	//      asphalte NU (plus de tiret qui traverse le carrefour).
+	// Un noeud est un carrefour s'il est partage par >= 3 routes, OU s'il est un point
+	// INTERIEUR d'au moins une route (une route qui passe au travers). Deux routes qui
+	// s'y terminent seulement = simple decoupage OSM d'une meme rue : ce n'est PAS un
+	// carrefour, et y effacer les tirets creverait le marquage de tout un boulevard.
+	// -----------------------------------------------------------------------------
+	constexpr float GJunctionPlainCm = 800.f;  // rayon d'effacement des tirets (8 m)
+	constexpr float GJunctionGridCm = 800.f;   // pas de la grille de recherche
+	constexpr float GJunctionPatchMarginCm = 100.f; // rayon = max demi-largeur + 1 m
+	constexpr float GJunctionPatchLiftCm = 5.f;     // patch pose au-dessus du ruban le plus haut
+	// v5 point 4 — FRAGMENTS ORPHELINS. Verdict utilisateur sur la v4b : « morceaux
+	// perdus » — des bouts de voie de quelques metres, sans aucun noeud commun avec le
+	// reseau, poses seuls au milieu de la dalle uniforme (troncons OSM coupes par la
+	// fenetre d'extraction, contre-allees, acces de parking). Un ruban court ET
+	// deconnecte n'apporte rien : il ne raconte pas une rue, il salit le fond.
+	constexpr float GOrphanMaxLenCm = 2500.f;
+	// Grille de l'index des DISQUES DE PATCH (plus large que celle des noeuds : un
+	// disque deborde de sa cellule). Chaque disque s'inscrit dans toutes les cellules
+	// que touche sa boite englobante ELARGIE de GPatchSlackMaxCm, si bien qu'une
+	// requete ne consulte qu'une seule cellule.
+	constexpr float GPatchGridCm = 3200.f;
+	constexpr float GPatchSlackMaxCm = 2000.f;
+
+	struct FJunctionNode
+	{
+		FVector2D PosCm = FVector2D::ZeroVector;
+		int32 FirstRoad = INDEX_NONE;
+		int32 LastRoad = INDEX_NONE;
+		int32 NumRoads = 0;
+		int32 NumAutoRoads = 0;
+		int32 NumInterior = 0;
+		float MaxHalfCm = 0.f;
+		float MaxZClassCm = 0.f;
+		const FSurfaceClass* Dominant = nullptr;
+		float DominantHalfCm = -1.f;
+
+		// NumRoads >= 2 est une PRECONDITION : sans elle, chaque sommet interieur
+		// d'une route SEULE passait pour un carrefour — mesure sur le proto v2 :
+		// 3 042 « carrefours » sur 3 920 noeuds releves, soit un patch tous les
+		// quelques metres et plus un seul tiret axial nulle part.
+		bool IsJunction() const { return NumRoads >= 2 && (NumRoads >= 3 || NumInterior >= 1); }
+
+		// v3 — un patch de carrefour n'a de sens qu'entre VOITURES. Verdict DA sur le
+		// proto v2 : dans le lacis pieton du centre, chaque croisement de sentiers
+		// posait son disque d'un autre revetement — « peau de leopard ». Condition :
+		// la voie DOMINANTE est une chaussee auto ET au moins une AUTRE voie du noeud
+		// l'est aussi (le disque recouvre alors une vraie zone de roulement).
+		bool WantsPatch() const
+		{
+			return IsJunction() && Dominant && Dominant->bAuto && NumAutoRoads >= 2;
+		}
+	};
+
+	struct FJunctionMap
+	{
+		// Quantification au decimetre : les noeuds partages viennent du MEME noeud OSM
+		// et traversent la conversion a l'identique — le decimetre absorbe le bruit
+		// d'arrondi du JSON (2 decimales de metre) sans fusionner deux vrais noeuds.
+		static FIntPoint Key(const FVector2D& P)
+		{
+			return FIntPoint(FMath::RoundToInt(P.X / 10.f), FMath::RoundToInt(P.Y / 10.f));
+		}
+
+		void Add(int32 RoadIndex, const TArray<FVector2D>& PtsCm, float HalfCm,
+			const FSurfaceClass* Class)
+		{
+			for (int32 i = 0; i < PtsCm.Num(); ++i)
+			{
+				FJunctionNode& Node = Nodes.FindOrAdd(Key(PtsCm[i]));
+				bool bNewRoadHere = false;
+				if (Node.NumRoads == 0)
+				{
+					Node.PosCm = PtsCm[i];
+					Node.FirstRoad = RoadIndex;
+					Node.NumRoads = 1;
+					bNewRoadHere = true;
+				}
+				else if (Node.FirstRoad != RoadIndex && Node.LastRoad != RoadIndex)
+				{
+					++Node.NumRoads;
+					bNewRoadHere = true;
+				}
+				// v3 : compte des CHAUSSEES AUTO distinctes au noeud (meme regle de
+				// dedoublonnage que NumRoads) — filtre des patchs de carrefour.
+				if (bNewRoadHere && Class && Class->bAuto)
+				{
+					++Node.NumAutoRoads;
+				}
+				Node.LastRoad = RoadIndex;
+				if (i > 0 && i + 1 < PtsCm.Num())
+				{
+					++Node.NumInterior;
+				}
+				Node.MaxHalfCm = FMath::Max(Node.MaxHalfCm, HalfCm);
+				if (Class)
+				{
+					Node.MaxZClassCm = FMath::Max(Node.MaxZClassCm, Class->ZClassCm);
+					// Dominante = la voie la plus LARGE (donc la plus prioritaire) ;
+					// a egalite, la premiere rencontree (deterministe : l'ordre du JSON).
+					if (HalfCm > Node.DominantHalfCm)
+					{
+						Node.DominantHalfCm = HalfCm;
+						Node.Dominant = Class;
+					}
+				}
+			}
+		}
+
+		// Index spatial des SEULS vrais carrefours, construit une fois la collecte finie.
+		// v5 : le meme passage remplit l'index des DISQUES DE PATCH — l'emprise ou la
+		// bordure s'interrompt et ou un passage pieton est reporte. Meme condition
+		// EXACTE que la passe de generation des patchs (WantsPatch + demi-largeur
+		// mini) : un seul endroit de verite, sinon la bordure se couperait la ou aucun
+		// disque n'est pose.
+		void Build()
+		{
+			for (TPair<FIntPoint, FJunctionNode>& Pair : Nodes)
+			{
+				if (Pair.Value.IsJunction())
+				{
+					Grid.FindOrAdd(FIntPoint(FMath::FloorToInt(Pair.Value.PosCm.X / GJunctionGridCm),
+						FMath::FloorToInt(Pair.Value.PosCm.Y / GJunctionGridCm))).Add(Pair.Value.PosCm);
+					++NumJunctions;
+					if (Pair.Value.WantsPatch())
+					{
+						++NumAutoJunctions;
+						if (Pair.Value.MaxHalfCm >= 150.f)
+						{
+							AddPatchDisc(Pair.Value.PosCm, Pair.Value.MaxHalfCm + GJunctionPatchMarginCm);
+						}
+					}
+				}
+			}
+		}
+
+		// Disque de patch reellement pose (centre + rayon), pour le decoupage de la
+		// bordure et le report des passages pietons.
+		struct FPatchDisc
+		{
+			FVector2D PosCm = FVector2D::ZeroVector;
+			float RadiusCm = 0.f;
+		};
+
+		void AddPatchDisc(const FVector2D& P, float RadiusCm)
+		{
+			const float Reach = RadiusCm + GPatchSlackMaxCm;
+			const int32 X0 = FMath::FloorToInt((P.X - Reach) / GPatchGridCm);
+			const int32 X1 = FMath::FloorToInt((P.X + Reach) / GPatchGridCm);
+			const int32 Y0 = FMath::FloorToInt((P.Y - Reach) / GPatchGridCm);
+			const int32 Y1 = FMath::FloorToInt((P.Y + Reach) / GPatchGridCm);
+			const FPatchDisc Disc{ P, RadiusCm };
+			for (int32 Y = Y0; Y <= Y1; ++Y)
+			{
+				for (int32 X = X0; X <= X1; ++X)
+				{
+					PatchGrid.FindOrAdd(FIntPoint(X, Y)).Add(Disc);
+				}
+			}
+			++NumPatchDiscs;
+		}
+
+		// Le point est-il couvert par un disque de patch (SlackCm = marge d'approche) ?
+		// Les disques etant inscrits dans toutes les cellules de leur boite elargie de
+		// GPatchSlackMaxCm, une SEULE cellule suffit tant que SlackCm reste sous cette
+		// borne — le clamp evite un faux negatif silencieux si un appelant la depasse.
+		bool IsInPatch(const FVector2D& P, float SlackCm = 0.f) const
+		{
+			const float Slack = FMath::Min(SlackCm, GPatchSlackMaxCm);
+			const TArray<FPatchDisc>* Cell = PatchGrid.Find(
+				FIntPoint(FMath::FloorToInt(P.X / GPatchGridCm), FMath::FloorToInt(P.Y / GPatchGridCm)));
+			if (!Cell)
+			{
+				return false;
+			}
+			for (const FPatchDisc& D : *Cell)
+			{
+				const float R = D.RadiusCm + Slack;
+				if (FVector2D::DistSquared(P, D.PosCm) <= R * R)
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+		bool IsNear(const FVector2D& P, float RadiusCm) const
+		{
+			const int32 GX = FMath::FloorToInt(P.X / GJunctionGridCm);
+			const int32 GY = FMath::FloorToInt(P.Y / GJunctionGridCm);
+			const float R2 = RadiusCm * RadiusCm;
+			for (int32 dy = -1; dy <= 1; ++dy)
+			{
+				for (int32 dx = -1; dx <= 1; ++dx)
+				{
+					if (const TArray<FVector2D>* Cell = Grid.Find(FIntPoint(GX + dx, GY + dy)))
+					{
+						for (const FVector2D& Q : *Cell)
+						{
+							if (FVector2D::DistSquared(P, Q) <= R2)
+							{
+								return true;
+							}
+						}
+					}
+				}
+			}
+			return false;
+		}
+
+		TMap<FIntPoint, FJunctionNode> Nodes;
+		TMap<FIntPoint, TArray<FVector2D>> Grid;
+		TMap<FIntPoint, TArray<FPatchDisc>> PatchGrid;
+		int32 NumJunctions = 0;
+		int32 NumAutoJunctions = 0; // v3 : ceux qui recoivent reellement un patch
+		int32 NumPatchDiscs = 0;    // v5 : disques indexes (== patchs poses)
+	};
+
+	// Patch de carrefour : disque du revetement dominant, pose AU-DESSUS de tous les
+	// rubans du noeud, UV0 monde en metres (jamais de ligne axiale au milieu d'un
+	// croisement). Le triangle-fan part du centre : 16 secteurs suffisent a un disque
+	// de 5-15 m vu depuis un drone.
+	void BuildJunctionPatch(FCityMeshBuilder& QM, const FVector2D& CenterCm, float RadiusCm,
+		float Zcm, const FResolvedSurface* Surf, const FVector3f& Tint)
+	{
+		constexpr int32 Sides = 16;
+		const FVector3f Up(0, 0, 1);
+		const FPolygonGroupID Group = QM.GetOrCreateGroup(Surf->SlotName(), Surf->Material);
+		auto At = [&](int32 i)
+		{
+			const float Ang = 2.f * PI * i / Sides;
+			return FVector3f((float)CenterCm.X + RadiusCm * FMath::Cos(Ang),
+				(float)CenterCm.Y + RadiusCm * FMath::Sin(Ang), Zcm);
+		};
+		const FVector3f C((float)CenterCm.X, (float)CenterCm.Y, Zcm);
+		for (int32 i = 0; i < Sides; ++i)
+		{
+			const FVector3f P[3] = { C, At(i), At(i + 1) };
+			const FVector2f UV[3] = {
+				FVector2f(P[0].X * 0.01f, P[0].Y * 0.01f),
+				FVector2f(P[1].X * 0.01f, P[1].Y * 0.01f),
+				FVector2f(P[2].X * 0.01f, P[2].Y * 0.01f) };
+			QM.AddPoly(Group, P, 3, Up, UV, Tint);
+		}
+	}
+
+	// -----------------------------------------------------------------------------
+	// v5 « VOIRIE » — RIVES ET BORDURES d'un segment de chaussee. Pour chaque cote :
+	//   1. la FACE de bordure, quad VERTICAL de 12 cm tourne vers la chaussee (c'est
+	//      elle qui prend la lumiere autrement que le sol : la rue se lit) ;
+	//   2. le CHANT, bande horizontale de 15 cm au sommet de la bordure ;
+	//   3. la RIVE, 1,70 m de classe DALLE au meme niveau que le chant.
+	// Chant et rive portent une UV0 MONDE en metres, exactement comme la dalle qui les
+	// porte : le scan y est EN PHASE avec le fond de ville, la rive prolonge le sol au
+	// lieu d'y coller un rectangle.
+	// Junctions : sur l'emprise d'un patch de carrefour, la structure laterale
+	// s'efface (le disque du patch EST la zone de roulement — une bordure la
+	// traverserait de part en part). Le decoupage ne se sous-divise qu'au VOISINAGE
+	// d'un patch : ailleurs, un quad par segment et par bande, comme avant.
+	// -----------------------------------------------------------------------------
+	void BuildStreetSides(FCityMeshBuilder& QM, const FVector2D& A, const FVector2D& B,
+		const FVector2D& NrmA, const FVector2D& NrmB, float ZA, float ZB, float Arc, float SegLen,
+		float RoadHalfCm, const FResolvedSurface* SurfCurb, const FResolvedSurface* SurfSlab,
+		const FVector3f& Tint, const FJunctionMap* Junctions, int32* OutCurbQuads)
+	{
+		if (SegLen < 1.f)
+		{
+			return;
+		}
+		const FVector3f Up(0, 0, 1);
+		const FPolygonGroupID CurbGroup = QM.GetOrCreateGroup(SurfCurb->SlotName(), SurfCurb->Material);
+		const FPolygonGroupID SlabGroup = QM.GetOrCreateGroup(SurfSlab->SlotName(), SurfSlab->Material);
+
+		// Sous-decoupe UNIQUEMENT si un disque de patch est a portee du segment.
+		int32 Sub = 1;
+		const bool bClip = Junctions && Junctions->NumPatchDiscs > 0 &&
+			(Junctions->IsInPatch(A, SegLen) || Junctions->IsInPatch(B, SegLen));
+		if (bClip)
+		{
+			Sub = FMath::Clamp(FMath::CeilToInt(SegLen / GCurbClipStepCm), 1, 32);
+		}
+		for (int32 s = 0; s < Sub; ++s)
+		{
+			const float T0 = (float)s / Sub;
+			const float T1 = (float)(s + 1) / Sub;
+			const FVector2D S0 = FMath::Lerp(A, B, T0);
+			const FVector2D S1 = FMath::Lerp(A, B, T1);
+			if (bClip && Junctions->IsInPatch(FMath::Lerp(S0, S1, 0.5f)))
+			{
+				continue;
+			}
+			const FVector2D N0 = FMath::Lerp(NrmA, NrmB, T0);
+			const FVector2D N1 = FMath::Lerp(NrmA, NrmB, T1);
+			const float Z0 = FMath::Lerp(ZA, ZB, T0);
+			const float Z1 = FMath::Lerp(ZA, ZB, T1);
+			const float U0 = (Arc + SegLen * T0) * 0.01f;
+			const float U1 = (Arc + SegLen * T1) * 0.01f;
+			// Side = +1 / -1 : les deux rives, symetriques par rapport a l'axe.
+			for (int32 Side = -1; Side <= 1; Side += 2)
+			{
+				auto At = [&](const FVector2D& S, const FVector2D& Nl, float Z, float Lateral, float Lift)
+				{
+					const FVector2D P = S + Nl * (Side * Lateral);
+					return FVector3f((float)P.X, (float)P.Y, Z + Lift);
+				};
+				auto WorldUV = [](const FVector3f& P) { return FVector2f(P.X * 0.01f, P.Y * 0.01f); };
+
+				// 1. FACE de bordure : quad vertical, normale vers l'axe de la rue.
+				const FVector3f F[4] = {
+					At(S0, N0, Z0, RoadHalfCm, 0.f),
+					At(S1, N1, Z1, RoadHalfCm, 0.f),
+					At(S1, N1, Z1, RoadHalfCm, GCurbHeightCm),
+					At(S0, N0, Z0, RoadHalfCm, GCurbHeightCm) };
+				const FVector2f FUV[4] = {
+					FVector2f(U0, 0.f), FVector2f(U1, 0.f),
+					FVector2f(U1, GCurbHeightCm * 0.01f), FVector2f(U0, GCurbHeightCm * 0.01f) };
+				const FVector2D Inward = -N0 * (float)Side;
+				QM.AddPoly(CurbGroup, F, 4,
+					FVector3f((float)Inward.X, (float)Inward.Y, 0.f).GetSafeNormal(), FUV, Tint);
+
+				// 2. CHANT : bande horizontale de 15 cm au sommet de la bordure.
+				const FVector3f C[4] = {
+					At(S0, N0, Z0, RoadHalfCm, GCurbHeightCm),
+					At(S1, N1, Z1, RoadHalfCm, GCurbHeightCm),
+					At(S1, N1, Z1, RoadHalfCm + GCurbTopWidthCm, GCurbHeightCm),
+					At(S0, N0, Z0, RoadHalfCm + GCurbTopWidthCm, GCurbHeightCm) };
+				const FVector2f CUV[4] = { WorldUV(C[0]), WorldUV(C[1]), WorldUV(C[2]), WorldUV(C[3]) };
+				QM.AddPoly(CurbGroup, C, 4, Up, CUV, Tint);
+
+				// 3. RIVE : 1,70 m de dalle, de plain-pied avec le chant.
+				const FVector3f W[4] = {
+					At(S0, N0, Z0, RoadHalfCm + GCurbTopWidthCm, GCurbHeightCm),
+					At(S1, N1, Z1, RoadHalfCm + GCurbTopWidthCm, GCurbHeightCm),
+					At(S1, N1, Z1, RoadHalfCm + GCurbTopWidthCm + GSidewalkWidthCm, GCurbHeightCm),
+					At(S0, N0, Z0, RoadHalfCm + GCurbTopWidthCm + GSidewalkWidthCm, GCurbHeightCm) };
+				const FVector2f WUV[4] = { WorldUV(W[0]), WorldUV(W[1]), WorldUV(W[2]), WorldUV(W[3]) };
+				QM.AddPoly(SlabGroup, W, 4, Up, WUV, Tint);
+
+				if (OutCurbQuads)
+				{
+					*OutCurbQuads += 2; // face + chant
+				}
+			}
+		}
+	}
+
+	// PASSAGE PIETON (v5 point 2). Les voies pietonnes vivent dans la DONNEE meme si
+	// elles ne produisent plus de ruban : la ou l'une d'elles partage un noeud avec une
+	// chaussee auto, il y avait un passage dans la vraie ville. On y pose un quad du
+	// scan pedestrian_crossing_lines, EN TRAVERS de la chaussee seule (jamais sur les
+	// rives : un passage ne monte pas sur le trottoir), aligne sur l'axe de la rue.
+	// UV : U = travers de la rue en metres (le scan repete ses bandes de 50 cm tous les
+	// 4 m : bandes PARALLELES a l'axe de la chaussee, norme francaise) ; V = 1 -> 3 m,
+	// soit UNE tuile du scan calee pour que son trait blanc tombe exactement sur les
+	// deux bords du passage plutot qu'en son milieu.
+	void BuildCrossing(FCityMeshBuilder& QM, const FVector2D& CenterCm, const FVector2D& DirCm,
+		float RoadHalfCm, float Zcm, const FResolvedSurface* Surf, const FVector3f& Tint)
+	{
+		const FVector2D D = DirCm.GetSafeNormal();
+		if (D.IsNearlyZero())
+		{
+			return;
+		}
+		const FVector2D Lat(-D.Y, D.X);
+		const FVector2D Along = D * GCrossingHalfLenCm;
+		const FVector2D Across = Lat * RoadHalfCm;
+		auto At = [&](float SAlong, float SAcross)
+		{
+			const FVector2D P = CenterCm + Along * SAlong + Across * SAcross;
+			return FVector3f((float)P.X, (float)P.Y, Zcm);
+		};
+		const FVector3f P[4] = { At(-1.f, -1.f), At(1.f, -1.f), At(1.f, 1.f), At(-1.f, 1.f) };
+		const float AcrossM = RoadHalfCm * 0.01f;
+		const FVector2f UV[4] = {
+			FVector2f(-AcrossM, 1.f), FVector2f(-AcrossM, 3.f),
+			FVector2f(AcrossM, 3.f), FVector2f(AcrossM, 1.f) };
+		QM.AddPoly(QM.GetOrCreateGroup(Surf->SlotName(), Surf->Material), P, 4,
+			FVector3f(0, 0, 1), UV, Tint);
+	}
+
+	// -----------------------------------------------------------------------------
+	// J3c maquette — BORDURE le long d'une polyligne de masque. Meme vocabulaire
+	// geometrique que BuildStreetSides (face verticale de 12 cm + chant de 15 cm),
+	// mais la polyligne n'est plus un AXE de route : c'est la FRONTIERE elle-meme,
+	// deja orientee au prep chaussee A GAUCHE. Un troisieme quad ferme la bordure
+	// cote trottoir.
+	//
+	// ASSUME : le sol etant PEINT, il est plan des deux cotes de la bordure — le
+	// trottoir n'est pas surhausse. La bordure est donc une PIERRE POSEE (12 cm de
+	// relief, 15 cm de chant) et non une marche. C'est ce qui donne la lecture des
+	// rives depuis le ciel (deux aretes eclairees differemment) au prix d'un
+	// trottoir qui, au ras du sol, est de plain-pied avec la chaussee. Surhausser
+	// le trottoir demanderait de deformer la dalle : hors perimetre de la maquette.
+	void BuildMaskCurb(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm,
+		const FDrapeContext& Drape, const FResolvedSurface* Surf, const FVector3f& Tint,
+		int32* OutQuads)
+	{
+		if (!Surf || PtsCm.Num() < 2)
+		{
+			return;
+		}
+		const FVector3f Up(0, 0, 1);
+		const FPolygonGroupID Group = QM.GetOrCreateGroup(Surf->SlotName(), Surf->Material);
+		auto WorldUV = [](const FVector3f& P) { return FVector2f(P.X * 0.01f, P.Y * 0.01f); };
+		float Arc = 0.f;
+		for (int32 i = 0; i + 1 < PtsCm.Num(); ++i)
+		{
+			const FVector2D A = PtsCm[i];
+			const FVector2D B = PtsCm[i + 1];
+			const FVector2D D = B - A;
+			const float SegLen = (float)D.Size();
+			if (SegLen < 1.f)
+			{
+				continue;
+			}
+			const FVector2D Dir = D / SegLen;
+			// Chaussee A GAUCHE : la normale qui pointe VERS la chaussee est
+			// (-Dir.Y, Dir.X), le trottoir est du cote oppose.
+			const FVector2D ToRoad(-Dir.Y, Dir.X);
+			const FVector2D ToWalk = -ToRoad;
+			const float ZA = Drape.GroundZ(A.X, A.Y);
+			const float ZB = Drape.GroundZ(B.X, B.Y);
+			auto At = [&](const FVector2D& P, float Z, const FVector2D& Lat, float Off, float Lift)
+			{
+				return FVector3f((float)(P.X + Lat.X * Off), (float)(P.Y + Lat.Y * Off), Z + Lift);
+			};
+			const float U0 = Arc * 0.01f;
+			const float U1 = (Arc + SegLen) * 0.01f;
+			Arc += SegLen;
+
+			// 1. FACE cote chaussee (celle qui prend la lumiere rasante).
+			const FVector3f F[4] = {
+				At(A, ZA, ToRoad, 0.f, -GMaskCurbSinkCm),
+				At(B, ZB, ToRoad, 0.f, -GMaskCurbSinkCm),
+				At(B, ZB, ToRoad, 0.f, GCurbHeightCm),
+				At(A, ZA, ToRoad, 0.f, GCurbHeightCm) };
+			const FVector2f FUV[4] = {
+				FVector2f(U0, 0.f), FVector2f(U1, 0.f),
+				FVector2f(U1, (GCurbHeightCm + GMaskCurbSinkCm) * 0.01f),
+				FVector2f(U0, (GCurbHeightCm + GMaskCurbSinkCm) * 0.01f) };
+			QM.AddPoly(Group, F, 4,
+				FVector3f((float)ToRoad.X, (float)ToRoad.Y, 0.f).GetSafeNormal(), FUV, Tint);
+
+			// 2. CHANT horizontal, 15 cm vers le trottoir. UV MONDE : le motif reste
+			//    en phase avec la dalle qui le porte (la bordure est de la meme
+			//    matiere, juste assombrie).
+			const FVector3f C[4] = {
+				At(A, ZA, ToRoad, 0.f, GCurbHeightCm),
+				At(B, ZB, ToRoad, 0.f, GCurbHeightCm),
+				At(B, ZB, ToWalk, GCurbTopWidthCm, GCurbHeightCm),
+				At(A, ZA, ToWalk, GCurbTopWidthCm, GCurbHeightCm) };
+			const FVector2f CUV[4] = { WorldUV(C[0]), WorldUV(C[1]), WorldUV(C[2]), WorldUV(C[3]) };
+			QM.AddPoly(Group, C, 4, Up, CUV, Tint);
+
+			// 3. FACE cote trottoir : sans elle la bordure serait un plan sans dos,
+			//    invisible depuis le trottoir.
+			const FVector3f W[4] = {
+				At(B, ZB, ToWalk, GCurbTopWidthCm, GCurbHeightCm),
+				At(A, ZA, ToWalk, GCurbTopWidthCm, GCurbHeightCm),
+				At(A, ZA, ToWalk, GCurbTopWidthCm, -GMaskCurbSinkCm),
+				At(B, ZB, ToWalk, GCurbTopWidthCm, -GMaskCurbSinkCm) };
+			const FVector2f WUV[4] = {
+				FVector2f(U1, 0.f), FVector2f(U0, 0.f),
+				FVector2f(U0, (GCurbHeightCm + GMaskCurbSinkCm) * 0.01f),
+				FVector2f(U1, (GCurbHeightCm + GMaskCurbSinkCm) * 0.01f) };
+			QM.AddPoly(Group, W, 4,
+				FVector3f((float)ToWalk.X, (float)ToWalk.Y, 0.f).GetSafeNormal(), WUV, Tint);
+
+			if (OutQuads)
+			{
+				*OutQuads += 3;
+			}
+		}
+	}
+
+	// TIRET de ligne axiale : un quad de 15 cm de large. Le debitage (3 m plein /
+	// 1,5 m vide, 8 m d'ecart aux carrefours, dans la chaussee seulement) est fait
+	// au prep — le C++ ne decide de rien ici.
+	void BuildAxialDash(FCityMeshBuilder& QM, const FVector2D& ACm, const FVector2D& BCm,
+		const FDrapeContext& Drape, const FResolvedSurface* Surf, const FVector3f& Tint)
+	{
+		const FVector2D D = BCm - ACm;
+		const float Len = (float)D.Size();
+		if (!Surf || Len < 1.f)
+		{
+			return;
+		}
+		const FVector2D Dir = D / Len;
+		const FVector2D Lat(-Dir.Y, Dir.X);
+		const float H = GAxialWidthCm * 0.5f;
+		auto At = [&](const FVector2D& P, float Side)
+		{
+			const FVector2D Q = P + Lat * (Side * H);
+			return FVector3f((float)Q.X, (float)Q.Y,
+				Drape.GroundZ(Q.X, Q.Y) + GMaskDashLiftCm);
+		};
+		const FVector3f P[4] = { At(ACm, -1.f), At(BCm, -1.f), At(BCm, 1.f), At(ACm, 1.f) };
+		const FVector2f UV[4] = {
+			FVector2f(0.f, 0.f), FVector2f(Len * 0.01f, 0.f),
+			FVector2f(Len * 0.01f, GAxialWidthCm * 0.01f), FVector2f(0.f, GAxialWidthCm * 0.01f) };
+		QM.AddPoly(QM.GetOrCreateGroup(Surf->SlotName(), Surf->Material), P, 4,
+			FVector3f(0, 0, 1), UV, Tint);
+	}
+
 	// Ruban de route TEXTURE : UN SEUL quad par segment (chaussee + trottoirs + bordures
 	// + marquage peints dans T_RoadStrip, slot Glass des cellules de sol). L'ancienne
 	// version geometrique (asphalte + 2 trottoirs + tirets, ~500-700 k tris de tirets
@@ -528,24 +1416,51 @@ namespace
 	// rail < route 55+. TerrainZ (desktop) : Z terrain par sommet, l'empilement
 	// devient RELATIF au terrain ; nul = plat historique (mobile).
 	// bBakedShade=false (desktop PBR) : teinte brute, Lumen eclaire (plus de Shade cuit).
+	// Surf (J3c point 2) : classe de revetement resolue — le ruban part dans un groupe
+	// de polygones dedie avec une UV0 EN METRES (U = abscisse curviligne, V = position
+	// transversale) au lieu du slot Glass + T_RoadStrip. Nul = chemin historique.
+	// SurfPlain + NearJunction (v2) : sur les segments dont un sommet touche un
+	// carrefour, la classe bascule vers l'asphalte NU — les tirets axiaux ne
+	// traversent plus les croisements. Le Z reste celui de la classe D'ORIGINE sur
+	// toute la longueur : pas de marche au raccord.
+	// SurfCurb + SurfSlab + Junctions (v5 « voirie ») : la CHAUSSEE AUTO n'est plus un
+	// quad unique — bande centrale de classe chaussee, deux bordures en relief de
+	// 12 cm et deux rives de 1,70 m en classe DALLE (cf. GSidewalkWidthCm). Le tout
+	// nul = chemin d'avant, a l'octet pres (mobile, gravier, sentiers).
 	void BuildRoad(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float WidthCm,
 		const FString& Type, int32 RoadIndex, const TArray<float>* TerrainZ = nullptr,
-		bool bBakedShade = true)
+		bool bBakedShade = true, const FResolvedSurface* Surf = nullptr,
+		const FResolvedSurface* SurfPlain = nullptr, const TArray<uint8>* NearJunction = nullptr,
+		const FResolvedSurface* SurfCurb = nullptr, const FResolvedSurface* SurfSlab = nullptr,
+		const FJunctionMap* Junctions = nullptr, int32* OutCurbQuads = nullptr)
 	{
 		const int32 N = PtsCm.Num();
 		if (N < 2)
 		{
 			return;
 		}
-		// Jitter x4 : a 0,8 cm de pas, deux routes qui se croisent scintillaient au-dela
-		// de ~1 km (precision depth GLES). 4 cm de pas repousse le seuil vers 2 km,
-		// au-dela duquel les rubans sont de toute facon culles (sol peint derriere).
-		const float ZRoad = 55.f + (RoadIndex % 7) * 4.f;
+		// v1 (mobile) : jitter par ordre d'arrivee — a 0,8 cm de pas, deux routes qui se
+		// croisent scintillaient au-dela de ~1 km (precision depth GLES).
+		// v2 (revetements) : offset DETERMINISTE PAR CLASSE (gravier bas ... dalles
+		// haut) + un micro-jitter de 0 a 1,2 cm pour departager deux rubans COPLANAIRES
+		// de la meme classe, dix fois plus petit que le pas entre classes : l'ordre
+		// entre classes ne s'inverse jamais.
+		const float ZRoad = Surf
+			? 55.f + Surf->Class->ZClassCm + (RoadIndex % 4) * 0.4f
+			: 55.f + (RoadIndex % 7) * 4.f;
 		const bool bWalkway = Type == TEXT("footway") || Type == TEXT("path") || Type == TEXT("cycleway");
 		const bool bMarking = !bWalkway && WidthCm >= 550.f;
 		const bool bSolid = Type == TEXT("primary") || Type == TEXT("secondary");
 		const float WalkW = bWalkway ? 0.f : 170.f;
-		const float Half = WidthCm * 0.5f + WalkW;
+		// v5 — RUE COMPLETE : reserve aux CHAUSSEES AUTO. Une allee de gravier ou une
+		// piste cyclable n'a pas de bordure ; elle garde son ruban d'un seul tenant.
+		const bool bStreet = Surf && SurfCurb && SurfSlab && Surf->Class->bAuto;
+		const float RoadHalf = WidthCm * 0.5f;
+		// La demi-largeur TOTALE du ruban : chaussee + chant + rive en rue complete
+		// (RibbonHalfCm cote appelant applique la MEME regle — c'est elle qui fixe le
+		// rayon des patchs de carrefour).
+		const float Half = bStreet ? RoadHalf + GCurbTopWidthCm + GSidewalkWidthCm
+			: WidthCm * 0.5f + WalkW;
 		const FVector3f Up(0, 0, 1);
 		// Teinte de base CLAIRE : les bandes de la texture assombrissent (asphalte 0,2x,
 		// trottoir 0,59x, marquage 1x) pour retrouver les couleurs historiques.
@@ -568,14 +1483,56 @@ namespace
 		for (int32 i = 0; i + 1 < N; ++i)
 		{
 			const FVector2D A = PtsCm[i], B = PtsCm[i + 1];
-			const FVector2D NA = Nrm[i] * Half, NB = Nrm[i + 1] * Half;
+			// v5 : en rue complete, le quad de CLASSE ne couvre plus que la chaussee —
+			// les rives partent dans le groupe de la dalle et la bordure les separe.
+			const float QuadHalf = bStreet ? RoadHalf : Half;
+			const FVector2D NA = Nrm[i] * QuadHalf, NB = Nrm[i + 1] * QuadHalf;
 			const float SegLen = (B - A).Size();
 			const float ZA = ZRoad + (TerrainZ ? (*TerrainZ)[i] : 0.f);
 			const float ZB = ZRoad + (TerrainZ ? (*TerrainZ)[i + 1] : 0.f);
 			const FVector3f P[4] = {
 				FVector3f(A.X - NA.X, A.Y - NA.Y, ZA), FVector3f(B.X - NB.X, B.Y - NB.Y, ZB),
 				FVector3f(B.X + NB.X, B.Y + NB.Y, ZB), FVector3f(A.X + NA.X, A.Y + NA.Y, ZA) };
-			if (bWalkway)
+			if (bStreet)
+			{
+				BuildStreetSides(QM, A, B, Nrm[i], Nrm[i + 1], ZA, ZB, Arc, SegLen, RoadHalf,
+					SurfCurb, SurfSlab, Shaded, Junctions, OutCurbQuads);
+			}
+			if (Surf)
+			{
+				// Segment au contact d'un carrefour : classe de remplacement NUE
+				// (asphalte tuile) pour ne pas tirer un tiret axial en travers du
+				// croisement. Seules les classes MARQUEES (bFullWidth) sont concernees.
+				const FResolvedSurface* SegSurf = Surf;
+				if (SurfPlain && NearJunction && Surf->Class->bFullWidth &&
+					((*NearJunction)[i] || (*NearJunction)[i + 1]))
+				{
+					SegSurf = SurfPlain;
+				}
+				// UV0 en METRES : U = abscisse curviligne, V = position transversale.
+				// bFullWidth : V couvre exactement AcrossM sur TOUTE la largeur du
+				// quad (la ligne axiale integree au scan tombe au milieu) ; sinon V
+				// est la distance transversale reelle et la texture tuile aussi.
+				// v5 : en rue complete le quad EST la chaussee — la ligne axiale peinte
+				// tombe donc au milieu de la CHAUSSEE et non plus au milieu de
+				// chaussee + trottoirs (elle etait decalee de toute la largeur d'un
+				// trottoir sur les rues etroites).
+				const float Along0 = Arc * 0.01f;
+				const float Along1 = (Arc + SegLen) * 0.01f;
+				const float AcrossMax = SegSurf->Class->bFullWidth
+					? SegSurf->Class->AcrossM : (2.f * QuadHalf * 0.01f);
+				const float AlongAt[4] = { Along0, Along1, Along1, Along0 };
+				const float AcrossAt[4] = { 0.f, 0.f, AcrossMax, AcrossMax };
+				FVector2f UV[4];
+				for (int32 c = 0; c < 4; ++c)
+				{
+					UV[c] = SegSurf->Class->bSwapUV
+						? FVector2f(AcrossAt[c], AlongAt[c])
+						: FVector2f(AlongAt[c], AcrossAt[c]);
+				}
+				QM.AddPoly(QM.GetOrCreateGroup(SegSurf->SlotName(), SegSurf->Material), P, 4, Up, UV, Shaded);
+			}
+			else if (bWalkway)
 			{
 				QM.AddQuad(QM.WallGroup, P[0], P[1], P[2], P[3], Up, Shaded);
 			}
@@ -669,6 +1626,17 @@ namespace
 		Mesh->GetStaticMaterials().Empty();
 		Mesh->GetStaticMaterials().Add(FStaticMaterial(WallMat, FName(TEXT("Wall"))));
 		Mesh->GetStaticMaterials().Add(FStaticMaterial(GlassMat, FName(TEXT("Glass"))));
+		// J3c point 2 : un slot par classe de revetement, MEME ORDRE que les groupes
+		// de polygones du builder (le nom de slot est la cle de correspondance a la
+		// construction). Materiau du pack absent -> repli sur GlassMat, qui est le
+		// materiau HISTORIQUE des rubans sur les cellules de sol (M_CityRoad_PBR) et
+		// vaut WallMat sur les cellules de surfaces : un import sans les assets
+		// Megascans rend donc exactement comme avant.
+		for (int32 e = 0; e < QM.ExtraSlotNames.Num(); ++e)
+		{
+			UMaterialInterface* ExtraMat = QM.ExtraSlotMaterials[e] ? QM.ExtraSlotMaterials[e] : GlassMat;
+			Mesh->GetStaticMaterials().Add(FStaticMaterial(ExtraMat, QM.ExtraSlotNames[e]));
+		}
 		Mesh->SetNumSourceModels(1);
 		FStaticMeshSourceModel& SourceModel = Mesh->GetSourceModel(0);
 		SourceModel.BuildSettings.bRecomputeNormals = true;
@@ -735,6 +1703,7 @@ FCityGenProfile FCityGenProfile::Desktop()
 	Profile.bSplitWallGlass = true;
 	Profile.bNanite = true;
 	Profile.bPBRMaterials = true;
+	Profile.bSurfaceMaterials = true;
 	return Profile;
 }
 
@@ -756,6 +1725,7 @@ FCityGenProfile FCityGenProfile::Resolved() const
 	Out.bSplitWallGlass = true;
 	Out.bNanite = true;
 	Out.bPBRMaterials = true;
+	Out.bSurfaceMaterials = true;
 	return Out;
 }
 
@@ -1160,8 +2130,11 @@ namespace
 	// cuite. TerrainZ (desktop) : Z terrain PAR SOMMET ajoute a l'offset d'empilement
 	// Zcm (verts drapes) ; nul = film plat historique (mobile, et l'eau desktop qui
 	// reste plane — son niveau est alors porte par Zcm).
+	// Surf (J3c point 2) : classe de revetement resolue — le polygone part dans son
+	// groupe dedie avec une UV0 MONDE EN METRES (pelouses, bois). Nul = historique.
 	void BuildFlatPolygon(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float Zcm,
-		const FVector3f& Tint, const TArray<float>* TerrainZ = nullptr)
+		const FVector3f& Tint, const TArray<float>* TerrainZ = nullptr,
+		const FResolvedSurface* Surf = nullptr)
 	{
 		TArray<int32> Tris;
 		TriangulateRing(PtsCm, Tris);
@@ -1170,13 +2143,29 @@ namespace
 		{
 			return Zcm + (TerrainZ ? (*TerrainZ)[Index] : 0.f);
 		};
+		const FPolygonGroupID Group = Surf
+			? QM.GetOrCreateGroup(Surf->SlotName(), Surf->Material) : QM.WallGroup;
 		for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
 		{
-			QM.AddTri(QM.WallGroup,
+			const FVector3f P[3] = {
 				FVector3f(PtsCm[Tris[t]].X, PtsCm[Tris[t]].Y, VertexZ(Tris[t])),
 				FVector3f(PtsCm[Tris[t + 1]].X, PtsCm[Tris[t + 1]].Y, VertexZ(Tris[t + 1])),
-				FVector3f(PtsCm[Tris[t + 2]].X, PtsCm[Tris[t + 2]].Y, VertexZ(Tris[t + 2])),
-				FVector3f(0, 0, 1), Shaded);
+				FVector3f(PtsCm[Tris[t + 2]].X, PtsCm[Tris[t + 2]].Y, VertexZ(Tris[t + 2])) };
+			if (!Surf)
+			{
+				QM.AddTri(QM.WallGroup, P[0], P[1], P[2], FVector3f(0, 0, 1), Shaded);
+				continue;
+			}
+			if ((P[0] - P[1]).IsNearlyZero(0.01f) || (P[1] - P[2]).IsNearlyZero(0.01f) ||
+				(P[2] - P[0]).IsNearlyZero(0.01f))
+			{
+				continue;
+			}
+			const FVector2f UV[3] = {
+				FVector2f(P[0].X * 0.01f, P[0].Y * 0.01f),
+				FVector2f(P[1].X * 0.01f, P[1].Y * 0.01f),
+				FVector2f(P[2].X * 0.01f, P[2].Y * 0.01f) };
+			QM.AddPoly(Group, P, 3, FVector3f(0, 0, 1), UV, Shaded);
 		}
 	}
 
@@ -1341,6 +2330,11 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 	const FVector3f ParkTint(0.35f, 0.48f, 0.22f);
 	TArray<FTransform> ScatterXf;
 
+	// J3c point 2 : revetements Megascans des surfaces vertes (l'eau et les rails
+	// gardent leur film teinte en v1). Desactive = surfaces historiques a l'octet pres.
+	FSurfaceLibrary Surfaces;
+	Surfaces.Init(Gen.bSurfaceMaterials, Gen.SurfacesFolder);
+
 	const TArray<TSharedPtr<FJsonValue>>* WaterJson = nullptr;
 	if (Root->TryGetArrayField(TEXT("water"), WaterJson))
 	{
@@ -1398,8 +2392,23 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 				ComputePolylineZ(Pts, Drape, /*bBridge=*/false, GreenTerrainZ);
 				GreenTerrainZPtr = &GreenTerrainZ;
 			}
+			// v5 point 3 — ASSAINISSEMENT DES ESPACES VERTS. Verdict utilisateur sur la
+			// v4b : « spaghetti des espaces verts ». Les polygones verts d'OSM se
+			// CHEVAUCHENT largement (un parc porte souvent 3 ou 4 anneaux empiles :
+			// leisure=park, landuse=grass, natural=wood...) ; y faire alterner trois
+			// herbes differentes transformait chaque chevauchement en frontiere visible.
+			// Une seule herbe (grass_cut) pour TOUS les verts : les chevauchements
+			// deviennent invisibles, il n'y a plus rien a harmoniser.
+			// bVariedGrass (defaut false) : l'alternance historique reste en code pour
+			// un usage futur — berges, friches — la ou la variete se justifiera.
+			const FSurfaceClass* GreenClass = &GSurfGrassCut;
+			if (Gen.bVariedGrass && bForest)
+			{
+				GreenClass = (((uint32)GreenIndex * 2654435761u) >> 16) % 2u == 0u
+					? &GSurfGrassUncut : &GSurfGrassWild;
+			}
 			BuildFlatPolygon(GetCell(Centroid(Pts)), Pts, (bForest ? 20.f : 12.f) + ZJitter,
-				bForest ? ForestTint : ParkTint, GreenTerrainZPtr);
+				bForest ? ForestTint : ParkTint, GreenTerrainZPtr, Surfaces.Resolve(GreenClass));
 			++GreenIndex;
 			++Summary.Green;
 
@@ -2926,7 +3935,182 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	}
 
 	// --- Routes : couche sol residente ---
+	// J3c point 2 : classe de revetement par DONNEE (tag OSM "surface"), a defaut par
+	// type + nombre de voies. Desactive (mobile) = ruban T_RoadStrip historique.
+	FSurfaceLibrary Surfaces;
+	Surfaces.Init(Gen.bSurfaceMaterials, Gen.SurfacesFolder);
+
+	// --- J3c maquette du sol : releve des cellules qui ont un masque cuit.
+	// La liste vient du DISQUE et non des routes : avec la chaussee peinte, une
+	// cellule peut n'avoir plus aucun ruban et devoir quand meme sa dalle.
+	// bMaskedGround exige bSurfaceMaterials (le melange se fait avec les memes
+	// scans) — sans lui, on ne bascule pas et le comportement actuel tient.
+	const bool bMaskedGround = Gen.bMaskedGround && Gen.bSurfaceMaterials;
+	TMap<FIntPoint, FGroundMaskCell> MaskCells;
+	if (bMaskedGround)
+	{
+		const FString Dir = GroundMasksDir(Gen);
+		TArray<FString> Files;
+		IFileManager::Get().FindFiles(Files, *(Dir / TEXT("sols_*.json")), true, false);
+		for (const FString& File : Files)
+		{
+			FString Rest = FPaths::GetBaseFilename(File);
+			Rest.RemoveFromStart(TEXT("sols_"));
+			FString Sx, Sy;
+			if (!Rest.Split(TEXT("_"), &Sx, &Sy, ESearchCase::CaseSensitive, ESearchDir::FromEnd))
+			{
+				continue;
+			}
+			const FIntPoint Key(FCString::Atoi(*Sx), FCString::Atoi(*Sy));
+			FGroundMaskCell Data;
+			if (LoadGroundMaskCell(Dir, Key.X, Key.Y, CellSizeM, Data))
+			{
+				MaskCells.Add(Key, MoveTemp(Data));
+				SlabKeys.Add(Key);
+			}
+		}
+		if (MaskCells.Num() == 0)
+		{
+			UE_LOG(LogCityImport, Warning,
+				TEXT("Maquette du sol demandee mais aucun masque dans '%s' : les rubans de chaussee restent generes."),
+				*Dir);
+		}
+	}
+	// Une cellule N'A de dalle masquee que si elle a A LA FOIS son JSON et son
+	// instance de materiau : sans le materiau, la peindre reviendrait a effacer la
+	// chaussee sans rien mettre a la place.
+	const FString MaskAssetDir = GroundMasksAssetDir(Gen);
+	auto LoadCellMaskMaterial = [&MaskAssetDir](const FIntPoint& Key) -> UMaterialInterface*
+	{
+		const FString Path = FString::Printf(TEXT("%s/MI_CityGround_%d_%d.MI_CityGround_%d_%d"),
+			*MaskAssetDir, Key.X, Key.Y, Key.X, Key.Y);
+		return LoadObject<UMaterialInterface>(nullptr, *Path, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	};
+	// Le basculement est GLOBAL et non par cellule : supprimer les rubans sur une
+	// cellule peinte et les garder sur sa voisine ferait une couture visible en
+	// plein milieu d'une rue. Si un seul materiau de cellule manque, on ne bascule
+	// pas du tout et on le dit.
+	bool bMaskedActive = bMaskedGround && MaskCells.Num() > 0;
+	if (bMaskedActive)
+	{
+		int32 Missing = 0;
+		for (const TPair<FIntPoint, FGroundMaskCell>& Pair : MaskCells)
+		{
+			if (!LoadCellMaskMaterial(Pair.Key))
+			{
+				++Missing;
+			}
+		}
+		if (Missing > 0)
+		{
+			bMaskedActive = false;
+			UE_LOG(LogCityImport, Warning,
+				TEXT("Maquette du sol : %d/%d instances MI_CityGround_* absentes sous '%s' — bascule ANNULEE (lancer Tools/import_ground_masks.py)."),
+				Missing, MaskCells.Num(), *MaskAssetDir);
+		}
+	}
+
+	// Largeur de ruban : la MEME regle que BuildRoad — elle sert au rayon des patchs
+	// de carrefour, donc a l'emprise ou la bordure s'interrompt. v5 : une chaussee
+	// auto emporte desormais chant + rive (chaussee/2 + 15 + 170) ; le reste garde la
+	// regle historique (chaussee/2 + 170, ou + 0 pour une voie pietonne).
+	auto RibbonHalfCm = [](const FString& Type, float WidthCm, const FSurfaceClass* Class)
+	{
+		if (Class && Class->bAuto)
+		{
+			return WidthCm * 0.5f + GCurbTopWidthCm + GSidewalkWidthCm;
+		}
+		const bool bWalkway = Type == TEXT("footway") || Type == TEXT("path") || Type == TEXT("cycleway");
+		return WidthCm * 0.5f + (bWalkway ? 0.f : 170.f);
+	};
+	auto ReadRoadTags = [](const TSharedPtr<FJsonObject>& O, FString& OutSurface, int32& OutLanes)
+	{
+		OutSurface.Empty();
+		OutLanes = 0;
+		O->TryGetStringField(TEXT("surface"), OutSurface);
+		O->TryGetNumberField(TEXT("lanes"), OutLanes);
+	};
+	// v5 point 2 — SITE DE PASSAGE PIETON. Un noeud partage entre une CHAUSSEE AUTO et
+	// une voie PIETONNE : la voie pietonne ne produit plus de ruban depuis la v4, mais
+	// elle existe toujours dans la donnee — c'est elle qui dit ou la vraie ville avait
+	// un passage. On retient, par noeud, la chaussee la plus LARGE (deterministe) avec
+	// sa tangente au noeud : le quad se posera dans l'axe de cette rue.
+	struct FCrossingSite
+	{
+		FVector2D PosCm = FVector2D::ZeroVector;
+		FVector2D DirCm = FVector2D::ZeroVector;
+		float RoadHalfCm = -1.f;
+		float ZClassCm = 0.f;
+	};
+	TMap<FIntPoint, FCrossingSite> CrossingSites;
+	TSet<FIntPoint> PedestrianNodes;
+
+	// v2 — PASSE 1 : releve des noeuds partages (sur les points D'ORIGINE du JSON,
+	// pas les points re-echantillonnes : seuls les noeuds OSM sont partages).
+	FJunctionMap Junctions;
 	const TArray<TSharedPtr<FJsonValue>>* RoadsJson = nullptr;
+	if (Gen.bSurfaceMaterials && Root->TryGetArrayField(TEXT("roads"), RoadsJson))
+	{
+		int32 Index = 0;
+		for (const TSharedPtr<FJsonValue>& V : *RoadsJson)
+		{
+			const TSharedPtr<FJsonObject>& O = V->AsObject();
+			TArray<FVector2D> Pts;
+			ReadPts(O->GetArrayField(TEXT("pts")), Pts);
+			const FString Type = O->GetStringField(TEXT("t"));
+			// v4 : une voie pietonne ne produit plus de ruban — elle ne doit donc plus
+			// peser sur les carrefours, ni par son compte de voies, ni comme dominante
+			// (une place pietonne large aurait sinon interdit le patch d'un vrai
+			// croisement de voitures qu'elle traverse).
+			if (Pts.Num() >= 2 && IsPedestrianRibbon(Type))
+			{
+				for (const FVector2D& P : Pts)
+				{
+					PedestrianNodes.Add(FJunctionMap::Key(P));
+				}
+			}
+			else if (Pts.Num() >= 2)
+			{
+				const float WidthCm = O->GetNumberField(TEXT("w")) * 100.f;
+				FString SurfaceTag;
+				int32 Lanes = 0;
+				ReadRoadTags(O, SurfaceTag, Lanes);
+				const FSurfaceClass* Class = SurfaceClassForRoad(SurfaceTag, Type, Lanes, WidthCm);
+				Junctions.Add(Index, Pts, RibbonHalfCm(Type, WidthCm, Class), Class);
+				if (Class && Class->bAuto)
+				{
+					for (int32 i = 0; i < Pts.Num(); ++i)
+					{
+						FCrossingSite& Site = CrossingSites.FindOrAdd(FJunctionMap::Key(Pts[i]));
+						if (WidthCm * 0.5f <= Site.RoadHalfCm)
+						{
+							continue;
+						}
+						// Tangente au noeud : moyenne des segments adjacents, comme les
+						// normales de BuildRoad — le passage reste dans l'axe meme sur un
+						// sommet de virage.
+						FVector2D D(0, 0);
+						if (i > 0) { D += (Pts[i] - Pts[i - 1]).GetSafeNormal(); }
+						if (i + 1 < Pts.Num()) { D += (Pts[i + 1] - Pts[i]).GetSafeNormal(); }
+						if (D.IsNearlyZero())
+						{
+							continue;
+						}
+						Site.PosCm = Pts[i];
+						Site.DirCm = D.GetSafeNormal();
+						Site.RoadHalfCm = WidthCm * 0.5f;
+						Site.ZClassCm = Class->ZClassCm;
+					}
+				}
+			}
+			++Index;
+		}
+		Junctions.Build();
+		UE_LOG(LogCityImport, Display,
+			TEXT("Carrefours : %d noeuds partages sur %d releves, dont %d a patcher (>= 2 chaussees auto)."),
+			Junctions.NumJunctions, Junctions.Nodes.Num(), Junctions.NumAutoJunctions);
+	}
+	RoadsJson = nullptr;
 	if (Root->TryGetArrayField(TEXT("roads"), RoadsJson))
 	{
 		int32 Index = 0;
@@ -2938,6 +4122,65 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			if (Pts.Num() < 2)
 			{
 				continue;
+			}
+			// v4 — LE PIETON EST LA DALLE : en profil revetements, aucune voie pietonne
+			// ne produit de ruban. C'est LA simplification structurelle de la v4 (le
+			// lacis pieton du centre faisait a lui seul l'effet « grand puzzle »). Le
+			// golden path mobile n'est pas concerne : sans revetements, les sentiers
+			// gardent leur ruban uni historique, a l'octet pres.
+			if (Gen.bSurfaceMaterials && IsPedestrianRibbon(O->GetStringField(TEXT("t"))))
+			{
+				++Index;
+				continue;
+			}
+			// J3c maquette — LA CHAUSSEE N'EST PLUS UN FILM POSE SUR LA DALLE. Une
+			// fois le sol peint, un ruban au niveau du sol ne ferait que doubler la
+			// peinture (et se battre avec elle en profondeur). Seuls survivent les
+			// PONTS : leur tablier est au-dessus du terrain, aucun masque de sol ne
+			// peut le rendre.
+			if (bMaskedActive)
+			{
+				bool bBridgeRibbon = false;
+				O->TryGetBoolField(TEXT("bridge"), bBridgeRibbon);
+				if (!bBridgeRibbon)
+				{
+					++Summary.GroundRibbonsSkipped;
+					++Index;
+					continue;
+				}
+				++Summary.BridgeRibbons;
+			}
+			// v5 point 4 — FRAGMENT ORPHELIN. Court (< 25 m) ET sans le moindre noeud
+			// partage avec le reste du reseau : ce n'est pas une rue, c'est un bout de
+			// voie coupe par la fenetre d'extraction, pose seul sur la dalle (« morceaux
+			// perdus », verdict v4b). La connexite se lit dans la carte des noeuds deja
+			// relevee en passe 1, sur les points D'ORIGINE (les seuls partages).
+			if (Gen.bSurfaceMaterials && Junctions.Nodes.Num() > 0)
+			{
+				float LenCm = 0.f;
+				for (int32 i = 0; i + 1 < Pts.Num(); ++i)
+				{
+					LenCm += (float)(Pts[i + 1] - Pts[i]).Size();
+				}
+				if (LenCm < GOrphanMaxLenCm)
+				{
+					bool bConnected = false;
+					for (const FVector2D& P : Pts)
+					{
+						const FJunctionNode* Node = Junctions.Nodes.Find(FJunctionMap::Key(P));
+						if (Node && Node->NumRoads >= 2)
+						{
+							bConnected = true;
+							break;
+						}
+					}
+					if (!bConnected)
+					{
+						++Summary.OrphanRibbons;
+						++Index;
+						continue;
+					}
+				}
 			}
 			// Desktop (J2 §3.2) : re-echantillonnage a pas fixe puis drapage MNT,
 			// l'empilement 55+ devient relatif au terrain. Champ optionnel bridge
@@ -2958,13 +4201,153 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				ComputePolylineZ(*RoadPts, Drape, bBridge, TerrainZ);
 				TerrainZPtr = &TerrainZ;
 			}
+			// Champs OSM optionnels, lus TOLERANT (absents sur les JSON historiques).
+			const float RoadWidthCm = O->GetNumberField(TEXT("w")) * 100.f;
+			const FString RoadType = O->GetStringField(TEXT("t"));
+			FString RoadSurface;
+			int32 RoadLanes = 0;
+			ReadRoadTags(O, RoadSurface, RoadLanes);
+			const FResolvedSurface* RoadSurf =
+				Surfaces.Resolve(SurfaceClassForRoad(RoadSurface, RoadType, RoadLanes, RoadWidthCm));
+			// v2 : drapeau « sommet au contact d'un carrefour » (les tirets axiaux y
+			// cedent la place a l'asphalte nu). Calcule seulement pour les classes
+			// marquees — inutile de sonder la grille pour un trottoir.
+			const FResolvedSurface* PlainSurf = nullptr;
+			TArray<uint8> NearJunction;
+			if (RoadSurf && RoadSurf->Class->bFullWidth && Junctions.NumJunctions > 0)
+			{
+				PlainSurf = Surfaces.Resolve(&GSurfAsphalt);
+				NearJunction.SetNumUninitialized(RoadPts->Num());
+				for (int32 i = 0; i < RoadPts->Num(); ++i)
+				{
+					NearJunction[i] = Junctions.IsNear((*RoadPts)[i], GJunctionPlainCm) ? 1 : 0;
+				}
+			}
+			// v5 : rives + bordures (chaussees auto uniquement). CurbSurf/SlabSurf nuls
+			// en profil mobile -> BuildRoad reprend son chemin d'un seul quad.
+			const FResolvedSurface* CurbSurf = Surfaces.Resolve(&GSurfCurb);
+			const FResolvedSurface* RibbonSlabSurf = Surfaces.Resolve(&GSurfSlab);
 			BuildRoad(GetIn(GroundCells, Pts[0], Cell, bLinearColors, bWorldUVs), *RoadPts,
-				O->GetNumberField(TEXT("w")) * 100.f,
-				O->GetStringField(TEXT("t")), Index, TerrainZPtr, bBakedShade);
+				RoadWidthCm, RoadType, Index, TerrainZPtr, bBakedShade, RoadSurf,
+				PlainSurf, PlainSurf ? &NearJunction : nullptr,
+				CurbSurf, RibbonSlabSurf, &Junctions, &Summary.CurbQuads);
 			SlabKeys.Add(FIntPoint(FMath::FloorToInt(Pts[0].X / Cell), FMath::FloorToInt(Pts[0].Y / Cell)));
 			++Summary.Roads;
 			++Index;
 		}
+		// v2 — PASSE 3 : patchs de carrefour. Un disque du revetement DOMINANT
+		// (classe de la voie la plus large) recouvre le disque de rencontre, pose
+		// au-dessus du ruban le plus haut du noeud. Si la dominante est une classe
+		// MARQUEE, le patch prend son equivalent NU : un croisement n'a jamais de
+		// ligne axiale en son milieu.
+		// v3 : WantsPatch() — reserve aux noeuds ou au moins DEUX chaussees auto se
+		// rencontrent (zero patch dans le lacis pieton, cf. « peau de leopard »).
+		for (const TPair<FIntPoint, FJunctionNode>& Pair : Junctions.Nodes)
+		{
+			const FJunctionNode& Node = Pair.Value;
+			// J3c maquette : un carrefour PEINT n'a pas besoin d'un disque de
+			// rattrapage — il n'y a plus de rubans a raccorder.
+			if (bMaskedActive || !Node.WantsPatch() || Node.MaxHalfCm < 150.f)
+			{
+				continue;
+			}
+			const FSurfaceClass* PatchClass = Node.Dominant->bFullWidth ? &GSurfAsphalt : Node.Dominant;
+			const FResolvedSurface* PatchSurf = Surfaces.Resolve(PatchClass);
+			if (!PatchSurf)
+			{
+				continue;
+			}
+			const float Zcm = 55.f + Node.MaxZClassCm + GJunctionPatchLiftCm
+				+ Drape.GroundZ(Node.PosCm.X, Node.PosCm.Y);
+			BuildJunctionPatch(GetIn(GroundCells, Node.PosCm, Cell, bLinearColors, bWorldUVs),
+				Node.PosCm, Node.MaxHalfCm + GJunctionPatchMarginCm, Zcm, PatchSurf,
+				FVector3f(0.85f, 0.85f, 0.80f));
+			SlabKeys.Add(FIntPoint(FMath::FloorToInt(Node.PosCm.X / Cell),
+				FMath::FloorToInt(Node.PosCm.Y / Cell)));
+			++Summary.JunctionPatches;
+		}
+
+		// v5 — PASSE 4 : PASSAGES PIETONS. Un quad par noeud partage entre une chaussee
+		// auto et une voie pietonne, en travers de la CHAUSSEE SEULE, au-dessus du
+		// ruban (+9 cm) et donc au-dessus du patch de ce noeud (+5 cm), mais SOUS le
+		// chant des bordures (+12 cm) : le passage s'arrete au pied du trottoir.
+		// Noeud deja couvert par un disque de patch : passage REPORTE (compte a part).
+		// Le raccord propre bord-de-patch (passage pose en amont de l'entree du
+		// carrefour) est au backlog — ici, un carrefour reste une zone de roulement nue.
+		if (Gen.bSurfaceMaterials && !bMaskedActive && CrossingSites.Num() > 0)
+		{
+			const FResolvedSurface* CrossSurf = Surfaces.Resolve(&GSurfCrossing);
+			for (const TPair<FIntPoint, FCrossingSite>& Pair : CrossingSites)
+			{
+				const FCrossingSite& Site = Pair.Value;
+				if (Site.RoadHalfCm <= 0.f || !PedestrianNodes.Contains(Pair.Key))
+				{
+					continue;
+				}
+				if (Junctions.IsInPatch(Site.PosCm))
+				{
+					++Summary.CrossingsDeferred;
+					continue;
+				}
+				if (!CrossSurf)
+				{
+					continue;
+				}
+				const float Zcm = 55.f + Site.ZClassCm + GCrossingLiftCm
+					+ Drape.GroundZ(Site.PosCm.X, Site.PosCm.Y);
+				BuildCrossing(GetIn(GroundCells, Site.PosCm, Cell, bLinearColors, bWorldUVs),
+					Site.PosCm, Site.DirCm, Site.RoadHalfCm, Zcm, CrossSurf,
+					FVector3f(0.85f, 0.85f, 0.80f));
+				SlabKeys.Add(FIntPoint(FMath::FloorToInt(Site.PosCm.X / Cell),
+					FMath::FloorToInt(Site.PosCm.Y / Cell)));
+				++Summary.Crossings;
+			}
+		}
+		if (Gen.bSurfaceMaterials)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("Voirie : %d quads de bordure, %d passages pietons poses, %d reportes (patch), %d rubans orphelins ecartes."),
+				Summary.CurbQuads, Summary.Crossings, Summary.CrossingsDeferred, Summary.OrphanRibbons);
+		}
+	}
+
+	// --- J3c maquette : LE RELIEF, depuis le masque. Trois passes tres courtes —
+	// tout le decoupage a ete fait au prep, il ne reste qu'a poser des quads. Elles
+	// vivent dans les cellules de RUBANS (SM_Ground_*, sans collision, cullables) :
+	// une bordure ou un tiret n'a rien a faire dans la dalle porteuse.
+	if (bMaskedActive)
+	{
+		const FResolvedSurface* CurbSurf = Surfaces.Resolve(&GSurfCurb);
+		const FResolvedSurface* CrossSurf = Surfaces.Resolve(&GSurfCrossing);
+		const FResolvedSurface* MarkSurf = Surfaces.Resolve(&GSurfMarking);
+		const FVector3f Tint(0.85f, 0.85f, 0.80f);
+		for (const TPair<FIntPoint, FGroundMaskCell>& Pair : MaskCells)
+		{
+			const FGroundMaskCell& Data = Pair.Value;
+			for (const TArray<FVector2D>& Line : Data.Curbs)
+			{
+				BuildMaskCurb(GetIn(GroundCells, Line[0], Cell, bLinearColors, bWorldUVs),
+					Line, Drape, CurbSurf, Tint, &Summary.CurbQuads);
+			}
+			for (const FMaskCrossing& Site : Data.Crossings)
+			{
+				const float Zcm = Drape.GroundZ(Site.PosCm.X, Site.PosCm.Y) + GMaskCrossLiftCm;
+				BuildCrossing(GetIn(GroundCells, Site.PosCm, Cell, bLinearColors, bWorldUVs),
+					Site.PosCm, Site.DirCm, Site.HalfWCm, Zcm, CrossSurf, Tint);
+				++Summary.Crossings;
+			}
+			for (const FVector4& Seg : Data.Axial)
+			{
+				const FVector2D A(Seg.X, Seg.Y);
+				BuildAxialDash(GetIn(GroundCells, A, Cell, bLinearColors, bWorldUVs),
+					A, FVector2D(Seg.Z, Seg.W), Drape, MarkSurf, Tint);
+				++Summary.AxialDashes;
+			}
+		}
+		UE_LOG(LogCityImport, Display,
+			TEXT("Maquette du sol : %d cellules masquees, %d rubans de chaussee supprimes, %d ponts conserves, %d quads de bordure, %d passages, %d tirets axiaux."),
+			MaskCells.Num(), Summary.GroundRibbonsSkipped, Summary.BridgeRibbons,
+			Summary.CurbQuads, Summary.Crossings, Summary.AxialDashes);
 	}
 
 	// --- Dalles de sol PEINTES : grilles 12x12 par cellule, sommets teintes par
@@ -3040,9 +4423,17 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	// MNT (desktop, sommets Z = AltCmAt - AltCapitole). Fabrique commune : la teinte
 	// peinte reste echantillonnee en (X, Y), le Z ne change pas les couleurs.
 	const int32 SlabGrid = FMath::Clamp(Gen.GroundGridN, 1, 256);
-	auto BuildGroundGrid = [&](FCityMeshBuilder& Builder, const FIntPoint& Key, int32 GridN, bool bPaint)
+	// v4 — LA DALLE PORTE LA MATIERE. Resolue une fois : nulle en profil mobile (la
+	// dalle reste la grille peinte historique, a l'octet pres) et nulle pour le mesh
+	// de COLLISION (jamais rendu — lui donner un slot de revetement serait du gachis).
+	const FResolvedSurface* SlabSurf = Surfaces.Resolve(&GSurfSlab);
+	auto BuildGroundGrid = [&](FCityMeshBuilder& Builder, const FIntPoint& Key, int32 GridN, bool bPaint,
+		const FResolvedSurface* Surf)
 	{
 		const float Step = Cell / GridN;
+		// Groupe de revetement cree UNE fois pour toute la dalle (pas par quad).
+		const FPolygonGroupID Group = Surf
+			? Builder.GetOrCreateGroup(Surf->SlotName(), Surf->Material) : Builder.WallGroup;
 		for (int32 GY = 0; GY < GridN; ++GY)
 		{
 			for (int32 GX = 0; GX < GridN; ++GX)
@@ -3053,18 +4444,34 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 					FVector3f(X0 + Step, Y0, Drape.GroundZ(X0 + Step, Y0)),
 					FVector3f(X0 + Step, Y0 + Step, Drape.GroundZ(X0 + Step, Y0 + Step)),
 					FVector3f(X0, Y0 + Step, Drape.GroundZ(X0, Y0 + Step)) };
-				const FVector2f UV[4] = { FVector2f(0, 0), FVector2f(1, 0), FVector2f(1, 1), FVector2f(0, 1) };
+				// UV0 : historiquement [0,1] PAR QUAD (le materiau de dalle ne lisait
+				// que la VertexColor). v4 : UV0 EN METRES MONDE, comme les rubans —
+				// c'est ce qui donne au scan sa vraie echelle et, surtout, ce qui fait
+				// que la dalle et le ruban qui la recouvre parlent la meme langue.
+				FVector2f UV[4] = { FVector2f(0, 0), FVector2f(1, 0), FVector2f(1, 1), FVector2f(0, 1) };
+				if (Surf)
+				{
+					for (int32 c = 0; c < 4; ++c)
+					{
+						UV[c] = FVector2f(C[c].X * 0.01f, C[c].Y * 0.01f);
+					}
+				}
 				FVector3f Cols[4];
 				for (int32 c = 0; c < 4; ++c)
 				{
 					const FVector3f Base = bPaint ? SampleGround(FVector2D(C[c].X, C[c].Y)) : SlabBase;
 					Cols[c] = bBakedShade ? Shade(Base, FVector3f(0, 0, 1), 0.f) : Base;
 				}
-				Builder.AddPolyPerVertexColors(Builder.WallGroup, C, 4,
-					FVector3f(0, 0, 1), UV, Cols);
+				Builder.AddPolyPerVertexColors(Group, C, 4, FVector3f(0, 0, 1), UV, Cols);
 			}
 		}
 	};
+	// J3c maquette : l'instance de la CELLULE, resolue comme une classe de
+	// revetement de plus (meme mecanique de slot, meme UV0 metrique monde — c'est
+	// exactement ce que le master attend). Une seule difference : son materiau
+	// change d'une cellule a l'autre, donc elle se resout dans la boucle.
+	FResolvedSurface MaskedSurf;
+	MaskedSurf.Class = &GSurfMaskedGround;
 	for (const FIntPoint& Key : SlabKeys)
 	{
 		FCityMeshBuilder SlabBuilder;
@@ -3073,7 +4480,17 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		{
 			SlabBuilder.EnableWorldUV1();
 		}
-		BuildGroundGrid(SlabBuilder, Key, SlabGrid, /*bPaint=*/true);
+		const FResolvedSurface* CellSurf = SlabSurf;
+		if (bMaskedActive && MaskCells.Contains(Key))
+		{
+			MaskedSurf.Material = LoadCellMaskMaterial(Key);
+			if (MaskedSurf.Material)
+			{
+				CellSurf = &MaskedSurf;
+				++Summary.MaskedCells;
+			}
+		}
+		BuildGroundGrid(SlabBuilder, Key, SlabGrid, /*bPaint=*/true, CellSurf);
 		const FString SlabName = FString::Printf(TEXT("SM_Slab_%d_%d"), Key.X, Key.Y);
 		UStaticMesh* SlabMesh = nullptr;
 		if (Drape.IsActive() && Gen.GroundCollisionGridN > 0)
@@ -3083,7 +4500,8 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			// via ComplexCollisionMesh (le trimesh plein serait du gachis memoire).
 			// Le mesh de collision n'est jamais rendu : ni Nanite ni materiau PBR.
 			FCityMeshBuilder ColBuilder;
-			BuildGroundGrid(ColBuilder, Key, FMath::Clamp(Gen.GroundCollisionGridN, 1, 64), /*bPaint=*/false);
+			BuildGroundGrid(ColBuilder, Key, FMath::Clamp(Gen.GroundCollisionGridN, 1, 64), /*bPaint=*/false,
+				/*Surf=*/nullptr);
 			UStaticMesh* ColMesh = CreateMeshAsset(AssetFolder / (SlabName + TEXT("_Col")), ColBuilder,
 				WallMat, WallMat, true);
 			SlabMesh = CreateMeshAsset(AssetFolder / SlabName, SlabBuilder, SlabMat, SlabMat,
@@ -3302,9 +4720,18 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	FEditorFileUtils::SaveDirtyPackages(/*bPromptUserToSave=*/false, /*bSaveMapPackages=*/true,
 		/*bSaveContentPackages=*/true);
 	UE_LOG(LogCityImport, Display,
-		TEXT("Ville streamee : %d batiments, %d routes, %d arbres — %d sols, %d proxys, %d meshes detail, %d collisions batiments, %d blocs. Tout est sauve."),
+		TEXT("Ville streamee : %d batiments, %d routes, %d arbres — %d sols, %d proxys, %d meshes detail, %d collisions batiments, %d blocs, %d patchs de carrefour, %d quads de bordure, %d passages pietons (%d reportes), %d orphelins ecartes. Tout est sauve."),
 		Summary.Buildings, Summary.Roads, Summary.Trees, Summary.GroundMeshes, Summary.ProxyMeshes,
-		Summary.BuildingMeshes, Summary.BuildingColMeshes, Summary.StreamingBlocks);
+		Summary.BuildingMeshes, Summary.BuildingColMeshes, Summary.StreamingBlocks,
+		Summary.JunctionPatches, Summary.CurbQuads, Summary.Crossings, Summary.CrossingsDeferred,
+		Summary.OrphanRibbons);
+	if (Summary.MaskedCells > 0)
+	{
+		UE_LOG(LogCityImport, Display,
+			TEXT("Maquette du sol : %d dalles peintes, %d rubans de chaussee supprimes, %d ponts, %d tirets axiaux."),
+			Summary.MaskedCells, Summary.GroundRibbonsSkipped, Summary.BridgeRibbons,
+			Summary.AxialDashes);
+	}
 	return Summary;
 }
 
