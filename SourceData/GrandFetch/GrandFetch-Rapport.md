@@ -427,3 +427,8 @@ sont les données brutes UTF-8.
 - Taille : 25.36 Mo. Duree : 4.5 min.
 - Sections distinctes : 52.
 - Bornes : X [-6864.95 ; 5355.24] m, Y [-5546.32 ; 5508.08] m (1042489 pts)
+
+## cours.json -- cours interieures des batiments
+- Source : WFS Geoplateforme BDTOPO_V3:batiment (BD TOPO v3), fetch du 2026-07-27, Licence Ouverte 2.0 (IGN).
+- Batiments a cour : 580 (sur 131575 lus), 748 cours retenues (>= 15 m2), 182 ecartees.
+- Aire de cours cumulee : 145899 m2. Taille : 283.1 Ko.

@@ -25,3 +25,8 @@ SourceData/*.avant_tint.json
 Tools/pylib/PIL/
 Tools/pylib/[Pp]illow*
 Content/Dev/ProtoSols/
+# Backup pre-rognage cadastral (regenerable via j3b_rogne_bati.py)
+SourceData/*.avant_rognage.json
+# Backup pre-cours (regenerable via Fetch-GF-Cours.ps1 + j3b_ajoute_cours.py)
+SourceData/*.avant_cours.json
+SourceData/*.avant_flatcut.json

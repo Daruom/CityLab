@@ -125,6 +125,37 @@ function GFExteriorRings($Geom) {
 	return ,$Rings
 }
 
+# Polygones AVEC leurs anneaux interieurs (les cours). Un polygone GeoJSON est un
+# tableau d'anneaux : [0] = exterieur, [1..] = trous. GFExteriorRings jette les
+# trous (bon pour les fetchs qui n'en veulent pas) ; ici on renvoie le tableau
+# d'anneaux COMPLET de chaque polygone, pour que Fetch-GF-Cours.ps1 recupere les
+# cours interieures. Ne remplace PAS GFExteriorRings.
+function GFRingsWithHoles($Geom) {
+	$Polys = New-Object System.Collections.Generic.List[object]
+	if ($null -eq $Geom -or $null -eq $Geom.coordinates) { return ,$Polys }
+	if ($Geom.type -eq 'Polygon') {
+		if (@($Geom.coordinates).Count -ge 1) { $Polys.Add($Geom.coordinates) }
+	} elseif ($Geom.type -eq 'MultiPolygon') {
+		foreach ($Poly in $Geom.coordinates) { if (@($Poly).Count -ge 1) { $Polys.Add($Poly) } }
+	}
+	return ,$Polys
+}
+
+# Aire (m2, valeur absolue) d'un anneau [ [x,y], ... ] en coordonnees LOCALES.
+# NB : $Pts.Count directement (PAS @($Pts).Count : sur une List[object] de tableaux,
+# @() casse en ArgumentException sous PS 5.1).
+function GFRingAreaM2($Pts) {
+	if ($null -eq $Pts) { return 0.0 }
+	$N = $Pts.Count
+	if ($N -lt 3) { return 0.0 }
+	$A = 0.0
+	for ($i = 0; $i -lt $N; $i++) {
+		$P = $Pts[$i]; $Q = $Pts[($i + 1) % $N]
+		$A += ([double]$P[0]) * ([double]$Q[1]) - ([double]$Q[0]) * ([double]$P[1])
+	}
+	return [Math]::Abs($A) / 2.0
+}
+
 function GFLines($Geom) {
 	$Lines = New-Object System.Collections.Generic.List[object]
 	if ($null -eq $Geom -or $null -eq $Geom.coordinates) { return ,$Lines }

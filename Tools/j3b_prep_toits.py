@@ -68,11 +68,41 @@ def clean_ring(pts):
     return ring
 
 
-def skeleton_faces(ring):
-    """Squelette droit -> (verts [[x,y,d]] anneau+noeuds, faces [[idx]]). Exception si degenere."""
+def skeleton_faces(ring, holes=None):
+    """Squelette droit d'un polygone avec trous OPTIONNELS.
+
+    Retourne (out_v [[x,y,d]], faces [[idx]], htotal).
+
+    CONTRAT DE SORTIE (le C++ le respecte a l'identique — cf. BuildPolygonBuildingDesktop) :
+    l'espace d'indices des faces est, DANS CET ORDRE,
+        [0 .. n)               : sommets du CONTOUR (d = 0),
+        [n .. n+htotal)         : sommets des TROUS a plat (d = 0), concatenes dans
+                                  l'ordre de la liste `holes`, chaque trou tel quel,
+        [n+htotal .. )          : noeuds du SQUELETTE (d = retrait > 0).
+    Le bloc roof ne stocke que `sv` = les noeuds de squelette (v[n+htotal:]) : le C++
+    reconstruit l'espace complet comme  contour ++ trous ++ sv  (le contour vient de
+    "pts", les trous de "holes", tous deux du niveau batiment).
+
+    Orientation EXIGEE en entree : contour CCW (aire signee > 0), trous CW (< 0)
+    — c'est ce que bpypolyskel.polygonize attend (dremonstrateur test_toit_trous.py).
+    Exception si degenere.
+    """
+    holes = holes or []
     verts = [Vector((x, y, 0.0)) for x, y in ring]
-    n = len(verts)
-    faces = bpypolyskel.polygonize(verts, 0, n, None, 0.0, 1.0, None, None)
+    n = len(ring)
+    holes_info = None
+    if holes:
+        holes_info = []
+        idx = n
+        for h in holes:
+            if len(h) < 3:
+                raise ValueError("trou < 3 sommets")
+            holes_info.append((idx, len(h)))
+            verts += [Vector((x, y, 0.0)) for x, y in h]
+            idx += len(h)
+    htotal = sum(len(h) for h in holes)
+    nb = n + htotal  # sommets de BORD (contour + trous), tous a d = 0
+    faces = bpypolyskel.polygonize(verts, 0, n, holes_info, 0.0, 1.0, None, None)
     if not faces:
         raise ValueError("aucune face")
     out_v = []
@@ -81,16 +111,22 @@ def skeleton_faces(ring):
         if not (math.isfinite(v[0]) and math.isfinite(v[1]) and math.isfinite(d)) or d < -0.01:
             raise ValueError("sommet invalide")
         out_v.append([round(v[0], 2), round(v[1], 2), round(max(d, 0.0), 3)])
-    maxd = max(v[2] for v in out_v)
+    maxd = max((v[2] for v in out_v[nb:]), default=0.0)  # sur les seuls noeuds de squelette
     if maxd <= 0.005:
         raise ValueError("squelette plat (maxd=0)")
+    # Aretes de BORD admissibles comme 1re arete d'un versant : celles du contour ET
+    # celles de chaque trou (l'egout exterieur OU l'avant-toit de cour). bpypolyskel
+    # garantit ce contrat ; on le VERIFIE ici, il est critique pour le C++.
+    bnd = set()
+    for (s, L) in [(0, n)] + (holes_info or []):
+        for i in range(L):
+            bnd.add((s + i, s + (i + 1) % L))
     for f in faces:
         if len(f) < 3 or any(i < 0 or i >= len(out_v) for i in f):
             raise ValueError("face invalide")
-        # Contrat bpypolyskel : la 1re arete de chaque face est une arete de l'emprise.
-        if not (f[0] < n and f[1] < n and (f[1] - f[0]) % n == 1):
-            raise ValueError("1re arete hors emprise")
-    return out_v, faces
+        if (f[0], f[1]) not in bnd:
+            raise ValueError("1re arete hors bord")
+    return out_v, faces, htotal
 
 
 def usage_of(b):
@@ -124,8 +160,11 @@ def mat_of(b):
     return "tuile"  # indetermine/absent -> defaut toulousain (verrou 1 : ~79 % tuile)
 
 
-def roof_of(b, ring):
-    """Bloc roof ou (None, raison). Bornes DELTA/EAVE du verrou 1."""
+def roof_of(b, ring, holes=None):
+    """Bloc roof ou (None, raison). Bornes DELTA/EAVE du verrou 1.
+    holes OPTIONNEL (cours) : passe tel quel a skeleton_faces (contour CCW, trous CW).
+    `sv` = noeuds de squelette SEULS (v[n+htotal:]) — le C++ reconstruit
+    contour ++ trous ++ sv (les trous viennent de "holes" au niveau batiment)."""
     amin_t = b.get("altitude_minimale_toit")
     amax_t = b.get("altitude_maximale_toit")
     amin_s = b.get("altitude_minimale_sol")
@@ -139,13 +178,13 @@ def roof_of(b, ring):
     eave = amin_t - amin_s
     if eave < EAVE_MIN:
         return None, "egout trop bas"
-    v, faces = skeleton_faces(ring)  # exceptions comptees par l'appelant
+    v, faces, htotal = skeleton_faces(ring, holes)  # exceptions comptees par l'appelant
     n = len(ring)
     return {
         "eave": round(eave, 1),
         "delta": round(delta, 1),
         "mat": mat_of(b),
-        "sv": v[n:],
+        "sv": v[n + htotal:],
         "f": faces,
     }, None
 
@@ -157,7 +196,7 @@ def selftest():
         nonlocal ok
         try:
             # Meme chemin que la passe reelle : nettoyage PUIS squelette.
-            v, f = skeleton_faces(clean_ring(ring))
+            v, f, _ = skeleton_faces(clean_ring(ring))
             maxd = max(x[2] for x in v)
             good = len(f) == exp_faces and abs(maxd - exp_maxd) < 0.05
             print(f"  {name:24s} : {len(f)} faces (attendu {exp_faces}), "
@@ -199,18 +238,147 @@ def selftest():
     good = r2 is None and why2 == "delta aberrant" and r3 is None and why3 == "alts absentes"
     print(f"  garde-fous plat          : {why2} / {why3} -> {'PASS' if good else 'FAIL'}")
     ok = ok and good
+
+    # --- Toit A COUR : carre 40x40 avec cour carree 10x10 (contour CCW, trou CW). ---
+    def area2(r):
+        s = 0.0
+        for i in range(len(r)):
+            x1, y1 = r[i]
+            x2, y2 = r[(i + 1) % len(r)]
+            s += x1 * y2 - x2 * y1
+        return s
+
+    ext = clean_ring([(0, 0), (40, 0), (40, 40), (0, 40)])   # CCW
+    hole = [(15, 15), (25, 15), (25, 25), (15, 25)]
+    if area2(hole) > 0:                                       # bpypolyskel EXIGE le trou CW
+        hole = hole[::-1]
+    try:
+        v0, f0, h0 = skeleton_faces(ext)                     # sans trou
+        v1, f1, h1 = skeleton_faces(ext, [hole])             # avec trou
+        sv = v1[8:]                                          # noeuds de squelette (n=4, htotal=4)
+        heights_ok = all(math.isfinite(x[2]) and x[2] >= 0.0 for x in v1)
+        # Plus de faces qu'a plein, htotal=4, bords a d=0, squelette souleve (d>0),
+        # et 1res aretes toutes sur un bord (skeleton_faces leve sinon).
+        good = (len(f1) > len(f0) and h1 == 4 and h0 == 0 and len(sv) >= 1
+                and heights_ok
+                and all(abs(x[2]) < 1e-6 for x in v1[:8])
+                and all(x[2] > 0.0 for x in sv))
+        print(f"  carre 40 a cour 10x10    : {len(f0)} faces plein -> {len(f1)} avec cour, "
+              f"htotal={h1}, {len(sv)} noeuds squelette -> {'PASS' if good else 'FAIL'}")
+        ok = ok and good
+    except Exception as e:  # noqa: BLE001
+        print(f"  carre 40 a cour 10x10    : EXCEPTION {e} -> FAIL")
+        ok = False
+
     print("SELFTEST " + ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
+
+
+def _ring_area2(ring):
+    s = 0.0
+    for i in range(len(ring)):
+        x1, y1 = ring[i]
+        x2, y2 = ring[(i + 1) % len(ring)]
+        s += x1 * y2 - x2 * y1
+    return s
+
+
+def _dumps_bati(root):
+    """Serialisation CANONIQUE de toulouse10_bati.json (round-trip octet identique)."""
+    return ('{"source":%s,"origin":%s,"sizeM":%s,"buildings":[%s]}') % (
+        json.dumps(root["source"], ensure_ascii=False),
+        json.dumps(root.get("origin"), separators=(",", ":")),
+        json.dumps(root.get("sizeM"), separators=(",", ":")),
+        ",".join(json.dumps(b, separators=(",", ":"), ensure_ascii=False)
+                 for b in root["buildings"]))
+
+
+def cours_pass():
+    """Recalcule le bloc roof des SEULS batiments a cour (cle "holes"), EN PLACE dans
+    toulouse10_bati.json. Reutilise eave/delta/mat/tint (issus des alts IGN, INDEPENDANTS
+    des trous) : seuls sv et f changent. Contour et trous pris VERBATIM (memes sommets,
+    meme ordre que le C++ : contour "pts" CCW ++ "holes" CW ++ sv). Retombe en toit PLAT
+    (bloc roof retire) si le squelette a trous degenere. Ne touche a AUCUN autre batiment."""
+    log(f"--cours : chargement {OUT_PATH}")
+    with open(OUT_PATH, encoding="utf-8") as f:
+        root = json.load(f)
+    buildings = root["buildings"]
+    n_cour = n_recomp = n_flat = n_sans_roof = n_bad_orient = n_flat_cut = 0
+    for b in buildings:
+        holes = b.get("holes")
+        if not holes:
+            continue
+        n_cour += 1
+        roof = b.get("roof")
+        if roof is None:
+            # J3c cours : un batiment a cours SANS toit en pente (alts IGN absentes ou
+            # toit trop plat) restait un PRISME PLEIN — le C++ conditionne la decoupe
+            # des cours a l'existence d'un bloc roof (bUseHoles = Roof != nullptr). C'est
+            # LE bug du "bloc blanc qui recouvre le passage". On lui fabrique donc un toit
+            # QUASI PLAT (delta 0,5 m, invisible) portant les faces du squelette a trous :
+            # le C++ monte alors les murs de cour et ajoure le toit, exactement comme pour
+            # un toit en pente. mat/tint restent au defaut (tuile, 0,95 blanc) -> l'aspect
+            # plat blanc est INCHANGE, seule la cour s'ouvre.
+            h = float(b.get("h") or height_of(b))
+            delta = 0.5
+            eave = round(h - delta, 1)
+            if eave < 2.0:                 # trop bas pour un egout valide (ParseRoof) -> plein
+                n_sans_roof += 1
+                continue
+            ring = [(float(x), float(y)) for x, y in b["pts"]]
+            hs = [[(float(x), float(y)) for x, y in hh] for hh in holes]
+            if _ring_area2(ring) <= 0 or any(_ring_area2(hh) >= 0 for hh in hs):
+                n_bad_orient += 1
+                continue
+            try:
+                v, faces, htotal = skeleton_faces(ring, hs)
+                n = len(ring)
+                b["roof"] = {"eave": eave, "delta": delta, "mat": mat_of(b),
+                             "sv": v[n + htotal:], "f": faces}
+                n_flat_cut += 1
+            except Exception as e:  # noqa: BLE001
+                n_sans_roof += 1   # squelette a trous degenere -> reste plein (rare)
+                log(f"  cour (toit plat) degeneree -> reste pleine : {str(e)[:50]}")
+            continue
+        # VERBATIM : aucun dedup/reorient (le C++ lit ces memes sommets sans les toucher).
+        ring = [(float(x), float(y)) for x, y in b["pts"]]
+        hs = [[(float(x), float(y)) for x, y in h] for h in holes]
+        if _ring_area2(ring) <= 0 or any(_ring_area2(h) >= 0 for h in hs):
+            # contour non CCW ou trou non CW : donnee incoherente -> plat de secours.
+            n_bad_orient += 1
+            b.pop("roof", None)
+            n_flat += 1
+            continue
+        try:
+            v, faces, htotal = skeleton_faces(ring, hs)
+            n = len(ring)
+            roof["sv"] = v[n + htotal:]
+            roof["f"] = faces
+            n_recomp += 1
+        except Exception as e:  # noqa: BLE001
+            b.pop("roof", None)
+            n_flat += 1
+            log(f"  cour degeneree -> toit plat : {str(e)[:60]}")
+    with open(OUT_PATH, "w", encoding="utf-8") as f:
+        f.write(_dumps_bati(root))
+    log(f"FIN --cours : {n_cour} batiments a cour ; {n_recomp} toits en pente recalcules "
+        f"avec trous, {n_flat_cut} toits PLATS ajoures (quasi-plat + cours decoupees), "
+        f"{n_flat} plats de secours (dont {n_bad_orient} orientation incoherente), "
+        f"{n_sans_roof} restent pleins (egout trop bas ou squelette degenere)")
+    return 0
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--cours", action="store_true")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--exclude", type=str, default="")
     args = ap.parse_args()
     if args.selftest:
         sys.exit(selftest())
+    if args.cours:
+        sys.exit(cours_pass())
 
     excl = set(int(x) for x in args.exclude.split(",") if x.strip())
     log(f"chargement {IN_PATH}")

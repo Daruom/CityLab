@@ -2856,9 +2856,13 @@ namespace
 		return 10; // tuile terre cuite — defaut toulousain (verrou 1 : ~79 % tuile)
 	}
 
-	// Lit et VALIDE le bloc "roof" d'un batiment (N = nombre de points de l'anneau).
-	// false = pas de toit en pente (l'appelant retombe sur le toit plat).
-	bool ParseRoof(const TSharedPtr<FJsonObject>& Bldg, int32 N, FRoofData& Out)
+	// Lit et VALIDE le bloc "roof" d'un batiment (N = nombre de points du contour).
+	// Holes = anneaux de cour (peut etre vide) : l'espace d'indices des faces est alors
+	// contour(N) ++ trous(HTotal) ++ squelette(Skel), et la 1re arete d'un versant peut
+	// etre une arete du contour OU d'un trou (avant-toit de cour). Vide = comportement
+	// historique bit-a-bit. false = pas de toit en pente (l'appelant retombe sur plat).
+	bool ParseRoof(const TSharedPtr<FJsonObject>& Bldg, int32 N,
+		const TArray<TArray<FVector2D>>& Holes, FRoofData& Out)
 	{
 		const TSharedPtr<FJsonObject>* RoofObj = nullptr;
 		if (!Bldg->TryGetObjectField(TEXT("roof"), RoofObj))
@@ -2906,6 +2910,25 @@ namespace
 		{
 			return false;
 		}
+		// Sommets de BORD (contour + trous), tous a d = 0 ; le squelette vient apres.
+		int32 HTotal = 0;
+		for (const TArray<FVector2D>& H : Holes) { HTotal += H.Num(); }
+		const int32 NB = N + HTotal;
+		// Aretes de BORD admissibles comme 1re arete d'un versant (egout exterieur OU
+		// avant-toit de cour) — contrat du prep (skeleton_faces valide l'identique).
+		// Sans trou : Bnd = les seules aretes (i, i+1) du contour, donc ce test est
+		// STRICTEMENT equivalent a l'ancien Face[0]<N && Face[1]<N && voisines.
+		TSet<TPair<int32, int32>> Bnd;
+		for (int32 i = 0; i < N; ++i) { Bnd.Add(TPair<int32, int32>(i, (i + 1) % N)); }
+		{
+			int32 Base = N;
+			for (const TArray<FVector2D>& H : Holes)
+			{
+				const int32 M = H.Num();
+				for (int32 i = 0; i < M; ++i) { Bnd.Add(TPair<int32, int32>(Base + i, Base + (i + 1) % M)); }
+				Base += M;
+			}
+		}
 		Out.Faces.Reset(Fa->Num());
 		for (const TSharedPtr<FJsonValue>& FV : *Fa)
 		{
@@ -2913,14 +2936,14 @@ namespace
 			for (const TSharedPtr<FJsonValue>& IV : FV->AsArray())
 			{
 				const int32 Idx = (int32)IV->AsNumber();
-				if (Idx < 0 || Idx >= N + Out.Skel.Num())
+				if (Idx < 0 || Idx >= NB + Out.Skel.Num())
 				{
 					return false;
 				}
 				Face.Add(Idx);
 			}
-			// Contrat du prep : la 1re arete de chaque versant = une arete de l'anneau.
-			if (Face.Num() < 3 || Face[0] >= N || Face[1] >= N || (Face[1] - Face[0] + N) % N != 1)
+			// Contrat du prep : la 1re arete de chaque versant = une arete de bord.
+			if (Face.Num() < 3 || !Bnd.Contains(TPair<int32, int32>(Face[0], Face[1])))
 			{
 				return false;
 			}
@@ -3071,7 +3094,7 @@ namespace
 	void BuildPolygonBuildingDesktop(FCityMeshBuilder& Wall, FCityMeshBuilder& Glass,
 		const TArray<FVector2D>& PtsCm, float Hcm, const FVector3f& Tint, int32 WallTile,
 		float ZBaseCm, float SocleDepthCm, bool bReveals, bool bBakedShade,
-		const FRoofData* Roof = nullptr)
+		const TArray<TArray<FVector2D>>& Holes, const FRoofData* Roof = nullptr)
 	{
 		const int32 Floors = FMath::Clamp(FMath::RoundToInt32(Hcm / 290.f), 1, 40);
 		const float FloorH = Hcm / Floors;
@@ -3080,11 +3103,17 @@ namespace
 		{
 			return bBakedShade ? Shade(C, Nrm, Zrel) : C;
 		};
-		const int32 N = PtsCm.Num();
+		// Un anneau de murs. Appele sur le CONTOUR (exterieur, CCW -> normale sortante)
+		// puis, si cour, sur chaque TROU (CW -> la meme formule Nout(dy,-dx) pointe vers
+		// l'interieur de la cour = la bonne face). Le corps est l'ancienne boucle d'aretes,
+		// inchangee : sans cour, seul le contour est monte -> geometrie bit-a-bit identique.
+		auto BuildWallRing = [&](const TArray<FVector2D>& Ring)
+		{
+		const int32 N = Ring.Num();
 		for (int32 e = 0; e < N; ++e)
 		{
-			const FVector2D A2 = PtsCm[e];
-			const FVector2D B2 = PtsCm[(e + 1) % N];
+			const FVector2D A2 = Ring[e];
+			const FVector2D B2 = Ring[(e + 1) % N];
 			const FVector2D Dir2 = B2 - A2;
 			const float Len = Dir2.Size();
 			if (Len < 30.f)
@@ -3204,6 +3233,23 @@ namespace
 			}
 		}
 
+		};
+		BuildWallRing(PtsCm);
+		// Cours : murs interieurs (face tournee vers la cour) montes UNIQUEMENT quand le
+		// toit en pente a trous existe ; sinon le toit plat couvre la cour et on garde le
+		// batiment plein (repli documente). Sans cour, seul le contour est monte : la
+		// geometrie est bit-a-bit identique a l'historique.
+		const bool bUseHoles = (Roof != nullptr) && (Holes.Num() > 0);
+		if (bUseHoles)
+		{
+			for (const TArray<FVector2D>& H : Holes)
+			{
+				BuildWallRing(H);
+			}
+		}
+
+		// N = nombre de sommets du CONTOUR (base de l'espace d'indices du toit).
+		const int32 N = PtsCm.Num();
 		// Toit : versants du squelette droit si fournis (J3b), sinon plat historique.
 		// Quasi blanc en vertex color (la sous-tuile porte la couleur du materiau).
 		// J3c : les VERSANTS prennent Roof->Tint (couleur ortho reelle du toit) ; le
@@ -3216,6 +3262,22 @@ namespace
 			// arete du versant, contrat du prep), V le long du rampant (longueur
 			// reelle) — les rangees de tuiles restent paralleles a l'egout.
 			const float SlopeLen = FMath::Sqrt(1.f + FMath::Square(Roof->DeltaCm / Roof->MaxDcm));
+			// Espace de sommets du toit = contour(N) ++ trous(Holes, a plat) ++ squelette.
+			// C'est le contrat EXACT du prep (j3b_prep_toits.py) : le C++ reconstruit ici
+			// le meme espace pour poser les faces. Sans cour (Holes vide), Idx>=N tombe
+			// directement sur le squelette -> mapping identique a l'historique.
+			auto RoofVert = [&](int32 Idx, FVector2D& OutXY, float& OutD)
+			{
+				if (Idx < N) { OutXY = PtsCm[Idx]; OutD = 0.f; return; }
+				int32 j = Idx - N;
+				for (const TArray<FVector2D>& H : Holes)
+				{
+					if (j < H.Num()) { OutXY = H[j]; OutD = 0.f; return; }
+					j -= H.Num();
+				}
+				OutXY = FVector2D(Roof->Skel[j].X, Roof->Skel[j].Y);
+				OutD = Roof->Skel[j].Z;
+			};
 			for (const TArray<int32>& Face : Roof->Faces)
 			{
 				const int32 Nf = Face.Num();
@@ -3227,10 +3289,9 @@ namespace
 				D.Reserve(Nf);
 				for (const int32 Idx : Face)
 				{
-					const bool bRing = Idx < N;
-					const FVector2D XY = bRing ? PtsCm[Idx]
-						: FVector2D(Roof->Skel[Idx - N].X, Roof->Skel[Idx - N].Y);
-					const float d = bRing ? 0.f : Roof->Skel[Idx - N].Z;
+					FVector2D XY;
+					float d;
+					RoofVert(Idx, XY, d);
 					C.Add(FVector3f((float)XY.X, (float)XY.Y,
 						ZBaseCm + Hcm + Roof->DeltaCm * d / Roof->MaxDcm));
 					C2.Add(XY);
@@ -3509,24 +3570,82 @@ namespace
 	// d'etre : les murs Nanite ne doivent JAMAIS servir de collision — leur
 	// fallback decime (~0,1 %) laisse les facades traversables (sonde 2026-07-25).
 	// Collision pure : ni teinte utile, ni UV, jamais rendu (pattern _Col du sol).
+	// Holes / Roof (cours J3b) : quand un batiment a un toit en pente a trous, la
+	// collision devient un PUITS — murs interieurs de cour en plus, et planchers/toits
+	// AJOURES (tessellation du toit = contour ++ trous ++ squelette, mise a plat) au lieu
+	// de l'emprise pleine, pour que le sol de la cour reste ouvert (pas de "beton"). Sans
+	// cour (Holes vide OU Roof nul), on garde EXACTEMENT le prisme plein historique.
 	void BuildCollisionPrism(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm,
-		float TopZCm, float BottomZCm)
+		float TopZCm, float BottomZCm,
+		const TArray<TArray<FVector2D>>& Holes = TArray<TArray<FVector2D>>(),
+		const FRoofData* Roof = nullptr)
 	{
 		const FVector3f White(1.f, 1.f, 1.f);
-		const int32 N = PtsCm.Num();
-		for (int32 e = 0; e < N; ++e)
+		// Un anneau de murs lateraux (contour ou cour). Meme quad des deux cotes de la
+		// convention : la collision est double-face, l'orientation de la normale n'importe pas.
+		auto SideWalls = [&](const TArray<FVector2D>& Ring)
 		{
-			const FVector2D A2 = PtsCm[e];
-			const FVector2D B2 = PtsCm[(e + 1) % N];
-			if ((B2 - A2).Size() < 1.0)
+			const int32 M = Ring.Num();
+			for (int32 e = 0; e < M; ++e)
 			{
-				continue;
+				const FVector2D A2 = Ring[e];
+				const FVector2D B2 = Ring[(e + 1) % M];
+				if ((B2 - A2).Size() < 1.0)
+				{
+					continue;
+				}
+				const FVector2D T2 = (B2 - A2).GetSafeNormal();
+				const FVector3f Nout(T2.Y, -T2.X, 0.f);
+				QM.AddQuad(QM.WallGroup,
+					FVector3f(A2.X, A2.Y, BottomZCm), FVector3f(B2.X, B2.Y, BottomZCm),
+					FVector3f(B2.X, B2.Y, TopZCm), FVector3f(A2.X, A2.Y, TopZCm), Nout, White);
 			}
-			const FVector2D T2 = (B2 - A2).GetSafeNormal();
-			const FVector3f Nout(T2.Y, -T2.X, 0.f);
-			QM.AddQuad(QM.WallGroup,
-				FVector3f(A2.X, A2.Y, BottomZCm), FVector3f(B2.X, B2.Y, BottomZCm),
-				FVector3f(B2.X, B2.Y, TopZCm), FVector3f(A2.X, A2.Y, TopZCm), Nout, White);
+		};
+		SideWalls(PtsCm);
+		const bool bUseHoles = (Roof != nullptr) && (Holes.Num() > 0);
+		if (bUseHoles)
+		{
+			const int32 N = PtsCm.Num();
+			for (const TArray<FVector2D>& H : Holes)
+			{
+				SideWalls(H);
+			}
+			// Espace de sommets = contour ++ trous ++ squelette (identique au toit).
+			auto CapVert = [&](int32 Idx) -> FVector2D
+			{
+				if (Idx < N) { return PtsCm[Idx]; }
+				int32 j = Idx - N;
+				for (const TArray<FVector2D>& H : Holes)
+				{
+					if (j < H.Num()) { return H[j]; }
+					j -= H.Num();
+				}
+				return FVector2D(Roof->Skel[j].X, Roof->Skel[j].Y);
+			};
+			// Planchers ajoures : chaque versant (polygone simple) triangule par ear-clip
+			// (comme le rendu du toit) puis pose a plat, en haut ET en bas.
+			for (const TArray<int32>& Face : Roof->Faces)
+			{
+				TArray<FVector2D> C2;
+				C2.Reserve(Face.Num());
+				for (const int32 Idx : Face)
+				{
+					C2.Add(CapVert(Idx));
+				}
+				TArray<int32> Tris;
+				TriangulateRing(C2, Tris);
+				for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
+				{
+					const FVector2D& P0 = C2[Tris[t]];
+					const FVector2D& P1 = C2[Tris[t + 1]];
+					const FVector2D& P2 = C2[Tris[t + 2]];
+					QM.AddTri(QM.WallGroup, FVector3f(P0.X, P0.Y, TopZCm), FVector3f(P1.X, P1.Y, TopZCm),
+						FVector3f(P2.X, P2.Y, TopZCm), FVector3f(0, 0, 1), White);
+					QM.AddTri(QM.WallGroup, FVector3f(P0.X, P0.Y, BottomZCm), FVector3f(P1.X, P1.Y, BottomZCm),
+						FVector3f(P2.X, P2.Y, BottomZCm), FVector3f(0, 0, -1), White);
+				}
+			}
+			return;
 		}
 		TArray<int32> Tris;
 		TriangulateRing(PtsCm, Tris);
@@ -3882,6 +4001,25 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			FVector2D Centroid(0, 0);
 			for (const FVector2D& P : Pts) { Centroid += P; }
 			Centroid /= Pts.Num();
+			// Cours interieures (J3b cours) : anneaux CW (metres) livres par
+			// j3b_ajoute_cours.py. Chaque trou -> mur de cour + toit qui retombe vers
+			// l'avant-toit interieur + collision ajouree. Ignore si le contour a du etre
+			// reoriente (bReversed) : l'alignement des indices toit/trous exige le meme
+			// contour CCW que le prep. Absent = batiment plein (compat totale).
+			TArray<TArray<FVector2D>> Holes;
+			const TArray<TSharedPtr<FJsonValue>>* HolesJson = nullptr;
+			if (!bReversed && O->TryGetArrayField(TEXT("holes"), HolesJson))
+			{
+				for (const TSharedPtr<FJsonValue>& HV : *HolesJson)
+				{
+					TArray<FVector2D> Hole;
+					ReadPts(HV->AsArray(), Hole);
+					if (Hole.Num() >= 3)
+					{
+						Holes.Add(MoveTemp(Hole));
+					}
+				}
+			}
 			const float Hcm = O->GetNumberField(TEXT("h")) * 100.f;
 			const FString Usage = O->GetStringField(TEXT("u"));
 			const FVector3f Tint = UsageTint(Usage, Index);
@@ -3902,7 +4040,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				// (coherent avec h = faitage - sol de la BD TOPO). Le prisme de
 				// collision reste a ZBase + h (plan du faitage).
 				FRoofData Roof;
-				const bool bPitched = !bReversed && ParseRoof(O, Pts.Num(), Roof)
+				const bool bPitched = !bReversed && ParseRoof(O, Pts.Num(), Holes, Roof)
 					&& Roof.EaveCm <= Hcm + 50.f;
 				const float WallHcm = bPitched ? FMath::Min(Roof.EaveCm, Hcm) : Hcm;
 				// Lot B : fenetres geometriques (en creux si bWindowReveals) ; les
@@ -3911,7 +4049,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				FCityMeshBuilder& GlassB = Gen.bSplitWallGlass
 					? GetIn(BldgGlassCells, Centroid, Cell, bLinearColors, false) : WallB;
 				BuildPolygonBuildingDesktop(WallB, GlassB, Pts, WallHcm, Tint, UsageTile(Usage, Index),
-					ZBase, SocleDepth, Gen.bWindowReveals, bBakedShade, bPitched ? &Roof : nullptr);
+					ZBase, SocleDepth, Gen.bWindowReveals, bBakedShade, Holes, bPitched ? &Roof : nullptr);
 				if (bPitched)
 				{
 					++Summary.RoofsPitched;
@@ -3919,7 +4057,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				// Verrou 2 : prisme de collision dedie, meme pose — les murs Nanite ne
 				// servent JAMAIS de collision (fallback decime = facades traversables).
 				BuildCollisionPrism(GetIn(BldgColCells, Centroid, Cell), Pts,
-					ZBase + Hcm, ZBase - SocleDepth);
+					ZBase + Hcm, ZBase - SocleDepth, Holes, bPitched ? &Roof : nullptr);
 			}
 			else
 			{

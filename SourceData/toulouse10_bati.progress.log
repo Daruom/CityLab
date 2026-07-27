@@ -35,3 +35,8 @@
 2026-07-25 22:34:55    plat : squelette : list.remove(x): x not in list x2
 2026-07-25 22:34:55    plat : squelette : (Infinite loop) circular reference detec x2
 2026-07-25 22:34:55    plat : squelette : 'NoneType' object is not iterable x2
+2026-07-27 16:44:01  --cours : chargement C:\Users\User\Documents\Unreal Projects\CityLab\Tools\..\SourceData\toulouse10_bati.json
+2026-07-27 16:44:12  FIN --cours : 579 batiments a cour ; 492 toits recalcules avec trous, 0 plats de secours (dont 0 orientation incoherente), 87 sans roof prealable (restent plats)
+2026-07-27 20:03:50  --cours : chargement C:\Users\User\Documents\Unreal Projects\CityLab\Tools\..\SourceData\toulouse10_bati.json
+2026-07-27 20:03:59    cour (toit plat) degeneree -> reste pleine : 1re arete hors bord
+2026-07-27 20:04:03  FIN --cours : 579 batiments a cour ; 492 toits en pente recalcules avec trous, 86 toits PLATS ajoures (quasi-plat + cours decoupees), 0 plats de secours (dont 0 orientation incoherente), 1 restent pleins (egout trop bas ou squelette degenere)

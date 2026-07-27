@@ -1,0 +1,186 @@
+2026-07-27 14:11:16  === ROGNAGE DES EMPRISES SUR LE CADASTRE (fermeture +0.20 m) ===
+2026-07-27 14:11:17  batiments : 131357 (C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\toulouse10_bati.json)
+2026-07-27 14:11:18  parcelles : 87092 lues, 2285 retenues, 0 invalides ecartees
+2026-07-27 14:11:18  index spatial pret (1.5 s)
+2026-07-27 14:11:18    10000/131357 (0 s, modifies 1, toits refaits 0)
+2026-07-27 14:11:19    20000/131357 (1 s, modifies 1, toits refaits 0)
+2026-07-27 14:11:19    30000/131357 (1 s, modifies 1, toits refaits 0)
+2026-07-27 14:11:19    40000/131357 (1 s, modifies 1, toits refaits 0)
+2026-07-27 14:11:21    50000/131357 (3 s, modifies 133, toits refaits 125)
+2026-07-27 14:11:23    60000/131357 (5 s, modifies 640, toits refaits 596)
+2026-07-27 14:11:24    70000/131357 (6 s, modifies 702, toits refaits 651)
+2026-07-27 14:11:24    80000/131357 (6 s, modifies 702, toits refaits 651)
+2026-07-27 14:11:25    90000/131357 (7 s, modifies 702, toits refaits 651)
+2026-07-27 14:11:25    100000/131357 (7 s, modifies 702, toits refaits 651)
+2026-07-27 14:11:25    110000/131357 (7 s, modifies 702, toits refaits 651)
+2026-07-27 14:11:26    120000/131357 (8 s, modifies 702, toits refaits 651)
+2026-07-27 14:11:26    130000/131357 (8 s, modifies 709, toits refaits 651)
+2026-07-27 14:11:26  passe terminee en 8 s
+2026-07-27 14:11:26  aire batie : 608399 m2 -> 604929 m2  (0.570 % rognes)
+2026-07-27 14:11:26    inchange                                       : 1783
+2026-07-27 14:11:26    modifie                                        : 710
+2026-07-27 14:11:26    toit recalcule                                 : 651
+2026-07-27 14:11:26    hors cadastre -> intact                        : 14
+2026-07-27 14:11:26    <50 %% dans ses parcelles -> intact            : 5
+2026-07-27 14:11:26                                                   : 1
+2026-07-27 14:11:26    trou ignore (schema anneau simple)             : 1
+2026-07-27 14:11:26    perte max 185.5 m2 (index 52100), p99 52.7 m2, mediane 0.08 m2
+2026-07-27 14:11:26  --dry-run : rien n'a ete ecrit
+2026-07-27 14:11:55  === ROGNAGE DES EMPRISES SUR LE CADASTRE (fermeture +0.20 m) ===
+2026-07-27 14:11:56  batiments : 131357 (C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\toulouse10_bati.json)
+2026-07-27 14:11:59  parcelles : 87092 lues, 87092 retenues, 0 invalides ecartees
+2026-07-27 14:11:59  index spatial pret (4.1 s)
+2026-07-27 14:12:05    10000/131357 (6 s, modifies 1006, toits refaits 793)
+2026-07-27 14:12:12    20000/131357 (12 s, modifies 2346, toits refaits 1951)
+2026-07-27 14:12:19    30000/131357 (20 s, modifies 4655, toits refaits 4015)
+2026-07-27 14:12:26    40000/131357 (27 s, modifies 6239, toits refaits 5514)
+2026-07-27 14:12:34    50000/131357 (35 s, modifies 7740, toits refaits 6888)
+2026-07-27 14:12:42    60000/131357 (43 s, modifies 9704, toits refaits 8670)
+2026-07-27 14:12:50    70000/131357 (51 s, modifies 11875, toits refaits 10660)
+2026-07-27 14:12:57    80000/131357 (58 s, modifies 13182, toits refaits 11810)
+2026-07-27 14:13:04    90000/131357 (65 s, modifies 14384, toits refaits 12858)
+2026-07-27 14:13:10    100000/131357 (71 s, modifies 15307, toits refaits 13695)
+2026-07-27 14:13:17    110000/131357 (78 s, modifies 16712, toits refaits 14892)
+2026-07-27 14:13:26    120000/131357 (87 s, modifies 18714, toits refaits 16708)
+2026-07-27 14:13:33    130000/131357 (94 s, modifies 19737, toits refaits 17280)
+2026-07-27 14:13:33  passe terminee en 94 s
+2026-07-27 14:13:33  aire batie : 18391684 m2 -> 18340777 m2  (0.277 % rognes)
+2026-07-27 14:13:33    inchange                                       : 111299
+2026-07-27 14:13:33    modifie                                        : 19852
+2026-07-27 14:13:33    toit recalcule                                 : 17280
+2026-07-27 14:13:33    hors cadastre -> intact                        : 126
+2026-07-27 14:13:33    <50 %% dans ses parcelles -> intact            : 80
+2026-07-27 14:13:33                                                   : 21
+2026-07-27 14:13:33    trou ignore (schema anneau simple)             : 21
+2026-07-27 14:13:33    ALERTE decoupe en 2 morceaux -> plus grande part : 17
+2026-07-27 14:13:33    toit -> plat de secours                        : 4
+2026-07-27 14:13:33      motif plat : 1re arete hors emprise          : 3
+2026-07-27 14:13:33    ALERTE decoupe en 3 morceaux -> plus grande part : 2
+2026-07-27 14:13:33      motif plat : 'NoneType' object is not iterable : 1
+2026-07-27 14:13:33    perte max 4773.8 m2 (index 121324), p99 25.6 m2, mediane 0.02 m2
+2026-07-27 14:13:33    ALERTE index 766 (1316.2 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 914 (541.2 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 42291 (1269.2 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 67920 (167.7 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 67973 (585.5 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 69460 (76.4 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 76184 (347.8 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 76192 (321.3 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 76824 (319.4 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 76841 (7.5 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 80678 (3206.3 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 96168 (23.9 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 101953 (2811.9 m2) : ALERTE decoupe en 3 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 125930 (163.0 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 126054 (454.4 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 126745 (727.5 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 129380 (1003.9 m2) : ALERTE decoupe en 3 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 130563 (1750.0 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33    ALERTE index 131031 (810.4 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:13:33  sauvegarde ecrite : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\toulouse10_bati.avant_rognage.json
+2026-07-27 14:13:33  ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\toulouse10_bati.json (51.9 Mo, 131357 batiments)
+2026-07-27 14:13:33  TOTAL 98 s
+2026-07-27 14:42:19  === ROGNAGE DES EMPRISES SUR LE CADASTRE (fermeture d=0.40 m, epaisseur e=1.00 m) ===
+2026-07-27 14:42:20  batiments : 131357 (ENTREE = C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\toulouse10_bati.avant_rognage.json)
+2026-07-27 14:42:23  parcelles : 87092 lues, 87092 retenues, 0 invalides ecartees
+2026-07-27 14:42:23  index spatial pret (3.9 s)
+2026-07-27 14:42:34    10000/131357 (11 s, modifies 1996, toits refaits 1473)
+2026-07-27 14:42:45    20000/131357 (22 s, modifies 4752, toits refaits 3759)
+2026-07-27 14:42:58    30000/131357 (35 s, modifies 9198, toits refaits 7627)
+2026-07-27 14:43:10    40000/131357 (47 s, modifies 13213, toits refaits 11320)
+2026-07-27 14:43:24    50000/131357 (61 s, modifies 16488, toits refaits 14236)
+2026-07-27 14:43:40    60000/131357 (76 s, modifies 21619, toits refaits 18748)
+2026-07-27 14:43:54    70000/131357 (91 s, modifies 27141, toits refaits 23678)
+2026-07-27 14:44:06    80000/131357 (102 s, modifies 29728, toits refaits 25897)
+2026-07-27 14:44:16    90000/131357 (113 s, modifies 31633, toits refaits 27470)
+2026-07-27 14:44:26    100000/131357 (123 s, modifies 33354, toits refaits 28903)
+2026-07-27 14:44:39    110000/131357 (136 s, modifies 36256, toits refaits 31214)
+2026-07-27 14:44:55    120000/131357 (151 s, modifies 39954, toits refaits 34445)
+2026-07-27 14:45:08    130000/131357 (165 s, modifies 42193, toits refaits 35820)
+2026-07-27 14:45:10  passe terminee en 166 s
+2026-07-27 14:45:10  aire batie : 18391684 m2 -> 18339020 m2  (0.286 % rognes)
+2026-07-27 14:45:10    inchange                                       : 88753
+2026-07-27 14:45:10    _aire_retiree                                  : 51087.0 m2
+2026-07-27 14:45:10    morceau retire (mince)                         : 44232
+2026-07-27 14:45:10    modifie                                        : 42367
+2026-07-27 14:45:10    toit recalcule                                 : 35823
+2026-07-27 14:45:10    _aire_rendue                                   : 13327.7 m2
+2026-07-27 14:45:10    morceau RENDU (epais)                          : 191
+2026-07-27 14:45:10    hors cadastre -> intact                        : 126
+2026-07-27 14:45:10    <50 %% dans ses parcelles -> intact            : 111
+2026-07-27 14:45:10                                                   : 20
+2026-07-27 14:45:10    trou ignore (schema anneau simple)             : 20
+2026-07-27 14:45:10    ALERTE decoupe en 2 morceaux -> plus grande part : 14
+2026-07-27 14:45:10    toit -> plat de secours                        : 3
+2026-07-27 14:45:10      motif plat : 1re arete hors emprise          : 2
+2026-07-27 14:45:10      motif plat : 'NoneType' object is not iterable : 1
+2026-07-27 14:45:10    perte max 1013.9 m2 (index 80678), p99 19.1 m2, mediane 0.04 m2
+2026-07-27 14:45:10    ALERTE index 12585 (161.0 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10    ALERTE index 19445 (161.1 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10    ALERTE index 32331 (92.3 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10    ALERTE index 53880 (13.3 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10    ALERTE index 69460 (76.4 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10    ALERTE index 76184 (347.8 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10    ALERTE index 76192 (321.3 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10    ALERTE index 76841 (7.5 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10    ALERTE index 79387 (37.4 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10    ALERTE index 80678 (3206.3 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10    ALERTE index 125930 (163.0 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10    ALERTE index 126054 (454.4 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10    ALERTE index 126745 (727.5 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10    ALERTE index 129220 (4800.7 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:45:10  sauvegarde deja presente, conservee : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\toulouse10_bati.avant_rognage.json
+2026-07-27 14:45:10  ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\toulouse10_bati.json (52.8 Mo, 131357 batiments)
+2026-07-27 14:45:10  TOTAL 170 s
+2026-07-27 14:47:25  === ROGNAGE DES EMPRISES SUR LE CADASTRE (fermeture d=0.40 m, epaisseur e=1.00 m) ===
+2026-07-27 14:47:26  batiments : 131357 (ENTREE = C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\toulouse10_bati.avant_rognage.json)
+2026-07-27 14:47:29  parcelles : 87092 lues, 87092 retenues, 0 invalides ecartees
+2026-07-27 14:47:29  index spatial pret (3.9 s)
+2026-07-27 14:47:39    10000/131357 (11 s, modifies 1996, toits refaits 1473)
+2026-07-27 14:47:50    20000/131357 (22 s, modifies 4752, toits refaits 3759)
+2026-07-27 14:48:03    30000/131357 (35 s, modifies 9198, toits refaits 7627)
+2026-07-27 14:48:15    40000/131357 (47 s, modifies 13213, toits refaits 11320)
+2026-07-27 14:48:29    50000/131357 (60 s, modifies 16488, toits refaits 14236)
+2026-07-27 14:48:45    60000/131357 (76 s, modifies 21619, toits refaits 18749)
+2026-07-27 14:48:59    70000/131357 (90 s, modifies 27141, toits refaits 23679)
+2026-07-27 14:49:11    80000/131357 (102 s, modifies 29728, toits refaits 25898)
+2026-07-27 14:49:21    90000/131357 (112 s, modifies 31633, toits refaits 27471)
+2026-07-27 14:49:31    100000/131357 (122 s, modifies 33354, toits refaits 28904)
+2026-07-27 14:49:43    110000/131357 (135 s, modifies 36256, toits refaits 31216)
+2026-07-27 14:49:59    120000/131357 (150 s, modifies 39954, toits refaits 34447)
+2026-07-27 14:50:12    130000/131357 (164 s, modifies 42193, toits refaits 35822)
+2026-07-27 14:50:14  passe terminee en 165 s
+2026-07-27 14:50:14  aire batie : 18391684 m2 -> 18339020 m2  (0.286 % rognes)
+2026-07-27 14:50:14    inchange                                       : 88753
+2026-07-27 14:50:14    _aire_retiree                                  : 51087.0 m2
+2026-07-27 14:50:14    morceau retire (mince)                         : 44232
+2026-07-27 14:50:14    modifie                                        : 42367
+2026-07-27 14:50:14    toit recalcule                                 : 35825
+2026-07-27 14:50:14    _aire_rendue                                   : 13327.7 m2
+2026-07-27 14:50:14    morceau RENDU (epais)                          : 191
+2026-07-27 14:50:14    hors cadastre -> intact                        : 126
+2026-07-27 14:50:14    <50 %% dans ses parcelles -> intact            : 111
+2026-07-27 14:50:14                                                   : 20
+2026-07-27 14:50:14    trou ignore (schema anneau simple)             : 20
+2026-07-27 14:50:14    ALERTE decoupe en 2 morceaux -> plus grande part : 14
+2026-07-27 14:50:14      toit sauve au repli simplify 0.05            : 2
+2026-07-27 14:50:14    toit -> plat de secours                        : 1
+2026-07-27 14:50:14      motif plat : 'NoneType' object is not iterable : 1
+2026-07-27 14:50:14    perte max 1013.9 m2 (index 80678), p99 19.1 m2, mediane 0.04 m2
+2026-07-27 14:50:14    ALERTE index 12585 (161.0 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14    ALERTE index 19445 (161.1 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14    ALERTE index 32331 (92.3 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14    ALERTE index 53880 (13.3 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14    ALERTE index 69460 (76.4 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14    ALERTE index 76184 (347.8 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14    ALERTE index 76192 (321.3 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14    ALERTE index 76841 (7.5 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14    ALERTE index 79387 (37.4 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14    ALERTE index 80678 (3206.3 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14    ALERTE index 125930 (163.0 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14    ALERTE index 126054 (454.4 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14    ALERTE index 126745 (727.5 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14    ALERTE index 129220 (4800.7 m2) : ALERTE decoupe en 2 morceaux -> plus grande part
+2026-07-27 14:50:14  sauvegarde deja presente, conservee : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\toulouse10_bati.avant_rognage.json
+2026-07-27 14:50:14  ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\toulouse10_bati.json (52.8 Mo, 131357 batiments)
+2026-07-27 14:50:14  TOTAL 169 s

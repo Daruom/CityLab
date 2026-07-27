@@ -17,8 +17,10 @@
 #   2. un JSON par cellule, le RELIEF qui restera maille :
 #        curbs     polylignes de BORDURE (frontiere chaussee <-> trottoir),
 #                  ORIENTEES chaussee A GAUCHE, hors autoroutier (accotement sans
-#                  bordure), hors voirie privee, coupees aux traversees et aux ponts ;
-#        crossings sites de PASSAGE PIETON (axe pieton OSM qui coupe la chaussee) ;
+#                  bordure), hors voirie privee, hors emprise batie, hors bout
+#                  pendant de troncon, coupees aux traversees et aux ponts ;
+#        crossings sites de PASSAGE PIETON — VIDE tant que CROSSINGS_ON est faux
+#                  (couche INFEREE, hors doctrine : voir la constante) ;
 #        axial     tirets de ligne axiale deja decoupes (3 m plein / 1,5 m vide),
 #                  voies >= 2, ecartes de 8 m des carrefours.
 #
@@ -97,6 +99,34 @@ CROSS_DEDUP_M = 7.0
 CROSS_HALF_LEN_M = 2.0  # demi-longueur du passage dans l'axe de la rue (GCrossingHalfLenCm)
 CURB_MIN_LEN_M = 1.5    # une bordure plus courte que ca est un artefact de decoupe
 CURB_SIMPLIFY_M = 0.15
+
+# --- PASSAGES PIETONS : COUPES (doctrine).
+# Toute couche du sol vient d'un POLYGONE REEL : emprise cadastrale, axe BD TOPO x
+# largeur_de_chaussee MESUREE. Les sites de passage, eux, etaient DEVINES : « un axe
+# pieton OSM croise la chaussee, donc il y avait probablement un passage la ». C'est
+# la seule couche inferee de tout le pipeline, et la mesure lui donne tort — sur le
+# km2 proto, 375 des 383 passages poses debordaient de la chaussee et 32 mordaient un
+# batiment. On la coupe : mieux vaut pas de marquage qu'un marquage invente.
+# Le marquage de traversee est de l'HABILLAGE : il se rebranchera le jour ou on aura
+# une vraie donnee (noeuds OSM highway=crossing), pas avant. La fonction
+# crossing_sites reste en place, testee, prete a servir — c'est la CUISSON qui ne
+# l'appelle plus.
+CROSSINGS_ON = False
+# Emprises baties : buffer applique a l'union avant de la retirer du corridor. 20 cm
+# absorbent le desaccord de calage entre le cadastre (parcelles) et le bati, sans
+# manger de trottoir reel.
+BATI_BUFFER_M = 0.20
+# Bordures : marge SUPPLEMENTAIRE autour du bati ou aucune bordure ne se pose (soit
+# 50 cm au total depuis la facade). Une bordure qui longe un mur est un artefact de
+# la decoupe par emprise, pas une marche de la ville.
+BATI_CURB_CLEAR_M = 0.30
+# Bordures : rayon du disque de silence autour d'une extremite PENDANTE de troncon
+# (largeur/2 + cette marge). Le bout PLAT du buffer d'axe (cap_style=2) ferme la
+# chaussee en travers de la rue ; sans ce disque, curb_lines y poserait une marche de
+# 12 cm perpendiculaire a la voie, qui se lit comme un mur. C'est NOTRE artefact de
+# decoupe, pas une donnee de la ville : on le retire, et rien d'autre — la voie
+# s'arrete parce que la donnee dit qu'elle s'arrete.
+CURB_DANGLE_CLEAR_M = 0.5
 
 
 def log(msg):
@@ -272,10 +302,23 @@ def charger_axes_pietons(fen):
 
 
 # ------------------------------------------------------------------- une cellule
-def classes_de_cellule(zone, parcelles, eaux, routes):
-    """corridor / chaussee / privee / gravier d'une emprise donnee (deja elargie de
-    la marge). Meme soustraction que le corridor valide, plus la separation des
-    natures etroites (gravier) et des bandes tombees dans une parcelle (privee)."""
+def classes_de_cellule(zone, parcelles, eaux, routes, batis=None):
+    """corridor / chaussee / privee / gravier / u_bati d'une emprise donnee (deja
+    elargie de la marge). Meme soustraction que le corridor valide, plus la
+    separation des natures etroites (gravier) et des bandes tombees dans une parcelle
+    (privee), plus le retrait des EMPRISES BATIES.
+
+    Le BATI dans le corridor : mesure sur le km2 proto, 5 612 m2 de corridor (2,2 %)
+    et 409 m2 de chaussee (0,4 %) tombaient SOUS des immeubles — le cadastre ne
+    couvre pas tout (14 batiments entierement en zone non cadastree), donc la
+    soustraction zone - parcelles - eau laissait du trottoir peint sous les murs. Une
+    emprise batie est un polygone REEL, exactement comme une parcelle : elle a sa
+    place dans la soustraction.
+
+    EXCEPTION PORCHE : la ou l'AXE ROUTIER LUI-MEME passe sous un batiment, la rue
+    passe VRAIMENT dessous (porche, passage couvert, arcade — Toulouse en est plein :
+    48 m d'axes sur 23 366, soit 0,21 %). Trouer la chaussee la-dessous casserait la
+    rue en deux. On rend donc au corridor la bande de chaussee des porches."""
     u_parc = unary_union(parcelles) if parcelles else None
     u_eau = unary_union(eaux) if eaux else None
     corridor = zone
@@ -290,6 +333,40 @@ def classes_de_cellule(zone, parcelles, eaux, routes):
                  for r in routes if sel(r) and r["largeur"] > 0]
         return C.valide(unary_union(parts)) if parts else zone.difference(zone)
 
+    u_bati = None
+    masque_bati = None      # le bati MOINS les porches : ce qui ne se peint jamais
+    if batis:
+        u_bati = C.valide(unary_union([b.buffer(BATI_BUFFER_M) for b in batis]))
+        if u_bati.is_empty:
+            u_bati = None
+    if u_bati is not None:
+        masque_bati = u_bati
+        avant_bati = corridor                       # corridor cadastral, sans le bati
+        corridor = C.valide(corridor.difference(u_bati))
+        # Les porches, bande par bande : le morceau d'axe reellement sous un
+        # batiment, bufferise a la largeur MESUREE de son propre troncon (meme
+        # buffer que les bandes de chaussee : bout plat, raccord mitre).
+        porches = []
+        for r in routes:
+            if r["pont"] or r["largeur"] <= 0:
+                continue
+            try:
+                sous = r["line"].intersection(u_bati)
+            except Exception:
+                continue
+            if sous.is_empty or sous.length <= 0.0:
+                continue
+            porches.append(sous.buffer(r["largeur"] / 2.0, cap_style=2, join_style=2,
+                                       mitre_limit=3.0))
+        if porches:
+            # ... rendus au corridor, mais SEULEMENT dans ce qui etait deja du
+            # corridor cadastral : un porche ne cree pas de rue la ou le cadastre
+            # dit « parcelle privee ».
+            rendu = C.valide(unary_union(porches).intersection(avant_bati))
+            if not rendu.is_empty:
+                corridor = C.valide(corridor.union(rendu))
+                masque_bati = C.valide(u_bati.difference(rendu))
+
     # Le PONT ne se peint pas : il reste un ruban 3D. On le retire de tout.
     b_pont = bande(lambda r: r["pont"])
     b_large = bande(lambda r: not r["pont"] and not r["etroit"])
@@ -301,13 +378,45 @@ def classes_de_cellule(zone, parcelles, eaux, routes):
     chaussee = C.valide(b_large.intersection(corridor))
     gravier = C.valide(b_etroite.intersection(zone).difference(chaussee))
     privee = C.valide(b_large.intersection(zone).difference(corridor).difference(gravier))
-    return corridor, chaussee, privee, gravier
+    if masque_bati is not None:
+        # gravier et privee se calculent sur la ZONE (une cour, une allee de
+        # residence sont dans une parcelle, donc hors corridor par construction) :
+        # sans ce retrait, tout ce que le corridor vient de perdre sous les murs
+        # reviendrait peint en voirie PRIVEE. Sous un batiment, on ne peint RIEN
+        # (classe 0) — sauf le porche, deja rendu au corridor.
+        gravier = C.valide(gravier.difference(masque_bati))
+        privee = C.valide(privee.difference(masque_bati))
+    # u_bati est rendu TEL QUEL (porches compris) : c'est curb_lines qui s'en sert
+    # comme zone de silence, et une bordure ne se pose pas plus le long d'un mur de
+    # porche que le long d'une facade.
+    return corridor, chaussee, privee, gravier, u_bati
 
 
-def curb_lines(chaussee, cell_box, routes, crossings):
+def dangling_ends(routes):
+    """Extremites PENDANTES : bout de troncon non-pont partage par UN SEUL troncon.
+
+    Meme cle arrondie au decimetre que junction_points (qui, lui, cherche n >= 3) —
+    ici n == 1, c'est-a-dire la vraie impasse (entree de cour, cul-de-sac) ou le bout
+    d'une voie que rien ne prolonge. On rend aussi la largeur du troncon concerne :
+    c'est elle qui donne le rayon du disque de silence des bordures."""
+    compte = {}
+    larg = {}
+    for r in routes:
+        if r["pont"]:
+            continue
+        cs = list(r["line"].coords)
+        for p in (cs[0], cs[-1]):
+            k = (round(p[0] * 10), round(p[1] * 10))
+            compte[k] = compte.get(k, 0) + 1
+            larg[k] = max(larg.get(k, 0.0), float(r["largeur"] or 0.0))
+    return [((k[0] / 10.0, k[1] / 10.0), larg[k]) for k, n in compte.items() if n == 1]
+
+
+def curb_lines(chaussee, cell_box, routes, crossings, u_bati=None):
     """Polylignes de bordure : la frontiere de la chaussee, PRIVEE de ce qui n'a pas
-    de bordure (autoroutier, pont) et de ce qui l'interrompt (les traversees), puis
-    ramenee a la cellule et ORIENTEE chaussee a gauche."""
+    de bordure (autoroutier, pont, emprise batie, bout pendant de troncon) et de ce
+    qui l'interrompt (les traversees), puis ramenee a la cellule et ORIENTEE chaussee
+    a gauche."""
     if chaussee.is_empty:
         return []
     bnd = chaussee.boundary
@@ -315,6 +424,15 @@ def curb_lines(chaussee, cell_box, routes, crossings):
     for r in routes:
         if r["pont"] or r["sans_bordure"]:
             coupes.append(r["line"].buffer(r["largeur"] / 2.0 + 1.0, cap_style=2, join_style=2))
+    # Depuis que le corridor connait le bati, la frontiere de la chaussee longe des
+    # FACADES : sans cette coupe, on maillerait une marche de 12 cm le long des murs.
+    if u_bati is not None and not u_bati.is_empty:
+        coupes.append(u_bati.buffer(BATI_CURB_CLEAR_M))
+    # Bout PLAT du buffer d'axe a une extremite pendante = frontiere de chaussee EN
+    # TRAVERS de la rue. Artefact de notre decoupe : on le fait taire, sans rien
+    # poser a la place.
+    for p, w in dangling_ends(routes):
+        coupes.append(Point(p).buffer(max(w, 0.0) / 2.0 + CURB_DANGLE_CLEAR_M))
     for cr in crossings:
         d = cr["d"]
         n = (-d[1], d[0])
@@ -478,7 +596,7 @@ def axial_dashes(routes, chaussee, cell_box, jonctions):
     return out
 
 
-def cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, preview=True):
+def cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, batis=None, preview=True):
     t0 = time.time()
     x0, y0 = cx * CELL_M, cy * CELL_M
     cell_box = box(x0, y0, x0 + CELL_M, y0 + CELL_M)
@@ -489,7 +607,9 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, preview=True):
     loc_parc = [p for p in parcelles if p.intersects(zone)]
     loc_eau = [e for e in eaux if e.intersects(zone)]
     loc_routes = [r for r in routes if r["line"].intersects(zone)]
-    corridor, chaussee, privee, gravier = classes_de_cellule(zone, loc_parc, loc_eau, loc_routes)
+    loc_bati = [b for b in (batis or []) if b.intersects(zone)]
+    corridor, chaussee, privee, gravier, u_bati = classes_de_cellule(
+        zone, loc_parc, loc_eau, loc_routes, loc_bati)
 
     # --- rasterisation (grille de calcul : cellule + marge, a 24,41 cm/px)
     size = OUT_PX * SS + 2 * MARGIN_PX
@@ -527,8 +647,12 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, preview=True):
     Image.fromarray(rgba, "RGBA").save(png, "PNG", optimize=True)
 
     # --- le RELIEF qui restera maille
-    crossings = crossing_sites(chaussee, cell_box, loc_routes, pietons)
-    curbs = curb_lines(chaussee, cell_box, loc_routes, crossings)
+    # CROSSINGS_ON faux : aucun site, donc aucun quad de passage ET aucune coupe de
+    # bordure a la traversee — les bordures sont desormais continues au droit des
+    # anciens passages devines. C'est VOULU : on ne coupe pas une bordure reelle pour
+    # une traversee qu'on a inferee.
+    crossings = crossing_sites(chaussee, cell_box, loc_routes, pietons) if CROSSINGS_ON else []
+    curbs = curb_lines(chaussee, cell_box, loc_routes, crossings, u_bati)
     jonctions = junction_points(loc_routes)
     dashes = axial_dashes(loc_routes, chaussee, cell_box, jonctions)
 
@@ -606,6 +730,9 @@ def apercu(cx, cy, r_chan, g_chan, curbs, crossings, dashes, x0, y0):
 
 # ------------------------------------------------------------------------ selftest
 def selftest():
+    # Le verrou 11 cuit une cellule bidon a resolution reduite : il touche donc aux
+    # globales de resolution, et les remet en place dans un finally.
+    global OUT_PX, SS, HI
     ok = True
 
     def check(nom, got, att, tol=1e-6):
@@ -656,7 +783,8 @@ def selftest():
         {"line": LineString([(0, 30), (100, 30)]), "largeur": 8.0, "nature": "route a 1 chaussee",
          "pont": True, "voies": 2, "etroit": False, "sans_bordure": False},
     ]
-    corridor, chaussee, privee, gravier = classes_de_cellule(zone, [p1, p2], [], routes)
+    corridor, chaussee, privee, gravier, u_b = classes_de_cellule(zone, [p1, p2], [], routes)
+    check_bool("sans bati : pas d'union batie", u_b is None, True)
     # Corridor = la bande de 10 m entre les parcelles, sur 100 m.
     check("corridor synthetique (m2)", corridor.area, 1000.0, 1.0)
     # La chaussee de 10 m rognee au corridor = la bande entiere ... moins le pont.
@@ -737,6 +865,135 @@ def selftest():
     check("largeur rendue d'une chaussee de 10 m",
           float((cols.max() - cols.min() + 1) * px), 10.0, 0.05)
 
+    # ------------------------------------------------------------------ correctif 2
+    # 8. LE CORRIDOR CONNAIT LE BATI. Scene dediee : corridor de 20 m entre deux
+    #    parcelles, une chaussee de 8 m au milieu, et trois batiments :
+    #      B1 pose sur le corridor, LOIN de tout axe   -> il troue le corridor ;
+    #      B2 a cheval sur le bord de la chaussee      -> il troue la chaussee et
+    #                                                     tue la bordure le long du mur ;
+    #      B3 TRAVERSE par deux axes                   -> PORCHE : la rue passe dessous.
+    zb = box(0, 0, 100, 100)
+    q1 = Polygon([(0, 0), (40, 0), (40, 100), (0, 100)])
+    q2 = Polygon([(60, 0), (100, 0), (100, 100), (60, 100)])
+    r_vert = {"line": LineString([(50, -10), (50, 110)]), "largeur": 8.0,
+              "nature": "route a 1 chaussee", "pont": False, "voies": 2,
+              "etroit": False, "sans_bordure": False}
+    r_hori = {"line": LineString([(-10, 50), (110, 50)]), "largeur": 6.0,
+              "nature": "route a 1 chaussee", "pont": False, "voies": 2,
+              "etroit": False, "sans_bordure": False}
+    routes_b = [r_vert, r_hori]
+    b1 = box(41.0, 20.0, 45.0, 30.0)          # dans le corridor, hors chaussee
+    b2 = box(44.0, 70.0, 48.0, 80.0)          # mord la chaussee (46..54), pas l'axe
+    b3 = box(42.0, 45.0, 58.0, 55.0)          # traverse par les deux axes : porche
+
+    cor0, ch0, _pv0, _gv0, _ub0 = classes_de_cellule(zb, [q1, q2], [], routes_b)
+    check("corridor sans bati (m2)", cor0.area, 2000.0, 1.0)
+    cor1, ch1, pv1, gv1, ub1 = classes_de_cellule(zb, [q1, q2], [], routes_b, [b1])
+    check_bool("union batie rendue", ub1 is not None and not ub1.is_empty, True)
+    # « Exactement l'aire du batiment » = son emprise BUFFEREE de BATI_BUFFER_M,
+    # c'est cette geometrie-la qui est soustraite (le buffer absorbe le desaccord de
+    # calage cadastre / bati).
+    check("corridor - batiment (m2)", cor0.area - cor1.area, b1.buffer(BATI_BUFFER_M).area, 0.02)
+    check("corridor sous batiment (m2)", cor1.intersection(b1).area, 0.0, 1e-6)
+
+    cor2, ch2b, pv2, gv2, ub2 = classes_de_cellule(zb, [q1, q2], [], routes_b, [b2])
+    check("chaussee sous batiment (m2)", ch2b.intersection(b2).area, 0.0, 1e-6)
+    check_bool("la chaussee perd bien du terrain", ch2b.area < ch0.area - 5.0, True)
+    # La voirie PRIVEE ne doit pas ramasser ce que le corridor perd sous les murs.
+    check("privee sous batiment (m2)", pv2.intersection(b2).area, 0.0, 1e-6)
+    lb = curb_lines(ch2b, zb, routes_b, [], ub2)
+    dans_bati = sum(1 for ln in lb for c in ln if b2.contains(Point(c)))
+    check("points de bordure dans le bati", float(dans_bati), 0.0, 0.0)
+    lg_bati = sum(LineString(ln).intersection(b2).length for ln in lb if len(ln) > 1)
+    check("longueur de bordure dans le bati", lg_bati, 0.0, 1e-6)
+    # La coupe ne doit pas tout emporter : la frontiere de la chaussee est ici un
+    # anneau unique (croix), la coupe du batiment l'ouvre — une seule polyligne,
+    # mais qui doit rester longue.
+    lg_reste = sum(LineString(ln).length for ln in lb if len(ln) > 1)
+    check_bool("des bordures subsistent ailleurs", len(lb) >= 1 and lg_reste > 200.0, True)
+
+    # 9. PORCHE : l'axe passe sous le batiment -> la chaussee est CONSERVEE dessous.
+    cor3, ch3, _pv3, _gv3, ub3 = classes_de_cellule(zb, [q1, q2], [], routes_b, [b3])
+    bandes_b = unary_union([r["line"].buffer(r["largeur"] / 2.0, cap_style=2,
+                                             join_style=2, mitre_limit=3.0)
+                            for r in routes_b])
+    att_porche = bandes_b.intersection(b3).area
+    check_bool("le porche a de la surface", att_porche > 100.0, True)
+    check("chaussee conservee sous le porche", ch3.intersection(b3).area, att_porche, 0.5)
+    check_bool("le centre du porche est de la chaussee", ch3.contains(Point(50.0, 50.0)), True)
+    # ... mais le RESTE du batiment (hors bande d'axe) sort quand meme du corridor.
+    reste = b3.difference(bandes_b.buffer(0.25))
+    check("corridor sous le porche hors bande", cor3.intersection(reste).area, 0.0, 0.05)
+
+    # ------------------------------------------------------------------ correctif 3
+    # 10. CUL-DE-SAC : le bout PLAT du buffer ferme la chaussee en travers ; la
+    #     frontiere existe bien dans la geometrie, mais AUCUNE bordure ne s'y pose.
+    zc = box(0, 0, 100, 100)
+    r_impasse = {"line": LineString([(10, 50), (60, 50)]), "largeur": 8.0,
+                 "nature": "route a 1 chaussee", "pont": False, "voies": 1,
+                 "etroit": False, "sans_bordure": False}
+    cor4, ch4, _pv4, _gv4, ub4 = classes_de_cellule(zc, [], [], [r_impasse])
+    pend = dangling_ends([r_impasse])
+    check("extremites pendantes", float(len(pend)), 2.0, 0.0)
+    check("largeur retenue au bout", pend[0][1], 8.0, 1e-9)
+    l4 = curb_lines(ch4, zc, [r_impasse], [])
+    check_bool("bordures d'impasse produites", len(l4) >= 1, True)
+    for bx_, by_ in ((10.0, 50.0), (60.0, 50.0)):
+        rayon = 8.0 / 2.0 + CURB_DANGLE_CLEAR_M
+        disque = Point(bx_, by_).buffer(rayon)
+        # l'artefact EXISTE dans la geometrie de la chaussee ...
+        check_bool("bout plat present dans la chaussee (%d)" % int(bx_),
+                   ch4.boundary.intersection(disque).length > 5.0, True)
+        # ... et il ne ressort PAS en bordure.
+        lg = sum(LineString(ln).intersection(disque).length for ln in l4 if len(ln) > 1)
+        check("bordure au bout pendant (%d)" % int(bx_), lg, 0.0, 1e-6)
+    # Un carrefour en T : l'extremite qui touche deux autres troncons n'est PAS
+    # pendante, elle ne doit pas faire taire la bordure.
+    r_t = [dict(r_impasse, line=LineString([(10, 50), (60, 50)])),
+           dict(r_impasse, line=LineString([(60, 50), (90, 50)])),
+           dict(r_impasse, line=LineString([(60, 50), (60, 90)]))]
+    pend_t = [p for p, _w in dangling_ends(r_t)]
+    check("pendantes du T (le noeud exclu)", float(len(pend_t)), 3.0, 0.0)
+    check_bool("le noeud du T n'est pas pendant",
+               all(math.hypot(p[0] - 60.0, p[1] - 50.0) > 0.5 for p in pend_t), True)
+
+    # ------------------------------------------------------------------ correctif 1
+    # 11. CROSSINGS_ON : la CUISSON n'ecrit plus aucun passage, alors que la
+    #     fonction crossing_sites, elle, en trouve toujours (elle reste testee et
+    #     prete a servir le jour ou une vraie donnee de traversee arrivera).
+    check_bool("CROSSINGS_ON coupe", CROSSINGS_ON, False)
+    X0 = 9999 * CELL_M
+    pp1 = box(X0 - 20, X0 - 20, X0 + 245, X0 + 520)
+    pp2 = box(X0 + 255, X0 - 20, X0 + 520, X0 + 520)
+    rr = [{"line": LineString([(X0 + 250, X0 - 20), (X0 + 250, X0 + 520)]), "largeur": 10.0,
+           "nature": "route a 1 chaussee", "pont": False, "voies": 2,
+           "etroit": False, "sans_bordure": False}]
+    pd = [LineString([(X0 + 230, X0 + 250), (X0 + 270, X0 + 250)])]
+    _c, ch5, _p, _g, _u = classes_de_cellule(
+        box(X0 - 4, X0 - 4, X0 + CELL_M + 4, X0 + CELL_M + 4), [pp1, pp2], [], rr)
+    check("crossing_sites appelee directement", float(len(crossing_sites(
+        ch5, box(X0, X0, X0 + CELL_M, X0 + CELL_M), rr, pd))), 1.0, 0.0)
+    # Cuisson reelle d'une cellule bidon (hors zone de production), a resolution
+    # reduite : c'est le CHEMIN COMPLET qu'on verrouille, pas une expression
+    # recopiee. Les globales de resolution sont restaurees quoi qu'il arrive.
+    sav = (OUT_PX, SS, HI)
+    OUT_PX, SS, HI = 64, 1, 1
+    res = None
+    try:
+        res = cuire_cellule(9999, 9999, [pp1, pp2], [], rr, pd, [], preview=False)
+        with open(res["json"], encoding="utf-8") as f:
+            cuit = json.load(f)
+    finally:
+        OUT_PX, SS, HI = sav
+        for p in ((res["png"], res["json"]) if res else ()):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+    check("passages ecrits par la cuisson", float(len(cuit["crossings"])), 0.0, 0.0)
+    check_bool("la cuisson ecrit toujours ses bordures", len(cuit["curbs"]) > 0, True)
+    check_bool("la cuisson ecrit toujours ses tirets", len(cuit["axial"]) > 0, True)
+
     log("SELFTEST : " + ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
 
@@ -771,11 +1028,14 @@ def main():
     eaux = eaux["proto"]
     routes = charger_routes_bdtopo(fen)
     pietons = charger_axes_pietons(fen)
+    # Le BATI entre dans le CALCUL, il ne sert plus seulement aux cartes de controle :
+    # un immeuble est un polygone reel, il a sa place dans la soustraction du sol.
+    batis = C.charger_bati(fenetres)["proto"]
     log("chargements : %.1f s" % (time.time() - t0))
 
     resume = []
     for cx, cy in cells:
-        resume.append(cuire_cellule(cx, cy, parcelles, eaux, routes, pietons,
+        resume.append(cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, batis,
                                     preview=not args.no_preview))
     idx = {"cellSizeM": CELL_M, "maskPx": OUT_PX, "sdfRangeM": SDF_RANGE_M,
            "cells": resume, "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%S")}
