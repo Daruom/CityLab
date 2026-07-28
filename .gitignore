@@ -30,3 +30,4 @@ SourceData/*.avant_rognage.json
 # Backup pre-cours (regenerable via Fetch-GF-Cours.ps1 + j3b_ajoute_cours.py)
 SourceData/*.avant_cours.json
 SourceData/*.avant_flatcut.json
+SourceData/*.avant_interstices.json
