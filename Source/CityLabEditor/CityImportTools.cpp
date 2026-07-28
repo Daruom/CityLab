@@ -3116,7 +3116,14 @@ namespace
 			const FVector2D B2 = Ring[(e + 1) % N];
 			const FVector2D Dir2 = B2 - A2;
 			const float Len = Dir2.Size();
-			if (Len < 30.f)
+			// Seuil a 1 cm (pas 30) : au-dela de ~1 cm on MONTE le mur de l'arete,
+			// meme courte. L'ancien saut a 30 cm laissait une FENTE verticale pleine
+			// hauteur partout ou le contour a un petit redan / pan coupe de coin
+			// (mesure : 46 778 aretes, 8 644 batiments = 6,58 %, dont le Capitole).
+			// Les murs sont bout a bout aux sommets partages : monter chaque arete
+			// rend l'anneau etanche. La garde U1-U0<1 de WallQuad couvre deja les
+			// quads degeneres ; 1 cm evite juste le NaN de Dir2/Len sur un doublon.
+			if (Len < 1.f)
 			{
 				continue;
 			}
