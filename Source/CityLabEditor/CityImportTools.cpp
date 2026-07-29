@@ -451,6 +451,14 @@ namespace
 		return Base * Var;
 	}
 
+	// J3f DA « marbre blanc taille » : teinte de vertex marbre chaud (encodage LINEAIRE
+	// desktop, ~albedo clair mais pas sature). Sur la sous-tuile pierre claire (12) du
+	// materiau PBR = pierre/marbre uni, sans dessin de facade.
+	FVector3f MarbleTint()
+	{
+		return FVector3f(0.88f, 0.87f, 0.83f);
+	}
+
 	// Batiment a emprise polygonale : facades avec fenetres par travee + toit plat.
 	void BuildPolygonBuilding(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float Hcm,
 		const FVector3f& Tint)
@@ -2847,6 +2855,19 @@ namespace
 		// ORTHO par Tools/j3c_tint_toits.py (mediane robuste / gris de reference),
 		// deja multipliee par le quasi-blanc historique. Defaut = ancien RoofTint.
 		FVector3f Tint = FVector3f(0.95f, 0.95f, 0.95f);
+		// PoC LiDAR (Roofer/3DBAG) : maillage de toit ABSOLU auto-porte. Quand present
+		// (champs "rv"/"rf" du batiment), il remplace le squelette droit : les faces
+		// indexent AbsVerts SEULS (aucun contrat d'arete de bord), z = hauteur au-dessus
+		// du sol du batiment (cm). Le squelette (Skel/Faces) reste vide.
+		bool bAbs = false;
+		TArray<FVector3f> AbsVerts;      // x,y,z en cm ; z = hauteur / sol du batiment
+		TArray<TArray<int32>> AbsFaces;  // versants LiDAR, indices dans AbsVerts
+		// PoC LiDAR — MURS Roofer (WallSurface du Solid LoD2.2). Present (champ "wf")
+		// => la coque abs est COMPLETE (toit + murs soudes au meme egout, watertight) :
+		// on rend ces murs et on SAUTE l'anneau de mur procedural (qui montait a une
+		// hauteur plate unique -> trous a l'egout LiDAR variable). Indices dans AbsVerts
+		// (memes sommets que le toit a l'egout). Vide => murs proceduraux (compat).
+		TArray<TArray<int32>> AbsWallFaces;
 	};
 
 	int32 RoofTileFromMat(const FString& Mat)
@@ -2868,6 +2889,93 @@ namespace
 		if (!Bldg->TryGetObjectField(TEXT("roof"), RoofObj))
 		{
 			return false;
+		}
+		// PoC LiDAR : maillage de toit ABSOLU (Roofer). Prioritaire sur le squelette.
+		// "rv" = sommets [x,y,z] en metres locaux (z = hauteur / sol du batiment) ;
+		// "rf" = faces indexant rv. Ne suit PAS le contrat d'arete de bord du squelette.
+		{
+			const TArray<TSharedPtr<FJsonValue>>* Rv = nullptr;
+			const TArray<TSharedPtr<FJsonValue>>* Rf = nullptr;
+			if ((*RoofObj)->TryGetArrayField(TEXT("rv"), Rv) &&
+				(*RoofObj)->TryGetArrayField(TEXT("rf"), Rf) &&
+				Rv->Num() >= 3 && Rf->Num() >= 1)
+			{
+				Out.AbsVerts.Reset(Rv->Num());
+				float ZMin = FLT_MAX, ZMax = -FLT_MAX;
+				for (const TSharedPtr<FJsonValue>& V : *Rv)
+				{
+					const TArray<TSharedPtr<FJsonValue>>& C = V->AsArray();
+					if (C.Num() < 3) { return false; }
+					const FVector3f P((float)(C[0]->AsNumber() * 100.0),
+						(float)(C[1]->AsNumber() * 100.0), (float)(C[2]->AsNumber() * 100.0));
+					if (!FMath::IsFinite(P.X) || !FMath::IsFinite(P.Y) || !FMath::IsFinite(P.Z))
+					{
+						return false;
+					}
+					ZMin = FMath::Min(ZMin, P.Z);
+					ZMax = FMath::Max(ZMax, P.Z);
+					Out.AbsVerts.Add(P);
+				}
+				const int32 NV = Out.AbsVerts.Num();
+				Out.AbsFaces.Reset(Rf->Num());
+				for (const TSharedPtr<FJsonValue>& FV : *Rf)
+				{
+					TArray<int32> Face;
+					for (const TSharedPtr<FJsonValue>& IV : FV->AsArray())
+					{
+						const int32 Idx = (int32)IV->AsNumber();
+						if (Idx < 0 || Idx >= NV) { return false; }
+						Face.Add(Idx);
+					}
+					if (Face.Num() >= 3) { Out.AbsFaces.Add(MoveTemp(Face)); }
+				}
+				if (Out.AbsFaces.Num() == 0) { return false; }
+				// MURS Roofer optionnels (WallSurface) : memes indices AbsVerts que le toit
+				// -> coque complete soudee a l'egout. Absent = repli murs proceduraux.
+				const TArray<TSharedPtr<FJsonValue>>* Wf = nullptr;
+				if ((*RoofObj)->TryGetArrayField(TEXT("wf"), Wf))
+				{
+					Out.AbsWallFaces.Reset(Wf->Num());
+					for (const TSharedPtr<FJsonValue>& FV : *Wf)
+					{
+						TArray<int32> Face;
+						bool bBad = false;
+						for (const TSharedPtr<FJsonValue>& IV : FV->AsArray())
+						{
+							const int32 Idx = (int32)IV->AsNumber();
+							if (Idx < 0 || Idx >= NV) { bBad = true; break; }
+							Face.Add(Idx);
+						}
+						if (!bBad && Face.Num() >= 3) { Out.AbsWallFaces.Add(MoveTemp(Face)); }
+					}
+				}
+				Out.bAbs = true;
+				Out.EaveCm = FMath::Max(ZMin, 0.f);      // egout = point de toit le plus bas
+				Out.DeltaCm = FMath::Max(ZMax - ZMin, 0.f);
+				Out.MaxDcm = 1.f;
+				FString AbsMat;
+				(*RoofObj)->TryGetStringField(TEXT("mat"), AbsMat);
+				Out.Tile = RoofTileFromMat(AbsMat);
+				// J3f LiDAR combine — teinte ORTHO par batiment AUSSI sur la coque abs.
+				// Le squelette lisait "tint" en fin de fonction (apres ce return) : les
+				// toits Roofer restaient donc au quasi-blanc par defaut (terracotta
+				// uniforme). On lit "tint" ICI, avant le return, pour que chaque toit
+				// LiDAR recoive sa vraie teinte ortho (meme validation/clamp que plus bas).
+				const TArray<TSharedPtr<FJsonValue>>* AbsTintArr = nullptr;
+				if (Bldg->TryGetArrayField(TEXT("tint"), AbsTintArr) && AbsTintArr->Num() >= 3)
+				{
+					FVector3f T(0.f, 0.f, 0.f);
+					bool bOk = true;
+					for (int32 i = 0; i < 3; ++i)
+					{
+						const float V = (float)(*AbsTintArr)[i]->AsNumber();
+						if (!FMath::IsFinite(V)) { bOk = false; break; }
+						T[i] = FMath::Clamp(V, 0.3f, 2.0f) * 0.95f;
+					}
+					if (bOk) { Out.Tint = T; }
+				}
+				return true;
+			}
 		}
 		double Eave = 0.0, Delta = 0.0;
 		if (!(*RoofObj)->TryGetNumberField(TEXT("eave"), Eave) ||
@@ -3092,13 +3200,27 @@ namespace
 	// saillie 6 cm). C'est la base du test « delta de tris par fenetre = +18 ».
 	// bBakedShade=false (PBR) : teintes brutes, Lumen eclaire (plus de Shade cuit).
 	void BuildPolygonBuildingDesktop(FCityMeshBuilder& Wall, FCityMeshBuilder& Glass,
-		const TArray<FVector2D>& PtsCm, float Hcm, const FVector3f& Tint, int32 WallTile,
+		const TArray<FVector2D>& PtsCm, float Hcm, const FVector3f& TintIn, int32 WallTileIn,
 		float ZBaseCm, float SocleDepthCm, bool bReveals, bool bBakedShade,
-		const TArray<TArray<FVector2D>>& Holes, const FRoofData* Roof = nullptr)
+		const TArray<TArray<FVector2D>>& Holes, const FRoofData* Roof = nullptr,
+		int32 WindowMode = 0, bool bMarbleWhite = false, bool bMarbleWalls = false)
 	{
 		const int32 Floors = FMath::Clamp(FMath::RoundToInt32(Hcm / 290.f), 1, 40);
 		const float FloorH = Hcm / Floors;
 		const FVector3f StoneTint(0.82f, 0.79f, 0.72f);
+		// J3f DA marbre : murs blancs sur la pierre claire (12), UsageTint/UsageTile ignores.
+		// bMarbleWalls (flag E) : marbre AUX MURS SEULEMENT (le toit garde sa tuile reelle) ;
+		// bMarbleWhite reste tout-ou-rien (murs ET toits). Les murs suivent donc l'un OU l'autre.
+		const bool bWallsMarble = bMarbleWhite || bMarbleWalls;
+		const FVector3f Tint = bWallsMarble ? MarbleTint() : TintIn;
+		const int32 WallTile = bWallsMarble ? 12 : WallTileIn;
+		// PoC LiDAR : coque Roofer complete -> murs abs rendus ici, anneau procedural
+		// reduit au SOCLE enterre (le reste du mur = faces Roofer soudees a l'egout).
+		const bool bAbsWalls = (Roof != nullptr) && Roof->bAbs && Roof->AbsWallFaces.Num() > 0;
+		// Modes fenetres : 1=aucune (pas de travees), 2=discretes (niche marbre), sinon
+		// geometrie complete (3=forcee, 0=historique via bReveals).
+		const bool bNoWindows = (WindowMode == 1);
+		const bool bDiscreetWindows = (WindowMode == 2);
 		auto Col = [&](const FVector3f& C, const FVector3f& Nrm, float Zrel)
 		{
 			return bBakedShade ? Shade(C, Nrm, Zrel) : C;
@@ -3107,7 +3229,7 @@ namespace
 		// puis, si cour, sur chaque TROU (CW -> la meme formule Nout(dy,-dx) pointe vers
 		// l'interieur de la cour = la bonne face). Le corps est l'ancienne boucle d'aretes,
 		// inchangee : sans cour, seul le contour est monte -> geometrie bit-a-bit identique.
-		auto BuildWallRing = [&](const TArray<FVector2D>& Ring)
+		auto BuildWallRing = [&](const TArray<FVector2D>& Ring, bool bExterior)
 		{
 		const int32 N = Ring.Num();
 		for (int32 e = 0; e < N; ++e)
@@ -3162,6 +3284,27 @@ namespace
 				Wall.AddPoly(Wall.WallGroup, P, 4, Nrm, UV,
 					Col(StoneTint, Nrm, P0.Z - ZBaseCm));
 			};
+			// Bandeau horizontal saillant de pierre claire (modenature J3f) : 3 quads
+			// (dessus / face avant / dessous), centre a Zc, demi-hauteur Half, saillie
+			// Proj vers l'exterieur (D<0, cf. -Nout*D). Meme enroulement que l'appui de
+			// fenetre plus haut (rendu prouve). Court le long de TOUTE l'arete ; les
+			// bandeaux d'aretes voisines se recouvrent au coin convexe mais dans le
+			// MEME materiau (StoneTint) -> pas de scintillement lisible. Garde-fous :
+			// arete courte / bande plate -> rien (aucun quad degenere).
+			auto Band = [&](float Zc, float Half, float Proj)
+			{
+				if (Len < 60.f || Half < 1.f || Proj < 1.f)
+				{
+					return;
+				}
+				const float Zb = Zc - Half, Zt = Zc + Half;
+				StoneQuad(Pt(0.f, Zt, -Proj), Pt(Len, Zt, -Proj),
+					Pt(Len, Zt, 0.f), Pt(0.f, Zt, 0.f), FVector3f(0, 0, 1));   // dessus
+				StoneQuad(Pt(0.f, Zb, -Proj), Pt(Len, Zb, -Proj),
+					Pt(Len, Zt, -Proj), Pt(0.f, Zt, -Proj), Nout);            // face avant
+				StoneQuad(Pt(0.f, Zb, -Proj), Pt(Len, Zb, -Proj),
+					Pt(Len, Zb, 0.f), Pt(0.f, Zb, 0.f), FVector3f(0, 0, -1)); // dessous
+			};
 			// Fenetre : vitre en retrait D, puis modenature (+9 quads si bReveals).
 			auto Window = [&](float WU0, float WU1, float WZ0, float WZ1)
 			{
@@ -3198,15 +3341,64 @@ namespace
 				StoneQuad(Pt(WU0, WZ1, -L), Pt(WU1, WZ1, -L), Pt(WU1, WZ1, 0), Pt(WU0, WZ1, 0),
 					FVector3f(0, 0, -1));
 			};
+			// Fenetre DISCRETE (J3f DA option C) : le mur reste PLEIN (le quad plein
+			// couvre deja la travee) ; on creuse juste une niche marbre peu profonde
+			// (6 cm) — fond en materiau MUR + 4 tableaux pierre. Ni trou traversant, ni
+			// vitre sombre : un simple renfoncement qui accroche l'ombre en vol.
+			auto BlindWindow = [&](float WU0, float WU1, float WZ0, float WZ1)
+			{
+				const float Dd = 6.f;
+				const FVector3f B[4] = { Pt(WU0, WZ0, Dd), Pt(WU1, WZ0, Dd),
+					Pt(WU1, WZ1, Dd), Pt(WU0, WZ1, Dd) };
+				const float SU = (WU1 - WU0) / 512.f;
+				const float SV = (WZ1 - WZ0) / 512.f;
+				const FVector2f BUV[4] = { AtlasUV(WallTile, 0, 0), AtlasUV(WallTile, SU, 0),
+					AtlasUV(WallTile, SU, SV), AtlasUV(WallTile, 0, SV) };
+				Wall.AddPoly(Wall.WallGroup, B, 4, Nout, BUV, Col(Tint, Nout, (WZ0 + WZ1) * 0.5f));
+				StoneQuad(Pt(WU0, WZ0, 0), Pt(WU0, WZ1, 0), Pt(WU0, WZ1, Dd), Pt(WU0, WZ0, Dd), T);
+				StoneQuad(Pt(WU1, WZ0, 0), Pt(WU1, WZ1, 0), Pt(WU1, WZ1, Dd), Pt(WU1, WZ0, Dd), -T);
+				StoneQuad(Pt(WU0, WZ1, 0), Pt(WU1, WZ1, 0), Pt(WU1, WZ1, Dd), Pt(WU0, WZ1, Dd),
+					FVector3f(0, 0, -1));
+				StoneQuad(Pt(WU0, WZ0, 0), Pt(WU1, WZ0, 0), Pt(WU1, WZ0, Dd), Pt(WU0, WZ0, Dd),
+					FVector3f(0, 0, 1));
+			};
 
 			const float Margin = 40.f;
 			const float Usable = Len - 2.f * Margin;
-			const int32 Bays = Usable > 200.f ? FMath::Max(1, FMath::RoundToInt32(Usable / 280.f)) : 0;
+			// Mode « aucune fenetre » (J3f DA option A/B) : 0 travee -> mur plein par etage.
+			const int32 Bays = (!bNoWindows && Usable > 200.f)
+				? FMath::Max(1, FMath::RoundToInt32(Usable / 280.f)) : 0;
 			// Socle enterre (desktop drape) : mur aveugle sous le rez-de-chaussee.
 			if (SocleDepthCm >= 1.f)
 			{
 				WallQuad(0.f, Len, -SocleDepthCm, 0.f);
 			}
+			// PoC LiDAR (coque Roofer) : on ne monte QUE le socle enterre ; les murs
+			// visibles (0..egout) sont les faces Roofer, soudees au toit -> zero trou.
+			// (Le socle reste sous le terrain draine, donc l'ecart d'emprise BD/Roofer
+			// au ras du sol est enterre et invisible.)
+			if (bAbsWalls)
+			{
+				continue;
+			}
+			// Mur marbre LISSE (couture zero) : la subdivision par etage + le tuilage
+			// d'atlas ne servent qu'a poser les fenetres et ne produisent que des COUTURES
+			// (l'UV redemarre 0->SU/0->SV a chaque etage ET a chaque arete -> rayures
+			// verticales+horizontales) ; la MODENATURE J3f (bandeaux saillants) ajoutait
+			// des rayures HORIZONTALES a chaque etage. DA « bloc lisse comme le proxy A » :
+			// on ignore Bays/travees et on monte TOUJOURS UN seul quad pleine hauteur a UV
+			// CONSTANT (centre de la sous-tuile pierre 12), et on SAUTE toute la modenature
+			// (bloc bExterior plus bas) -> mur parfaitement lisse, identique au proxy.
+			if (bWallsMarble)
+			{
+				const FVector3f MP[4] = { Pt(0.f, 0.f, 0.f), Pt(Len, 0.f, 0.f),
+					Pt(Len, Hcm, 0.f), Pt(0.f, Hcm, 0.f) };
+				const FVector2f MC = AtlasUV(WallTile, 0.5f, 0.5f);
+				const FVector2f MUV[4] = { MC, MC, MC, MC };
+				Wall.AddPoly(Wall.WallGroup, MP, 4, Nout, MUV, Col(Tint, Nout, Hcm * 0.5f));
+			}
+			else
+			{
 			float Z0 = 0.f;
 			for (int32 F = 0; F < Floors; ++F)
 			{
@@ -3234,14 +3426,53 @@ namespace
 					WallQuad(WU1, BU1, Z0, Z1);
 					WallQuad(WU0, WU1, Z0, WZ0);
 					WallQuad(WU0, WU1, WZ1, Z1);
-					Window(WU0, WU1, WZ0, WZ1);
+					// Discretes = niche marbre peu profonde ; sinon vitre en creux.
+					if (bDiscreetWindows)
+					{
+						BlindWindow(WU0, WU1, WZ0, WZ1);
+					}
+					else
+					{
+						Window(WU0, WU1, WZ0, WZ1);
+					}
 				}
 				Z0 = Z1;
+			}
+			}
+			// --- Modenature de facade (J3f) : bandeaux de pierre saillants, LISIBLES en
+			//     vol sur un batiment blanc. CONTOUR uniquement (bExterior) ; purement
+			//     ADDITIF -- ne touche ni au contour, ni au toit, ni aux cours.
+			//     Marbre (bWallsMarble) : AUCUNE modenature (socle/bandeaux/corniche/debord)
+			//     -> ce sont justement les rayures horizontales que la DA « bloc lisse »
+			//     refuse. Le mur marbre reste le seul quad plein pose au-dessus.
+			if (bExterior && !bWallsMarble)
+			{
+				// Socle : plinthe saillante 5 cm sur les ~50 premiers cm au sol.
+				Band(25.f, 25.f, 5.f);
+				// Bandeaux d'etage : fine bande 3 cm a chaque ligne de plancher
+				// intermediaire (dans l'allege, entre les fenetres -> pas de conflit).
+				if (Floors >= 2 && FloorH >= 200.f)
+				{
+					for (int32 F = 1; F < Floors; ++F)
+					{
+						Band((float)F * FloorH, 4.f, 3.f);
+					}
+				}
+				// Corniche : bandeau saillant 10 cm sous l'egout (au-dessus des fenetres
+				// du dernier etage), avec un jour avant le debord.
+				if (Hcm > 120.f)
+				{
+					Band(Hcm - 30.f, 6.f, 10.f);
+				}
+				// Debord de toiture : l'egout deborde 30 cm (sous-face + chant visibles
+				// en vol). Le dessus AFFLEURE l'egout (Zt = Hcm) et prolonge le toit vers
+				// l'exterieur -- hors contour, donc aucun recouvrement avec le toit.
+				Band(Hcm - 8.f, 8.f, 30.f);
 			}
 		}
 
 		};
-		BuildWallRing(PtsCm);
+		BuildWallRing(PtsCm, true);
 		// Cours : murs interieurs (face tournee vers la cour) montes UNIQUEMENT quand le
 		// toit en pente a trous existe ; sinon le toit plat couvre la cour et on garde le
 		// batiment plein (repli documente). Sans cour, seul le contour est monte : la
@@ -3251,7 +3482,7 @@ namespace
 		{
 			for (const TArray<FVector2D>& H : Holes)
 			{
-				BuildWallRing(H);
+				BuildWallRing(H, false);
 			}
 		}
 
@@ -3261,7 +3492,156 @@ namespace
 		// Quasi blanc en vertex color (la sous-tuile porte la couleur du materiau).
 		// J3c : les VERSANTS prennent Roof->Tint (couleur ortho reelle du toit) ; le
 		// toit plat garde ce quasi blanc — non-regression mobile intouchable.
-		const FVector3f RoofTint(0.95f, 0.95f, 0.95f);
+		// J3f DA marbre : toit (pente ET plat) force au marbre blanc, sous-tuile pierre (12).
+		const FVector3f RoofTint = bMarbleWhite ? MarbleTint() : FVector3f(0.95f, 0.95f, 0.95f);
+		if (Roof && Roof->bAbs)
+		{
+			// PoC LiDAR : coque Roofer ABSOLUE. z deja au-dessus du sol (AbsVerts.Z en cm)
+			// -> Z monde = ZBase + Z. Quand la coque fournit ses MURS (AbsWallFaces), ils
+			// sont soudes au meme egout que le toit (memes sommets) -> aucun trou ; l'anneau
+			// procedural est alors reduit au socle (cf. bAbsWalls). Sinon les murs procd.
+			// montent a l'egout plat via WallHcm.
+			// --- MURS Roofer (WallSurface) : faces VERTICALES -> la projection XY est
+			// degeneree, on triangule dans le PLAN du mur (repere tangente/hauteur). Marbre
+			// (sous-tuile 12) si DA marbre OU flag E, sinon tuile mur BD. UV : U le long du
+			// mur, V = hauteur monde (texture verticale). Winding force vers la normale
+			// sortante (Newell) pour un rendu monoface propre.
+			if (bAbsWalls)
+			{
+				for (const TArray<int32>& WFace : Roof->AbsWallFaces)
+				{
+					const int32 Nw = WFace.Num();
+					if (Nw < 3) { continue; }
+					TArray<FVector3f> W;
+					W.Reserve(Nw);
+					for (const int32 Idx : WFace)
+					{
+						const FVector3f& V = Roof->AbsVerts[Idx];
+						W.Add(FVector3f(V.X, V.Y, ZBaseCm + V.Z));
+					}
+					// Normale robuste (Newell) sur le polygone 3D.
+					FVector3f Newell(0.f, 0.f, 0.f);
+					for (int32 i = 0; i < Nw; ++i)
+					{
+						const FVector3f& A = W[i];
+						const FVector3f& B = W[(i + 1) % Nw];
+						Newell.X += (A.Y - B.Y) * (A.Z + B.Z);
+						Newell.Y += (A.Z - B.Z) * (A.X + B.X);
+						Newell.Z += (A.X - B.X) * (A.Y + B.Y);
+					}
+					const FVector3f WN = Newell.GetSafeNormal();
+					if (WN.IsNearlyZero()) { continue; }
+					// Repere 2D dans le plan du mur : Tg = tangente horizontale, Vt = "haut".
+					FVector3f Tg = FVector3f::CrossProduct(FVector3f(0, 0, 1), WN);
+					if (Tg.IsNearlyZero()) { Tg = FVector3f(1, 0, 0); }
+					Tg = Tg.GetSafeNormal();
+					const FVector3f Vt = FVector3f::CrossProduct(WN, Tg).GetSafeNormal();
+					const FVector3f Origin = W[0];
+					TArray<FVector2D> Q;
+					TArray<int32> Order;
+					Q.Reserve(Nw);
+					Order.Reserve(Nw);
+					for (int32 i = 0; i < Nw; ++i)
+					{
+						const FVector3f R = W[i] - Origin;
+						Q.Add(FVector2D(FVector3f::DotProduct(R, Tg), FVector3f::DotProduct(R, Vt)));
+						Order.Add(i);
+					}
+					// TriangulateRing exige un anneau CCW : inverser Q ET l'index map si CW.
+					if (SignedArea(Q) < 0.0)
+					{
+						Algo::Reverse(Q);
+						Algo::Reverse(Order);
+					}
+					TArray<int32> WTris;
+					TriangulateRing(Q, WTris);
+					for (int32 t = 0; t + 2 < WTris.Num(); t += 3)
+					{
+						FVector3f P[3] = { W[Order[WTris[t]]], W[Order[WTris[t + 1]]], W[Order[WTris[t + 2]]] };
+						FVector2f TUV[3];
+						if (bWallsMarble)
+						{
+							// Coque Roofer = beaucoup de petites faces -> le tuilage d'atlas
+							// multiplierait les coutures. Marbre => UV CONSTANT (centre de la
+							// sous-tuile pierre 12) : mur LiDAR lisse, coherent avec le proxy
+							// et les murs proceduraux marbre.
+							TUV[0] = TUV[1] = TUV[2] = AtlasUV(WallTile, 0.5f, 0.5f);
+						}
+						else
+						{
+							for (int32 k = 0; k < 3; ++k)
+							{
+								const FVector3f R = P[k] - Origin;
+								TUV[k] = AtlasUV(WallTile, (float)FVector3f::DotProduct(R, Tg) / 512.f,
+									(P[k].Z - ZBaseCm) / 512.f);
+							}
+						}
+						// Winding : la normale du tri doit suivre WN (Newell de la face source).
+						FVector3f TN = FVector3f::CrossProduct(P[1] - P[0], P[2] - P[0]);
+						if (FVector3f::DotProduct(TN, WN) < 0.f)
+						{
+							Swap(P[1], P[2]);
+							Swap(TUV[1], TUV[2]);
+						}
+						const float Zc = (P[0].Z + P[1].Z + P[2].Z) / 3.f - ZBaseCm;
+						Wall.AddPoly(Wall.WallGroup, P, 3, WN, TUV, Col(Tint, WN, Zc));
+						// DOUBLE-FACE (fix trous LiDAR mur<->toit) : le winding des faces
+						// WallSurface Roofer est INCOHERENT dans la donnee source (mesure :
+						// 65 % des faces "wf" ont leur normale Newell tournee vers l'INTERIEUR
+						// du batiment). Rendues monoface elles sont back-face-culled -> le mur
+						// disparait de l'exterieur = les trous vus au rendu, alors que la
+						// donnee est watertight. On emet donc la face MIROIR (winding inverse
+						// + normale opposee) : la coque est visible des DEUX cotes, quel que
+						// soit le winding source. Cout : x2 tris de mur sur ~186 bat LiDAR
+						// (negligeable) ; depuis l'exterieur seule la face tournee vers la
+						// camera est dessinee (materiau monoface) -> eclairage correct, zero
+						// z-fighting.
+						FVector3f Pb[3] = { P[0], P[2], P[1] };
+						FVector2f Ub[3] = { TUV[0], TUV[2], TUV[1] };
+						Wall.AddPoly(Wall.WallGroup, Pb, 3, -WN, Ub, Col(Tint, -WN, Zc));
+					}
+				}
+			}
+			const int32 AbsTile = bMarbleWhite ? 12 : Roof->Tile;
+			const FVector3f AbsTint = bMarbleWhite ? MarbleTint() : Roof->Tint;
+			for (const TArray<int32>& Face : Roof->AbsFaces)
+			{
+				const int32 Nf = Face.Num();
+				TArray<FVector3f> C;
+				TArray<FVector2D> C2;
+				C.Reserve(Nf);
+				C2.Reserve(Nf);
+				for (const int32 Idx : Face)
+				{
+					const FVector3f& V = Roof->AbsVerts[Idx];
+					C.Add(FVector3f(V.X, V.Y, ZBaseCm + V.Z));
+					C2.Add(FVector2D(V.X, V.Y));
+				}
+				FVector3f Nrm = FVector3f::CrossProduct(C[1] - C[0], C[2] - C[0]).GetSafeNormal();
+				if (Nrm.Z < 0.f) { Nrm = -Nrm; }
+				if (Nrm.IsNearlyZero()) { Nrm = FVector3f(0, 0, 1); }
+				FBox2D Box(ForceInit);
+				for (const FVector2D& P : C2) { Box += P; }
+				const FVector2D Sz = Box.GetSize();
+				TArray<FVector2f> UV;
+				UV.Reserve(Nf);
+				for (const FVector2D& P : C2)
+				{
+					UV.Add(AtlasUV(AbsTile,
+						(float)((P.X - Box.Min.X) / FMath::Max(Sz.X, 1.0)),
+						(float)((P.Y - Box.Min.Y) / FMath::Max(Sz.Y, 1.0))));
+				}
+				TArray<int32> Tris;
+				TriangulateRing(C2, Tris);
+				for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
+				{
+					const FVector3f P[3] = { C[Tris[t]], C[Tris[t + 1]], C[Tris[t + 2]] };
+					const FVector2f TUV[3] = { UV[Tris[t]], UV[Tris[t + 1]], UV[Tris[t + 2]] };
+					Wall.AddPoly(Wall.WallGroup, P, 3, Nrm, TUV, Col(AbsTint, Nrm, Hcm));
+				}
+			}
+			return;
+		}
 		if (Roof)
 		{
 			// Ici Hcm = hauteur d'EGOUT (les murs s'arretent a l'egout), le versant
@@ -3269,6 +3649,9 @@ namespace
 			// arete du versant, contrat du prep), V le long du rampant (longueur
 			// reelle) — les rangees de tuiles restent paralleles a l'egout.
 			const float SlopeLen = FMath::Sqrt(1.f + FMath::Square(Roof->DeltaCm / Roof->MaxDcm));
+			// J3f DA marbre : versants blancs sur pierre claire (12), teinte ortho ignoree.
+			const int32 RoofTile = bMarbleWhite ? 12 : Roof->Tile;
+			const FVector3f RoofFaceTint = bMarbleWhite ? MarbleTint() : Roof->Tint;
 			// Espace de sommets du toit = contour(N) ++ trous(Holes, a plat) ++ squelette.
 			// C'est le contrat EXACT du prep (j3b_prep_toits.py) : le C++ reconstruit ici
 			// le meme espace pour poser les faces. Sans cour (Holes vide), Idx>=N tombe
@@ -3319,7 +3702,7 @@ namespace
 				const float USpan = FMath::Max(U1 - U0, 1.f);
 				for (FVector2f& T : UV)
 				{
-					T = AtlasUV(Roof->Tile, (T.X - U0) / USpan, T.Y / VMax);
+					T = AtlasUV(RoofTile, (T.X - U0) / USpan, T.Y / VMax);
 				}
 				// Normale vraie du versant (Z force vers le haut). Tris par
 				// ear-clipping de la projection XY : un toit est un champ de hauteur,
@@ -3341,12 +3724,15 @@ namespace
 					const FVector3f P[3] = { C[Tris[t]], C[Tris[t + 1]], C[Tris[t + 2]] };
 					const FVector2f TUV[3] = { UV[Tris[t]], UV[Tris[t + 1]], UV[Tris[t + 2]] };
 					// J3c : teinte ortho du toit (Roof->Tint vaut RoofTint si absente).
-					Wall.AddPoly(Wall.WallGroup, P, 3, Nrm, TUV, Col(Roof->Tint, Nrm, Hcm));
+					// J3f DA marbre : RoofFaceTint = MarbleTint quand bMarbleWhite.
+					Wall.AddPoly(Wall.WallGroup, P, 3, Nrm, TUV, Col(RoofFaceTint, Nrm, Hcm));
 				}
 			}
 			return;
 		}
 		// Toit plat : sous-tuile toit terre cuite (10), UV0 = emprise normalisee.
+		// J3f DA marbre : pierre claire (12) a la place de la terre cuite.
+		const int32 FlatRoofTile = bMarbleWhite ? 12 : 10;
 		TArray<int32> Tris;
 		TriangulateRing(PtsCm, Tris);
 		FBox2D RoofBox(ForceInit);
@@ -3364,7 +3750,7 @@ namespace
 			{
 				const FVector2D& P2 = PtsCm[Tris[t + i]];
 				R[i] = FVector3f(P2.X, P2.Y, ZBaseCm + Hcm);
-				RUV[i] = AtlasUV(10,
+				RUV[i] = AtlasUV(FlatRoofTile,
 					(float)((P2.X - RoofBox.Min.X) / FMath::Max(RoofSize.X, 1.0)),
 					(float)((P2.Y - RoofBox.Min.Y) / FMath::Max(RoofSize.Y, 1.0)));
 			}
@@ -3451,7 +3837,7 @@ namespace
 	// bBakedShade=false (desktop PBR) : teinte brute, Lumen eclaire (cf. BuildRoad).
 	void BuildProxyBuilding(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float Hcm,
 		const FVector3f& Tint, float ZBaseCm = 0.f, float SocleDepthCm = 0.f,
-		bool bBakedShade = true)
+		bool bBakedShade = true, bool bWhite = false)
 	{
 		// RECTANGLE ORIENTE (10 tris par batiment contre ~28 pour le contour simplifie,
 		// « tout garder, moins cher ») : axe = plus longue arete de l'emprise,
@@ -3559,7 +3945,8 @@ namespace
 		}
 		TArray<int32> Tris;
 		TriangulateRing(P, Tris);
-		const FVector3f RoofBase(0.42f, 0.40f, 0.38f);
+		// J3f DA marbre : toit plat du proxy BLANC comme les murs (A = boite marbre nue).
+		const FVector3f RoofBase = bWhite ? MarbleTint() : FVector3f(0.42f, 0.40f, 0.38f);
 		const FVector3f RoofShaded = bBakedShade ? Shade(RoofBase, FVector3f(0, 0, 1), H) : RoofBase;
 		for (int32 t = 0; t + 2 < Tris.Num(); t += 3)
 		{
@@ -4056,23 +4443,28 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				FCityMeshBuilder& GlassB = Gen.bSplitWallGlass
 					? GetIn(BldgGlassCells, Centroid, Cell, bLinearColors, false) : WallB;
 				BuildPolygonBuildingDesktop(WallB, GlassB, Pts, WallHcm, Tint, UsageTile(Usage, Index),
-					ZBase, SocleDepth, Gen.bWindowReveals, bBakedShade, Holes, bPitched ? &Roof : nullptr);
+					ZBase, SocleDepth, Gen.bWindowReveals, bBakedShade, Holes, bPitched ? &Roof : nullptr,
+					Gen.WindowMode, Gen.bMarbleWhite, Gen.bMarbleWalls);
 				if (bPitched)
 				{
 					++Summary.RoofsPitched;
 				}
 				// Verrou 2 : prisme de collision dedie, meme pose — les murs Nanite ne
 				// servent JAMAIS de collision (fallback decime = facades traversables).
+				// PoC LiDAR : toit absolu -> prisme plein a plat (cap au faitage = ZBase+Hcm) ;
+				// pas de cap ajoure (Roof.Faces vide). Envelope de collision suffisante (vol).
 				BuildCollisionPrism(GetIn(BldgColCells, Centroid, Cell), Pts,
-					ZBase + Hcm, ZBase - SocleDepth, Holes, bPitched ? &Roof : nullptr);
+					ZBase + Hcm, ZBase - SocleDepth, Holes,
+					(bPitched && !Roof.bAbs) ? &Roof : nullptr);
 			}
 			else
 			{
 				BuildPolygonBuildingTextured(GetIn(BldgCells, Centroid, Cell), Pts, Hcm, Tint,
 					ZBase, SocleDepth);
 			}
-			BuildProxyBuilding(GetIn(ProxyCells, Centroid, ProxyCell, bLinearColors), Pts, Hcm, Tint,
-				ZBase, SocleDepth, bBakedShade);
+			BuildProxyBuilding(GetIn(ProxyCells, Centroid, ProxyCell, bLinearColors), Pts, Hcm,
+				Gen.bMarbleWhite ? MarbleTint() : Tint,
+				ZBase, SocleDepth, bBakedShade, Gen.bMarbleWhite);
 			SlabKeys.Add(FIntPoint(FMath::FloorToInt(Centroid.X / Cell), FMath::FloorToInt(Centroid.Y / Cell)));
 			++Summary.Buildings;
 			++Index;

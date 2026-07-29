@@ -129,6 +129,33 @@ struct FCityGenProfile
 	 */
 	UPROPERTY() FString BuildingsJsonPath;
 
+	/**
+	 * J3f DA « marbre blanc taille » : ZERO coloriage. Murs, toits (plats ET en pente)
+	 * ET proxys forcent une teinte marbre blanche et la sous-tuile pierre claire (12),
+	 * en ignorant UsageTint / UsageTile et la teinte ortho du toit (Roof->Tint). Purement
+	 * additif hors profil desktop batiments ; defaut false = comportement historique.
+	 */
+	UPROPERTY() bool bMarbleWhite = false;
+
+	/**
+	 * Flag E « murs marbre + toits terracotta » : applique le blanc marbre (teinte marbre
+	 * + sous-tuile pierre claire 12) AUX MURS SEULEMENT (procduraux ET coque Roofer), en
+	 * gardant la tuile/teinte REELLE du TOIT (terre cuite). Complementaire de bMarbleWhite
+	 * (tout-ou-rien) : si bMarbleWhite est vrai il l'emporte (murs ET toits blancs). N'affecte
+	 * que le chemin desktop batiments ; defaut false = comportement historique.
+	 */
+	UPROPERTY() bool bMarbleWalls = false;
+
+	/**
+	 * J3f DA fenetres du chemin batiment desktop (BuildPolygonBuildingDesktop) :
+	 *   0 = Defaut (comportement historique : fenetres geometriques, creux si bWindowReveals) ;
+	 *   1 = Aucune (murs pleins, pas de travees) ;
+	 *   2 = Discretes (mur PLEIN + niche marbre peu profonde 6 cm, ni trou ni vitre) ;
+	 *   3 = Normales (fenetres geometriques completes, force meme sans bWindowReveals).
+	 * N'affecte que le chemin desktop ; mobile et proxy inchanges.
+	 */
+	UPROPERTY() int32 WindowMode = 0;
+
 	/** Prereglage desktop complet : 64x64 drape, collision 16x16, pas routes 15 m. */
 	static FCityGenProfile Desktop();
 
