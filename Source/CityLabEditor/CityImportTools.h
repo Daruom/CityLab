@@ -303,6 +303,22 @@ struct FCitySurfacesSummary
 	UPROPERTY() int32 Meshes = 0;
 };
 
+/** Counts of what ImportVegetation placed. */
+USTRUCT(BlueprintType)
+struct FCityVegSummary
+{
+	GENERATED_BODY()
+
+	/** Vegetation instances placed (all meshes together). */
+	UPROPERTY() int32 Instances = 0;
+
+	/** Distinct meshes instanced (one HISM per mesh). */
+	UPROPERTY() int32 Meshes = 0;
+
+	/** Actors spawned to carry the HISM components (one per mesh). */
+	UPROPERTY() int32 Actors = 0;
+};
+
 /**
  * Imports a real-world city district from a prepared JSON file (building footprints with
  * heights, road polylines with widths, tree positions — all in meters around a local
@@ -371,6 +387,27 @@ public:
 	UFUNCTION(meta = (AICallable), Category = "CityImportTools")
 	static FCitySurfacesSummary ImportCitySurfaces(const FString& JsonFilePath, const FString& AssetFolder,
 		const FString& WallMaterialPath, float CellSizeM, FVector Location, const FCityGenProfile& Profile);
+
+	/**
+	 * Places vegetation instances from a prepared JSON ("instances" array of
+	 * {mesh (package or object path), x, y (meters), scale, yaw (degrees)}) onto the
+	 * terrain the AUTHORITATIVE way — exactly like buildings. Each instance is seated
+	 * at Drape.GroundZ(x,y) (the FTerrainSampler the whole generator shares), base at 0,
+	 * ZERO min_Z offset (Megascans pivot at the foot), so nothing floats. Instances are
+	 * grouped by mesh (HISM constraint: one component per mesh); each distinct mesh is
+	 * loaded with LoadObject (never recreated) and its materials are left untouched — only
+	 * MATUSAGE_InstancedStaticMeshes is flagged (F.39). One "CityVeg_*" actor per mesh.
+	 * Re-running is a vegetation-only pass: it first destroys every previous "CityVeg*" actor.
+	 * @param VegJsonPath Absolute path to the vegetation JSON.
+	 * @param AssetFolder Package folder context (validated; passes reuse it for logs/lookups).
+	 * @param Location World position of the district origin (instances are world-space).
+	 * @param Profile Generation profile; must match the district's (Desktop, bDrapeToTerrain=true)
+	 *        so GroundZ is identical to the buildings' seating.
+	 * @return Counts of what was placed.
+	 */
+	UFUNCTION(meta = (AICallable), Category = "CityImportTools")
+	static FCityVegSummary ImportVegetation(const FString& VegJsonPath, const FString& AssetFolder,
+		FVector Location, const FCityGenProfile& Profile);
 
 	/**
 	 * Imports a district split into three layers for distance streaming on device:

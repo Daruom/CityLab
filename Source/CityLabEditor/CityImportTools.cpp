@@ -12,6 +12,8 @@
 #include "FileHelpers.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
+#include "Engine/HitResult.h"
+#include "CollisionQueryParams.h"
 #include "Engine/TextRenderActor.h"
 #include "Components/TextRenderComponent.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -2543,6 +2545,359 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 	UE_LOG(LogCityImport, Display,
 		TEXT("Surfaces importees : %d eau, %d vert, %d rails, %d arbres disperses, %d meshes."),
 		Summary.Water, Summary.Green, Summary.Rails, Summary.ScatterTrees, Summary.Meshes);
+	return Summary;
+}
+
+// Placement de la vegetation EN C++ (comme les batiments) : le Z vient du
+// FTerrainSampler autoritaire (Drape.GroundZ), pas d'un modele MNT re-invente en
+// Python — d'ou plus d'arbres flottants. La logique data (x, y, scale, yaw) reste
+// preparee en JSON ; ici on ne fait que poser, base-a-0, sur le vrai sol.
+FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
+	const FString& AssetFolder, FVector Location, const FCityGenProfile& Profile)
+{
+	FCityVegSummary Summary;
+
+	// Profil effectif + MNT charge une fois : GroundZ identique a la pose des batiments.
+	const FCityGenProfile Gen = Profile.Resolved();
+	FDrapeContext Drape;
+	if (!MakeDrapeContext(Gen, Drape))
+	{
+		return Summary;
+	}
+
+	FString Json;
+	if (!FFileHelper::LoadFileToString(Json, *VegJsonPath))
+	{
+		RaiseError(FString::Printf(TEXT("Cannot read vegetation file '%s'."), *VegJsonPath));
+		return Summary;
+	}
+	TSharedPtr<FJsonObject> Root;
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json), Root) || !Root.IsValid())
+	{
+		RaiseError(TEXT("Vegetation file is not valid JSON."));
+		return Summary;
+	}
+	if (AssetFolder.IsEmpty() || !AssetFolder.StartsWith(TEXT("/")))
+	{
+		RaiseError(TEXT("AssetFolder must be a package path such as /Game/Dev/ProtoE2Sol2/Veg."));
+		return Summary;
+	}
+	UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+	if (!World)
+	{
+		RaiseError(TEXT("No editor world is loaded."));
+		return Summary;
+	}
+
+	// Idempotence (passe vege-seule rejouable) : efface la vege precedente.
+	TArray<AActor*> ToDestroy;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (It->GetActorLabel().StartsWith(TEXT("CityVeg")))
+		{
+			ToDestroy.Add(*It);
+		}
+	}
+	for (AActor* A : ToDestroy)
+	{
+		World->DestroyActor(A);
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* Instances = nullptr;
+	if (!Root->TryGetArrayField(TEXT("instances"), Instances) || Instances->Num() == 0)
+	{
+		UE_LOG(LogCityImport, Display, TEXT("Vegetation : aucune instance dans '%s'."), *VegJsonPath);
+		return Summary;
+	}
+
+	// -------------------------------------------------------------------------
+	// POSE SUR LA SURFACE VISIBLE (films SM_Surface + dalle SM_Slab), pas GroundZ.
+	// Verdict utilisateur (iteration 6) : les arbres FLOTTENT car ils etaient poses
+	// sur GroundZ analytique. Verdict iteration 7 (30/07) : les arbres sont ENTERRES.
+	// Mesure sunk_measure2 (2 873 arbres x 9 traces, collision film reelle) :
+	//  - la passe precedente a pose 100 % des arbres sur la DALLE (z_central - z_base
+	//    = 0,0 exactement pour 1380/1380 arbres au trace central dalle) : donner une
+	//    collision aux films par CollisionTraceFlag + InvalidatePhysicsData +
+	//    CreatePhysicsMeshes NE CUIT AUCUN trimesh (echec silencieux : le cook est lie
+	//    au Build du mesh, Invalidate+Create seuls retombent sur le cache vide) ;
+	//  - resultat visuel : base sous le film d'herbe (lift ~12 cm + drapage fin) —
+	//    sunk mediane +11,6 cm, P90 +35,4 cm, max +5,8 m (parc en pente, cellule -1_0).
+	// LA VOIE PROUVEE (diag 30/07, 209/246 hits) : DUPLIQUER chaque mesh de sol dans
+	// le paquet transient, poser CTF_UseComplexAsSimple AVANT tout usage physique puis
+	// Build() -> le trimesh cuit ; on trace contre des acteurs PROXY jetables.
+	//  - proxys aussi pour les DALLES : leur collision d'origine est le mesh dedie
+	//    16x16 (~28 m/sommet) alors que l'oeil voit le rendu 64x64 (~7 m) — le proxy
+	//    (Nanite off, ComplexCollisionMesh nul) rend le Z du RENDU visible ;
+	//  - les assets d'origine ne sont PAS touches : rien de dirty, rien a restaurer,
+	//    cleanup = destruction des proxys (les duplicatas transient partent au GC).
+	// La vegetation existante (Sol2Veg/Sol2Grass) a une collision DENSE de canopee
+	// -> on l'IGNORE dans le trace, sinon un arbre se poserait sur un autre arbre.
+	// Le trace ECC_Visibility descend TOUTE la colonne (multi-hit : on traverse les
+	// toits et le mobilier) et rend le hit SOL (SM_Surface_/SM_Slab_) le plus HAUT ;
+	// repli GroundZ (comptabilise) uniquement si AUCUN sol n'existe dans la colonne.
+
+	FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(VegPlaceSurface), /*bTraceComplex=*/true);
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		const FString L = It->GetActorLabel();
+		if (L.StartsWith(TEXT("Sol2Veg")) || L.StartsWith(TEXT("Sol2Grass")) ||
+			L.StartsWith(TEXT("CityVeg")) || L == TEXT("CitySurfaceTrees"))
+		{
+			TraceParams.AddIgnoredActor(*It);
+		}
+	}
+
+	// --- Proxys de trace : duplicatas transient (collision qui cuit VRAIMENT) ---
+	TArray<AStaticMeshActor*> TraceProxies;
+	{
+		TArray<AStaticMeshActor*> SolActors;
+		for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
+		{
+			const FString L = It->GetActorLabel();
+			if (L.StartsWith(TEXT("SM_Surface_")) ||
+				(L.StartsWith(TEXT("SM_Slab_")) && !L.EndsWith(TEXT("_Col"))))
+			{
+				SolActors.Add(*It);
+			}
+		}
+		int32 ProxyIdx = 0;
+		for (AStaticMeshActor* Src : SolActors)
+		{
+			UStaticMeshComponent* SrcComp = Src->GetStaticMeshComponent();
+			UStaticMesh* SrcMesh = SrcComp ? SrcComp->GetStaticMesh() : nullptr;
+			if (!SrcMesh)
+			{
+				continue;
+			}
+			UStaticMesh* Dup = DuplicateObject<UStaticMesh>(SrcMesh, GetTransientPackage());
+			Dup->SetFlags(RF_Transient);
+			Dup->GetNaniteSettings().bEnabled = false; // trimesh depuis le rendu plein res
+			Dup->ComplexCollisionMesh = nullptr;       // dalle : pas le 16x16 dedie
+			Dup->CreateBodySetup();
+			Dup->GetBodySetup()->CollisionTraceFlag = CTF_UseComplexAsSimple;
+			Dup->Build(/*bSilent=*/true);
+			AStaticMeshActor* P = World->SpawnActor<AStaticMeshActor>(
+				Src->GetActorLocation(), Src->GetActorRotation());
+			P->GetStaticMeshComponent()->SetMobility(EComponentMobility::Movable);
+			P->SetActorTransform(Src->GetActorTransform());
+			P->GetStaticMeshComponent()->SetStaticMesh(Dup);
+			P->GetStaticMeshComponent()->SetCollisionProfileName(TEXT("BlockAll"));
+			P->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+			P->SetActorHiddenInGame(true);
+			P->SetIsTemporarilyHiddenInEditor(true);
+			// Le prefixe SOL est conserve : le classement film/dalle du trace lit ce label.
+			P->SetActorLabel(FString::Printf(TEXT("%s_TraceProxy%d"),
+				Src->GetActorLabel().StartsWith(TEXT("SM_Surface_"))
+					? TEXT("SM_Surface") : TEXT("SM_Slab"), ProxyIdx++));
+			TraceProxies.Add(P);
+		}
+		// Le Build des duplicatas peut etre asynchrone : tout finir AVANT de tracer.
+		FStaticMeshCompilingManager::Get().FinishAllCompilation();
+	}
+
+	int32 TraceMiss = 0, NumFilmCentral = 0, NumDalleCentral = 0;
+	int32 NumFosseCorrige = 0, NumMultiHitRecup = 0;
+	// Hit SOL le plus haut de la colonne. Multi-hit : tout impact non-sol (toit de
+	// batiment, mobilier) est TRAVERSE en re-traçant juste sous lui, 8 etages max.
+	auto TraceColumnSol = [&](double Xcm, double Ycm, float& OutZ, bool& bOutFilm,
+		bool& bOutTraversee) -> bool
+	{
+		FVector Start(Xcm, Ycm, 50000.0);
+		const FVector End(Xcm, Ycm, -50000.0);
+		bOutTraversee = false;
+		for (int32 Step = 0; Step < 8; ++Step)
+		{
+			FHitResult Hit;
+			if (!World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, TraceParams))
+			{
+				return false;
+			}
+			const AActor* HitActor = Hit.GetActor();
+			const FString HL = HitActor ? HitActor->GetActorLabel() : FString();
+			if (HL.StartsWith(TEXT("SM_Surface_")) || HL.StartsWith(TEXT("SM_Slab_")))
+			{
+				OutZ = (float)Hit.ImpactPoint.Z;
+				bOutFilm = HL.StartsWith(TEXT("SM_Surface_"));
+				return true;
+			}
+			bOutTraversee = true;
+			Start.Z = Hit.ImpactPoint.Z - 1.0;
+			if (Start.Z <= End.Z + 1.0)
+			{
+				return false;
+			}
+		}
+		return false;
+	};
+
+	// Groupe les instances par mesh (contrainte HISM : un composant = un seul mesh).
+	// Le Z est calcule plus bas, une fois le mesh CHARGE : le rayon de fosse de la
+	// couronne depend de sa canopee. La cle preserve l'ordre de premiere apparition.
+	struct FVegInst
+	{
+		double X = 0.0;
+		double Y = 0.0;
+		float Scale = 1.f;
+		float Yaw = 0.f;
+	};
+	TMap<FString, TArray<FVegInst>> ByMesh;
+	for (const TSharedPtr<FJsonValue>& V : *Instances)
+	{
+		const TSharedPtr<FJsonObject> O = V->AsObject();
+		if (!O.IsValid())
+		{
+			continue;
+		}
+		const FString MeshPath = O->GetStringField(TEXT("mesh"));
+		if (MeshPath.IsEmpty())
+		{
+			continue;
+		}
+		FVegInst Inst;
+		Inst.X = O->GetNumberField(TEXT("x")) * 100.0;
+		Inst.Y = O->GetNumberField(TEXT("y")) * 100.0;
+		double Scale = 1.0; O->TryGetNumberField(TEXT("scale"), Scale);
+		double Yaw = 0.0;   O->TryGetNumberField(TEXT("yaw"), Yaw);
+		Inst.Scale = (float)Scale;
+		Inst.Yaw = (float)Yaw;
+		ByMesh.FindOrAdd(MeshPath).Add(Inst);
+	}
+
+	// Un acteur + un HISM par mesh distinct. Aucun mesh recree, aucun materiau touche.
+	for (auto& Pair : ByMesh)
+	{
+		const FString& MeshPath = Pair.Key;
+		// Accepte le chemin de package nu (/Game/.../SM_x) ou l'objet (/Game/.../SM_x.SM_x).
+		FString ObjectPath = MeshPath;
+		if (!ObjectPath.Contains(TEXT(".")))
+		{
+			ObjectPath += TEXT(".") + FPackageName::GetLongPackageAssetName(MeshPath);
+		}
+		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *ObjectPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (!Mesh)
+		{
+			UE_LOG(LogCityImport, Warning,
+				TEXT("Vegetation : mesh introuvable '%s' (%d instances ignorees)."),
+				*MeshPath, Pair.Value.Num());
+			continue;
+		}
+		// Piege F.39 : sans l'usage ISM sur ses materiaux, les instances rendent en defaut.
+		for (const FStaticMaterial& SM : Mesh->GetStaticMaterials())
+		{
+			if (SM.MaterialInterface)
+			{
+				SM.MaterialInterface->CheckMaterialUsage(MATUSAGE_InstancedStaticMeshes);
+			}
+		}
+		// Rayon de fosse : replique gen_surfaces_v5.py — rayon de canopee reel
+		// (demi-somme des demi-emprises X/Y du mesh) x scale, clamp [4;6] m, +50 cm de
+		// marge. Les touffes d'herbe (Clump) n'ont pas de fosse : pas de couronne (les
+		// relever a l'herbe distante ferait flotter une touffe posee sur dalle visible).
+		const FBoxSphereBounds MeshBounds = Mesh->GetBounds();
+		const float CanopyRUnitCm = (float)(MeshBounds.BoxExtent.X + MeshBounds.BoxExtent.Y) * 0.5f;
+		const bool bClump = Mesh->GetName().Contains(TEXT("Clump"));
+
+		AActor* VegActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
+		// Les instances deja posees ont une collision de canopee : sans cette ligne, les
+		// traces des meshes suivants s'epuisent dans les feuillages des arbres precedents
+		// (constate au run du 30/07 : 5 670 replis GroundZ au lieu de ~0).
+		TraceParams.AddIgnoredActor(VegActor);
+		USceneComponent* Root2 = NewObject<USceneComponent>(VegActor, TEXT("Root"), RF_Transactional);
+		VegActor->SetRootComponent(Root2);
+		VegActor->AddInstanceComponent(Root2);
+		Root2->RegisterComponent();
+		Root2->SetWorldLocation(Location);
+		UHierarchicalInstancedStaticMeshComponent* Hism =
+			NewObject<UHierarchicalInstancedStaticMeshComponent>(VegActor, TEXT("Veg"), RF_Transactional);
+		Hism->SetStaticMesh(Mesh);
+		Hism->SetupAttachment(Root2);
+		VegActor->AddInstanceComponent(Hism);
+		Hism->RegisterComponent();
+		for (const FVegInst& Inst : Pair.Value)
+		{
+			// Base-a-0, ZERO offset min_Z (pivot Megascans au pied) : le sol EST le hit
+			// SOL le plus haut de la colonne (proxys films + dalles), pas GroundZ.
+			float SolZ = 0.f;
+			bool bFilm = false;
+			bool bTraversee = false;
+			const bool bSol = TraceColumnSol(Inst.X, Inst.Y, SolZ, bFilm, bTraversee);
+			if (bSol && bTraversee)
+			{
+				++NumMultiHitRecup;
+			}
+			if (bSol && bFilm)
+			{
+				++NumFilmCentral;
+			}
+			else if (bSol)
+			{
+				++NumDalleCentral;
+				// Arbre en fosse : le trace central passe par le TROU du film et tape la
+				// dalle, alors que l'herbe VISIBLE autour est drapee plus haut. Couronne
+				// de 8 traces au rayon de fosse : >= 3 films -> base a la MEDIANE des Z
+				// film, bornee par la dalle (max) pour ne jamais enfoncer l'arbre sous un
+				// fond de fosse visible plus haut que l'herbe (creux du MNT).
+				if (!bClump)
+				{
+					const float RayonCm =
+						FMath::Clamp(CanopyRUnitCm * Inst.Scale, 400.f, 600.f) + 50.f;
+					TArray<float> FilmZs;
+					for (int32 K = 0; K < 8; ++K)
+					{
+						const double Ang = 2.0 * PI * K / 8.0;
+						float Zc = 0.f;
+						bool bF = false;
+						bool bT = false;
+						if (TraceColumnSol(Inst.X + RayonCm * FMath::Cos(Ang),
+							Inst.Y + RayonCm * FMath::Sin(Ang), Zc, bF, bT) && bF)
+						{
+							FilmZs.Add(Zc);
+						}
+					}
+					if (FilmZs.Num() >= 3)
+					{
+						FilmZs.Sort();
+						const int32 N = FilmZs.Num();
+						const float MedianFilm = (N % 2) ? FilmZs[N / 2]
+							: 0.5f * (FilmZs[N / 2 - 1] + FilmZs[N / 2]);
+						if (MedianFilm > SolZ)
+						{
+							SolZ = MedianFilm;
+							++NumFosseCorrige;
+						}
+					}
+				}
+			}
+			else
+			{
+				// Pas de sol dans la colonne : repli GroundZ (comptabilise, pas de hasard).
+				++TraceMiss;
+				SolZ = Drape.GroundZ(Inst.X, Inst.Y);
+			}
+			const FTransform Xf(FRotator(0, Inst.Yaw, 0),
+				FVector(Inst.X, Inst.Y, SolZ), FVector(Inst.Scale));
+			Hism->AddInstance(Xf, /*bWorldSpace*/ true);
+			++Summary.Instances;
+		}
+		VegActor->SetActorLabel(FString::Printf(TEXT("CityVeg_%s"), *Mesh->GetName()));
+		++Summary.Meshes;
+		++Summary.Actors;
+	}
+
+	// Cleanup des proxys de trace : acteurs detruits, duplicatas transient au GC.
+	// Les films/dalles d'ORIGINE n'ont jamais ete touches (rien de dirty).
+	for (AStaticMeshActor* P : TraceProxies)
+	{
+		World->DestroyActor(P);
+	}
+
+	FStaticMeshCompilingManager::Get().FinishAllCompilation();
+	UE_LOG(LogCityImport, Display,
+		TEXT("Vegetation importee : %d instances, %d meshes, %d acteurs — central film=%d, ")
+		TEXT("central dalle=%d, fosses corrigees (couronne)=%d, multi-hit recuperes=%d, ")
+		TEXT("replis GroundZ=%d, proxys sol=%d."),
+		Summary.Instances, Summary.Meshes, Summary.Actors, NumFilmCentral, NumDalleCentral,
+		NumFosseCorrige, NumMultiHitRecup, TraceMiss, TraceProxies.Num());
 	return Summary;
 }
 
