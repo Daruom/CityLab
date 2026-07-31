@@ -317,6 +317,16 @@ struct FCityVegSummary
 
 	/** Actors spawned to carry the HISM components (one per mesh). */
 	UPROPERTY() int32 Actors = 0;
+
+	/**
+	 * Instances REJECTED because no ground (SM_Surface_/SM_Slab_) was found in their
+	 * column. There is no analytic GroundZ fallback any more: no ground, no instance.
+	 * Their positions are written to "<VegJsonPath>.skipped.json" for tracing.
+	 */
+	UPROPERTY() int32 Skipped = 0;
+
+	/** Planting pits generated at the foot of trees growing through mineral ground. */
+	UPROPERTY() int32 Pits = 0;
 };
 
 /**
@@ -390,20 +400,32 @@ public:
 
 	/**
 	 * Places vegetation instances from a prepared JSON ("instances" array of
-	 * {mesh (package or object path), x, y (meters), scale, yaw (degrees)}) onto the
-	 * terrain the AUTHORITATIVE way — exactly like buildings. Each instance is seated
-	 * at Drape.GroundZ(x,y) (the FTerrainSampler the whole generator shares), base at 0,
-	 * ZERO min_Z offset (Megascans pivot at the foot), so nothing floats. Instances are
-	 * grouped by mesh (HISM constraint: one component per mesh); each distinct mesh is
-	 * loaded with LoadObject (never recreated) and its materials are left untouched — only
-	 * MATUSAGE_InstancedStaticMeshes is flagged (F.39). One "CityVeg_*" actor per mesh.
-	 * Re-running is a vegetation-only pass: it first destroys every previous "CityVeg*" actor.
+	 * {mesh (package or object path), x, y (meters), scale, yaw (degrees), kind
+	 * (optional "tree"/"hedge"/"clump")}) — the SINGLE authority that seats every plant
+	 * of the city, trees, hedges and grass clumps alike.
+	 *
+	 * Seating is done by TRACING the VISIBLE surface (throwaway trace proxies of the
+	 * SM_Surface_ films and SM_Slab_ slabs), not by an analytic terrain model: the
+	 * highest ground hit of the column wins, base at 0, ZERO min_Z offset (Megascans
+	 * pivot at the foot). NO GroundZ FALLBACK: an instance whose column has no ground
+	 * at all is simply NOT placed, counted in Skipped and listed in
+	 * "<VegJsonPath>.skipped.json".
+	 *
+	 * A TREE whose central hit is the slab AND whose ground mask says "mineral"
+	 * (R channel of SourceData/Sols/mask_<x>_<y>.png, < 128) gets a ~1.2 m planting
+	 * pit generated at its foot (one shared HISM, actor "CityVeg_TreePits").
+	 *
+	 * Instances are grouped by mesh (HISM constraint: one component per mesh); each
+	 * distinct mesh is loaded with LoadObject (never recreated) and its materials are
+	 * left untouched — only MATUSAGE_InstancedStaticMeshes is flagged (F.39). Grass
+	 * clumps additionally get the validated render settings (45-60 m fade, no shadow).
+	 * One "CityVeg_*" actor per mesh; re-running is a vegetation-only pass that first
+	 * destroys every previous "CityVeg*" actor.
 	 * @param VegJsonPath Absolute path to the vegetation JSON.
-	 * @param AssetFolder Package folder context (validated; passes reuse it for logs/lookups).
+	 * @param AssetFolder Package folder context (also receives the generated pit mesh).
 	 * @param Location World position of the district origin (instances are world-space).
-	 * @param Profile Generation profile; must match the district's (Desktop, bDrapeToTerrain=true)
-	 *        so GroundZ is identical to the buildings' seating.
-	 * @return Counts of what was placed.
+	 * @param Profile Generation profile; must match the district's (Desktop, bDrapeToTerrain=true).
+	 * @return Counts of what was placed, skipped and dug.
 	 */
 	UFUNCTION(meta = (AICallable), Category = "CityImportTools")
 	static FCityVegSummary ImportVegetation(const FString& VegJsonPath, const FString& AssetFolder,

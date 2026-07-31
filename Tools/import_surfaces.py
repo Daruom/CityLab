@@ -42,6 +42,11 @@ PACKS = [
     'wild_grass_sfknaeoa',
     'gravel_on_soil_okosdmp0',
     'pedestrian_crossing_lines_veggecd',
+    # SOLVERT (2026-07-30) : la couche HERBE du masque de sol (scan 2 x 2 m, moitie
+    # moins repetitif que grass_cut a resolution egale) et sa bande d'usure de
+    # frontiere. Consommes par import_ground_masks (M_CityGroundMasked).
+    'ground_grass_tb3nce2k',
+    'dried_grass_pjwfo0',
 ]
 MAPS = ('BaseColor', 'Normal', 'Roughness')
 QUIT_AFTER_S = 90.0
@@ -75,7 +80,8 @@ HARMONISE_MIN, HARMONISE_MAX = 0.70, 2.40
 # Bornes ELARGIES reservees a la cible chaussee de la v4b, qui vise plus bas que la
 # cible commune et pourrait donc demander a assombrir plus fort.
 ROAD_MIN, ROAD_MAX = 0.50, 2.60
-GRASS_PACKS = ('grass_cut_pjxmz0', 'uncut_grass_oilpt20', 'wild_grass_sfknaeoa')
+GRASS_PACKS = ('grass_cut_pjxmz0', 'uncut_grass_oilpt20', 'wild_grass_sfknaeoa',
+               'ground_grass_tb3nce2k', 'dried_grass_pjwfo0')
 # v5 « voirie » — packs laisses INTACTS (multiplicateur 1,0). Le passage pieton porte
 # un marquage PEINT : l'eclaircir ou l'assombrir pour le rapprocher de la clarte
 # commune reviendrait a repeindre les bandes. Il se lit par son motif, pas par sa
@@ -247,9 +253,12 @@ def harmonise_tints(root):
 
 
 def find_map(pack_dir, kind):
-    for name in sorted(os.listdir(pack_dir)):
-        if name.lower().endswith('_2k_%s.jpg' % kind.lower()):
-            return os.path.join(pack_dir, name)
+    """SOLVERT : le 4K est prefere quand il est extrait (politique desktop « author
+    4K, jamais 8K »), le 2K reste le repli — aucun pack ne casse s'il n'a pas de 4K."""
+    for token in ('_4k_', '_2k_'):
+        for name in sorted(os.listdir(pack_dir)):
+            if name.lower().endswith('%s%s.jpg' % (token, kind.lower())):
+                return os.path.join(pack_dir, name)
     return None
 
 
@@ -285,6 +294,13 @@ def configure_texture(tex, kind):
         tex.set_editor_property('lod_group', unreal.TextureGroup.TEXTUREGROUP_WORLD)
     tex.set_editor_property('address_x', unreal.TextureAddress.TA_WRAP)
     tex.set_editor_property('address_y', unreal.TextureAddress.TA_WRAP)
+    # SOLVERT : coherence VT <-> samplers (piege paye, fix_grass_vt) — les materiaux
+    # M_Surf_* / M_CityGroundMasked echantillonnent en samplers CLASSIQUES ; une
+    # texture auto-passee en VT a l'import 4K les casserait silencieusement.
+    try:
+        tex.set_editor_property('virtual_texture_streaming', False)
+    except Exception:
+        pass
 
 
 def build_material(slug, folder, textures, size_x, size_y, tint):
@@ -350,7 +366,11 @@ def build_material(slug, folder, textures, size_x, size_y, tint):
     return wired, saved, nanite
 
 
-def run():
+def run(only=None):
+    """only : sous-ensemble de PACKS a (re)importer. Les teintes d'harmonisation sont
+    TOUJOURS calculees sur la palette complete (la cible commune ne doit pas bouger
+    quand on ne reimporte qu'une partie des packs) ; seuls les packs listes sont
+    touches sur disque — les surfaces dormantes restent intactes (SOLVERT)."""
     root = ground_root()
     log('packs lus dans %s' % root)
     tints = harmonise_tints(root)
@@ -358,6 +378,8 @@ def run():
     # v5 : textures du pack de dalle memorisees au passage, pour en deriver la bordure.
     curb_src = {'textures': None, 'size': (2.0, 2.0)}
     for slug in PACKS:
+        if only is not None and slug not in only:
+            continue
         pack_dir = os.path.join(root, slug)
         if not os.path.isdir(pack_dir):
             problems.append('%s : dossier absent' % slug)

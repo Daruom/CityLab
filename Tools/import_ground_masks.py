@@ -19,6 +19,21 @@
 # escalier. EdgeMinM est le plancher : si les derivees ne disent rien, la
 # transition retombe sur une valeur fixe et ca marche quand meme.
 #
+# SOLVERT (2026-07-30) — 5e COUCHE : L'HERBE (canal R du masque, SDF cuit par
+# j3c_sols_masks depuis OCS GE CS2.*). Les films verts SM_Surface_* disparaissent.
+#   - revetement : ground_grass_tb3nce2k (scan 2 x 2 m — l'echelle est imposee par
+#     physical_size du pack : la recette ne PERMET PAS de se tromper de tiling) ;
+#   - bord ORGANIQUE : la distance d'herbe est deplacee par 2 octaves d'un bruit
+#     tuilable (T_SolNoise512, cuit par work/SOLVERT/gen_noise512.py) — ondulation
+#     ~3 m d'amplitude +-27 cm + meandre ~16 m d'amplitude +-60 cm : la corde de
+#     9 m de la donnee disparait sous un bord vivant ;
+#   - bande d'USURE : dried_grass_pjwfo0 melange sur ~80 cm autour de la frontiere
+#     (le raccord herbe/pave se lit comme une transition, pas comme une decoupe) ;
+#   - MACRO-VARIATION de teinte a vraie grande periode (~30 m de motif dominant,
+#     amplitude 0,80..1,25) : casse la repetition la ou l'oeil la voit (5-30 m).
+#   - ordre du melange : slab -> HERBE -> grav -> priv -> road (l'herbe passe sur
+#     la dalle, la voirie passe sur l'herbe : le peint gagne toujours).
+#
 # Pieges payes, respectes ici :
 #   - session -nullrhi = materiaux SANS shaders -> ce script tourne en RHI reel ;
 #   - set_editor_property ne salit pas le package -> recompile + save FORCE ;
@@ -49,6 +64,14 @@ CLASSES = [
     ('priv', 'herringbone_brick_pavement_ue3gbepkw'),
     ('grav', 'gravel_on_soil_okosdmp0'),
 ]
+# SOLVERT : la 5e couche et sa bande d'usure (importees par import_surfaces comme
+# les autres packs ; herbes NON harmonisees — teinte x1).
+# CORRECTION mesuree (2026-07-30) : ground_grass_tb3nce2k, retenu par le rapport
+# pour sa taille (2 x 2 m), est en realite un scan d'herbe SECHE beige (RGB moyen
+# 159/142/110, R > G). Le 2 x 2 m VERT de la bibliotheque est uncut_grass_oilpt20
+# (84/96/42) — verifie sur planche comparative work/SOLVERT/_compare_grass.png.
+GRASS_SLUG = 'uncut_grass_oilpt20'
+WEAR_SLUG = 'dried_grass_pjwfo0'
 MAPS = ('BaseColor', 'Normal', 'Roughness')
 
 # Doit valoir SDF_RANGE_M de j3c_sols_masks.py — la seule constante partagee entre
@@ -58,6 +81,18 @@ CELL_SIZE_M = 500.0
 # Transition minimale de la frontiere, en metres. 4 cm : au ras du sol on voit une
 # arete franche, jamais un escalier de texels.
 EDGE_MIN_M = 0.04
+
+# SOLVERT — bord d'herbe organique et macro-variation. Les periodes sont celles de
+# la TUILE du bruit (le motif dominant du bruit fait ~1/3 de tuile, cf. gen_noise512).
+NOISE_NAME = 'T_SolNoise512'
+NOISE1_M = 9.0        # octave fine : ondulation ~3 m ...
+NOISE1_AMP = 0.55     # ... amplitude +-27 cm
+NOISE2_M = 48.0       # meandre ~16 m ...
+NOISE2_AMP = 1.20     # ... amplitude +-60 cm
+MACRO_M = 90.0        # macro-teinte : motif dominant ~30 m
+MACRO_MIN = 0.80
+MACRO_MAX = 1.25
+WEAR_HALF_M = 0.8     # demi-largeur de la bande d'usure dried_grass
 
 E = unreal.EditorAssetLibrary
 AT = unreal.AssetToolsHelpers.get_asset_tools()
@@ -112,6 +147,35 @@ def import_mask_texture(png_path, name):
     tex.set_editor_property('address_x', unreal.TextureAddress.TA_CLAMP)
     tex.set_editor_property('address_y', unreal.TextureAddress.TA_CLAMP)
     E.save_asset('%s/%s' % (GROUND_ROOT, name), only_if_is_dirty=False)
+    return tex
+
+
+def import_noise_texture(png_path):
+    """T_SolNoise512 : bruit tuilable LINEAIRE (sRGB off, wrap). Une seule texture
+    512x512 pour les 2 octaves de bord ET la macro-teinte (3 echantillons a 3
+    echelles differentes)."""
+    task = unreal.AssetImportTask()
+    task.set_editor_property('filename', png_path)
+    task.set_editor_property('destination_path', GROUND_ROOT)
+    task.set_editor_property('destination_name', NOISE_NAME)
+    task.set_editor_property('automated', True)
+    task.set_editor_property('replace_existing', True)
+    task.set_editor_property('save', False)
+    AT.import_asset_tasks([task])
+    tex = E.load_asset('%s/%s' % (GROUND_ROOT, NOISE_NAME))
+    if tex is None:
+        return None
+    tex.set_editor_property('srgb', False)
+    tex.set_editor_property('compression_settings',
+                            unreal.TextureCompressionSettings.TC_DEFAULT)
+    tex.set_editor_property('lod_group', unreal.TextureGroup.TEXTUREGROUP_WORLD)
+    tex.set_editor_property('address_x', unreal.TextureAddress.TA_WRAP)
+    tex.set_editor_property('address_y', unreal.TextureAddress.TA_WRAP)
+    try:
+        tex.set_editor_property('virtual_texture_streaming', False)
+    except Exception:
+        pass
+    E.save_asset('%s/%s' % (GROUND_ROOT, NOISE_NAME), only_if_is_dirty=False)
     return tex
 
 
@@ -180,7 +244,21 @@ def build_master(textures, sizes, tints):
     mask.set_editor_property('sampler_type', unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR)
     MEL.connect_material_expressions(mask_uv, '', mask, 'UVs')
 
-    # --- Poids des classes, depuis les CHAMPS DE DISTANCE (canaux G/B/A).
+    # --- SOLVERT : 3 echantillons du bruit tuilable (2 octaves de bord + macro),
+    #     en UV monde metriques comme les revetements.
+    noise_nodes = {}
+    for key, period, ny in (('N1', NOISE1_M, 300), ('N2', NOISE2_M, 500), ('N3', MACRO_M, 700)):
+        ntc = MEL.create_material_expression(mat, unreal.MaterialExpressionTextureCoordinate,
+                                             -1850, ny)
+        ntc.set_editor_property('u_tiling', 1.0 / period)
+        ntc.set_editor_property('v_tiling', 1.0 / period)
+        noise_nodes[key] = sample(mat, textures['noise'], ntc, -1650, ny,
+                                  unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR)
+
+    # --- Poids des classes, depuis les CHAMPS DE DISTANCE (canaux R/G/B/A).
+    #     R = herbe (SOLVERT), G = chaussee, B = voirie privee, A = gravier.
+    #     La distance d'HERBE est deplacee par 2 octaves de bruit AVANT le calcul du
+    #     poids : le bord vit, et fw (footprint ecran) antialiase aussi le bruit.
     edge = MEL.create_material_expression(mat, unreal.MaterialExpressionScalarParameter,
                                           -1550, 100)
     edge.set_editor_property('parameter_name', 'EdgeMinM')
@@ -188,36 +266,73 @@ def build_master(textures, sizes, tints):
     weights = MEL.create_material_expression(mat, unreal.MaterialExpressionCustom, -1250, -200)
     weights.set_editor_property('description', 'ClassWeightsFromSDF')
     weights.set_editor_property('output_type',
-                                unreal.CustomMaterialOutputType.CMOT_FLOAT3)
+                                unreal.CustomMaterialOutputType.CMOT_FLOAT4)
     weights.set_editor_property('code', (
-        '// G/B/A = distances signees a la chaussee, a la voirie privee et au gravier.\n'
-        'float3 sd = (float3(M.g, M.b, M.a) - 0.5) * %.1f;\n'
-        'float3 w = 0;\n'
-        '{ float d = sd.x; float fw = max(EdgeMinM, (abs(ddx(d)) + abs(ddy(d))) * 0.75);\n'
+        '// R/G/B/A = distances signees : herbe, chaussee, voirie privee, gravier.\n'
+        'float4 sd = (float4(M.r, M.g, M.b, M.a) - 0.5) * %.1f;\n'
+        '// bord d herbe ORGANIQUE : 2 octaves de bruit deplacent la frontiere.\n'
+        'float dg = sd.x + (N1 - 0.5) * %.2f + (N2 - 0.5) * %.2f;\n'
+        'float4 w = 0;\n'
+        '{ float d = dg;   float fw = max(EdgeMinM, (abs(ddx(d)) + abs(ddy(d))) * 0.75);\n'
         '  w.x = saturate(d / fw + 0.5); }\n'
         '{ float d = sd.y; float fw = max(EdgeMinM, (abs(ddx(d)) + abs(ddy(d))) * 0.75);\n'
         '  w.y = saturate(d / fw + 0.5); }\n'
         '{ float d = sd.z; float fw = max(EdgeMinM, (abs(ddx(d)) + abs(ddy(d))) * 0.75);\n'
         '  w.z = saturate(d / fw + 0.5); }\n'
-        'return w;' % (2.0 * SDF_RANGE_M)))
+        '{ float d = sd.w; float fw = max(EdgeMinM, (abs(ddx(d)) + abs(ddy(d))) * 0.75);\n'
+        '  w.w = saturate(d / fw + 0.5); }\n'
+        'return w;' % (2.0 * SDF_RANGE_M, NOISE1_AMP, NOISE2_AMP)))
     ins = []
-    for nom in ('M', 'EdgeMinM'):
+    for nom in ('M', 'EdgeMinM', 'N1', 'N2'):
         ci = unreal.CustomInput()
         ci.set_editor_property('input_name', nom)
         ins.append(ci)
     weights.set_editor_property('inputs', ins)
     MEL.connect_material_expressions(mask, 'RGBA', weights, 'M')
     MEL.connect_material_expressions(edge, '', weights, 'EdgeMinM')
+    MEL.connect_material_expressions(noise_nodes['N1'], 'R', weights, 'N1')
+    MEL.connect_material_expressions(noise_nodes['N2'], 'R', weights, 'N2')
+    # w.x = herbe, w.y = chaussee, w.z = privee, w.w = gravier
+    wg = MEL.create_material_expression(mat, unreal.MaterialExpressionComponentMask, -1050, -400)
     wx = MEL.create_material_expression(mat, unreal.MaterialExpressionComponentMask, -1050, -320)
     wy = MEL.create_material_expression(mat, unreal.MaterialExpressionComponentMask, -1050, -240)
     wz = MEL.create_material_expression(mat, unreal.MaterialExpressionComponentMask, -1050, -160)
-    for m, (r, g, b) in ((wx, (True, False, False)), (wy, (False, True, False)),
-                         (wz, (False, False, True))):
+    for m, (r, g, b, a) in ((wg, (True, False, False, False)), (wx, (False, True, False, False)),
+                            (wy, (False, False, True, False)), (wz, (False, False, False, True))):
         m.set_editor_property('r', r)
         m.set_editor_property('g', g)
         m.set_editor_property('b', b)
-        m.set_editor_property('a', False)
+        m.set_editor_property('a', a)
         MEL.connect_material_expressions(weights, '', m, '')
+
+    # --- SOLVERT : bande d'usure a la frontiere d'herbe (meme distance bruitee).
+    wear_t = MEL.create_material_expression(mat, unreal.MaterialExpressionCustom, -1250, 550)
+    wear_t.set_editor_property('description', 'GrassWearBand')
+    wear_t.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT1)
+    wear_t.set_editor_property('code', (
+        'float dg = (M.r - 0.5) * %.1f + (N1 - 0.5) * %.2f + (N2 - 0.5) * %.2f;\n'
+        'return saturate(1.0 - abs(dg) / %.2f);'
+        % (2.0 * SDF_RANGE_M, NOISE1_AMP, NOISE2_AMP, WEAR_HALF_M)))
+    ins_w = []
+    for nom in ('M', 'N1', 'N2'):
+        ci = unreal.CustomInput()
+        ci.set_editor_property('input_name', nom)
+        ins_w.append(ci)
+    wear_t.set_editor_property('inputs', ins_w)
+    MEL.connect_material_expressions(mask, 'RGBA', wear_t, 'M')
+    MEL.connect_material_expressions(noise_nodes['N1'], 'R', wear_t, 'N1')
+    MEL.connect_material_expressions(noise_nodes['N2'], 'R', wear_t, 'N2')
+
+    # --- SOLVERT : macro-variation de teinte (0,80..1,25) a vraie grande periode.
+    macro_lo = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant, -1250, 800)
+    macro_lo.set_editor_property('r', MACRO_MIN)
+    macro_hi = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant, -1250, 880)
+    macro_hi.set_editor_property('r', MACRO_MAX)
+    macro_mul = MEL.create_material_expression(mat, unreal.MaterialExpressionLinearInterpolate,
+                                               -1050, 820)
+    MEL.connect_material_expressions(macro_lo, '', macro_mul, 'A')
+    MEL.connect_material_expressions(macro_hi, '', macro_mul, 'B')
+    MEL.connect_material_expressions(noise_nodes['N3'], 'R', macro_mul, 'Alpha')
 
     # --- Un jeu d'echantillons par classe, en UV metriques a l'echelle du scan.
     outs = {}
@@ -257,14 +372,60 @@ def build_master(textures, sizes, tints):
         outs[key] = node
         y += 900
 
-    # --- Melange : dalle, puis gravier, puis privee, puis chaussee (priorite du
-    #     masque, a l'identique du canal de classe cuit par le prep).
+    # --- SOLVERT : la couche HERBE = scan 2 m module par la macro-teinte, fondu
+    #     vers dried_grass dans la bande d'usure (meme geometrie que le poids).
+    def grass_layer():
+        sxg, syg = sizes['grass']
+        tcg = MEL.create_material_expression(mat, unreal.MaterialExpressionTextureCoordinate,
+                                             -900, y + 0)
+        tcg.set_editor_property('u_tiling', 1.0 / sxg)
+        tcg.set_editor_property('v_tiling', 1.0 / syg)
+        sxw, syw = sizes['wear']
+        tcw = MEL.create_material_expression(mat, unreal.MaterialExpressionTextureCoordinate,
+                                             -900, y + 700)
+        tcw.set_editor_property('u_tiling', 1.0 / sxw)
+        tcw.set_editor_property('v_tiling', 1.0 / syw)
+        node = {}
+        for i, kind in enumerate(MAPS):
+            gt = textures['grass'].get(kind)
+            if gt is None:
+                continue
+            sampler = (unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL if kind == 'Normal'
+                       else unreal.MaterialSamplerType.SAMPLERTYPE_MASKS if kind == 'Roughness'
+                       else unreal.MaterialSamplerType.SAMPLERTYPE_COLOR)
+            sg = sample(mat, gt, tcg, -650, y + i * 200, sampler)
+            pin_g = 'R' if kind == 'Roughness' else ''
+            cur, pin = sg, pin_g
+            if kind == 'BaseColor':
+                mulm = MEL.create_material_expression(
+                    mat, unreal.MaterialExpressionMultiply, -420, y + i * 200)
+                MEL.connect_material_expressions(sg, '', mulm, 'A')
+                MEL.connect_material_expressions(macro_mul, '', mulm, 'B')
+                cur, pin = mulm, ''
+            wt = textures['wear'].get(kind)
+            if wt is not None:
+                sw = sample(mat, wt, tcw, -650, y + 700 + i * 200, sampler)
+                lpw = MEL.create_material_expression(
+                    mat, unreal.MaterialExpressionLinearInterpolate, -250, y + i * 200)
+                MEL.connect_material_expressions(cur, pin, lpw, 'A')
+                MEL.connect_material_expressions(sw, 'R' if kind == 'Roughness' else '',
+                                                 lpw, 'B')
+                MEL.connect_material_expressions(wear_t, '', lpw, 'Alpha')
+                cur, pin = lpw, ''
+            node[kind] = (cur, pin)
+        return node
+
+    outs['grass'] = grass_layer()
+
+    # --- Melange : dalle, puis HERBE, puis gravier, puis privee, puis chaussee
+    #     (priorite du masque : le PEINT gagne toujours sur l'herbe).
     def blend(kind, prop, y0):
         base = outs['slab'].get(kind)
         if base is None:
             return False
         cur, pin = base
-        for i, (key, w) in enumerate((('grav', wz), ('priv', wy), ('road', wx))):
+        for i, (key, w) in enumerate((('grass', wg), ('grav', wz), ('priv', wy),
+                                      ('road', wx))):
             other = outs[key].get(kind)
             if other is None:
                 continue
@@ -397,6 +558,32 @@ def run():
         sizes[key] = src['physical_size'](pack_dir) if os.path.isdir(pack_dir) else (2.0, 2.0)
         log('classe %-6s -> %-40s scan %gx%g m, cartes %s'
             % (key, slug, sizes[key][0], sizes[key][1], '+'.join(sorted(got))))
+
+    # --- SOLVERT : herbe (5e couche) + bande d'usure + bruit tuilable.
+    for key, slug in (('grass', GRASS_SLUG), ('wear', WEAR_SLUG)):
+        folder = '%s/%s' % (SURFACES_ROOT, slug)
+        got = {}
+        for kind in MAPS:
+            p = '%s/T_%s_%s' % (folder, slug, kind)
+            t = E.load_asset(p)
+            if t is None:
+                log('ANOMALIE : %s absent (lancer import_surfaces.py)' % p)
+            else:
+                got[kind] = t
+        textures[key] = got
+        pack_dir = os.path.join(ground, slug)
+        sizes[key] = src['physical_size'](pack_dir) if os.path.isdir(pack_dir) else (2.0, 2.0)
+        log('couche %-6s -> %-40s scan %gx%g m, cartes %s'
+            % (key, slug, sizes[key][0], sizes[key][1], '+'.join(sorted(got))))
+    if not textures['grass']:
+        raise RuntimeError('MASK: textures %s absentes — la couche herbe ne peut pas '
+                           'se construire (import_surfaces d abord)' % GRASS_SLUG)
+    noise_png = os.path.join(d, 'noise512.png')
+    if not os.path.exists(noise_png):
+        raise RuntimeError('MASK: %s absent — lancer work/SOLVERT/gen_noise512.py' % noise_png)
+    textures['noise'] = import_noise_texture(noise_png)
+    if textures['noise'] is None:
+        raise RuntimeError('MASK: import du bruit %s echoue' % noise_png)
 
     master, wired = build_master(textures, sizes, tints)
     build_marking(tints)

@@ -22,7 +22,9 @@ public class CityLabEditor : ModuleRules
 			"ImageWrapper",
 			"Json",
 			"MeshDescription",
-			"StaticMeshDescription"
+			"StaticMeshDescription",
+			// Lecture des sommets de rendu (empattement des arbres -> taille des fosses).
+			"RenderCore"
 		});
 	}
 }

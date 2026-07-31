@@ -14,19 +14,22 @@
    ],
    "png": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\mask_-1_-1.png",
    "json": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\sols_-1_-1.json",
-   "curbs": 64,
+   "curbs": 67,
    "crossings": 0,
    "axial": 4,
-   "curbLenM": 8088.3,
-   "pngBytes": 134890,
-   "jsonBytes": 10496,
+   "curbLenM": 8268.8,
+   "pngBytes": 157366,
+   "jsonBytes": 10800,
    "areasM2": {
-    "corridor": 46712.9,
-    "chaussee": 16345.8,
+    "corridor": 47548.0,
+    "chaussee": 16548.1,
     "privee": 1272.2,
     "gravier": 0.0,
+    "herbe": 27210.9,
     "cellule": 250000.0
-   }
+   },
+   "herbeRasterM2": 27450.3,
+   "herbeEcartPc": 0.88
   },
   {
    "cell": [
@@ -39,19 +42,22 @@
    ],
    "png": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\mask_-1_0.png",
    "json": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\sols_-1_0.json",
-   "curbs": 118,
+   "curbs": 116,
    "crossings": 0,
    "axial": 27,
-   "curbLenM": 8408.6,
-   "pngBytes": 132060,
-   "jsonBytes": 13351,
+   "curbLenM": 8594.0,
+   "pngBytes": 128883,
+   "jsonBytes": 13485,
    "areasM2": {
-    "corridor": 45468.0,
-    "chaussee": 18633.4,
+    "corridor": 46208.9,
+    "chaussee": 18720.1,
     "privee": 1476.9,
     "gravier": 0.0,
+    "herbe": 10343.7,
     "cellule": 250000.0
-   }
+   },
+   "herbeRasterM2": 10472.5,
+   "herbeEcartPc": 1.246
   },
   {
    "cell": [
@@ -67,16 +73,19 @@
    "curbs": 76,
    "crossings": 0,
    "axial": 206,
-   "curbLenM": 13389.2,
-   "pngBytes": 163415,
-   "jsonBytes": 19970,
+   "curbLenM": 13452.9,
+   "pngBytes": 156103,
+   "jsonBytes": 20111,
    "areasM2": {
-    "corridor": 89047.7,
-    "chaussee": 32081.1,
-    "privee": 105.0,
+    "corridor": 89892.5,
+    "chaussee": 32105.2,
+    "privee": 105.1,
     "gravier": 0.0,
+    "herbe": 5357.2,
     "cellule": 250000.0
-   }
+   },
+   "herbeRasterM2": 5425.2,
+   "herbeEcartPc": 1.269
   },
   {
    "cell": [
@@ -89,20 +98,23 @@
    ],
    "png": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\mask_0_0.png",
    "json": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Sols\\sols_0_0.json",
-   "curbs": 81,
+   "curbs": 73,
    "crossings": 0,
    "axial": 183,
-   "curbLenM": 10619.3,
-   "pngBytes": 117289,
-   "jsonBytes": 15777,
+   "curbLenM": 10800.7,
+   "pngBytes": 118413,
+   "jsonBytes": 15761,
    "areasM2": {
-    "corridor": 59527.2,
-    "chaussee": 25086.9,
+    "corridor": 61228.0,
+    "chaussee": 25135.0,
     "privee": 332.6,
     "gravier": 0.0,
+    "herbe": 6071.6,
     "cellule": 250000.0
-   }
+   },
+   "herbeRasterM2": 6196.5,
+   "herbeEcartPc": 2.057
   }
  ],
- "generatedAt": "2026-07-27T12:52:53"
+ "generatedAt": "2026-07-30T20:35:00"
 }

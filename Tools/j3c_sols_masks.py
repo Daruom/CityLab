@@ -26,8 +26,22 @@
 #
 # Les PONTS (position_par_rapport_au_sol > 0) sont EXCLUS du masque : ils restent
 # les rubans/tabliers du generateur C++ — un pont ne se peint pas sur le sol.
-# Les espaces VERTS ne sont pas peints non plus : ils restent les meshes existants
-# poses au-dessus de la dalle.
+#
+# SOLVERT (2026-07-30) — L'HERBE EST LA 5e COUCHE DU MASQUE (canal R).
+# Les films verts (meshes SM_Surface_* poses au-dessus de la dalle) sont abandonnes :
+# l'herbe devient un ETAT DU SOL, decrit par un champ de distance comme la chaussee.
+#   R = SDF signe HERBE (etait : identifiant de classe, que le shader ne lisait pas ;
+#       la classe reste calculee pour l'apercu et le selftest, elle n'est plus cuite).
+# Source vegetale : IGN OCS GE CS2.* ENTIER (ligneux + herbace — une pelouse sous les
+# arbres d'un square est classee ligneuse, cf. work/SOLVERT/ocsge_eval.md), convertie
+# en repere local par work/SOLVERT/solvert_prep.py -> SourceData/ocsge_verts.json.
+#   herbe = union(CS2.*) - chaussee - privee - gravier - bati - eau
+# L'herbe est LE COMPLEMENT de la voirie peinte : le debordement (grief 3) est
+# structurellement impossible. Ouverture morphologique VECTORIELLE de 1 m
+# (buffer -1/+1) : les languettes, croissants et fils meurent d'un coup (grief 4),
+# operateur uniforme et national, sans parametre par ville. Les fosses d'arbres
+# inventees (disques 4-6 m) ne sont PLUS generees (doctrine CROSSINGS_ON : « mieux
+# vaut pas de marquage qu'un marquage invente »).
 #
 # Usage :
 #   python j3c_sols_masks.py --selftest        # verrou geometrique synthetique
@@ -62,6 +76,9 @@ OUT_DIR = os.path.join(SRC, "Sols")
 SAVED = os.path.join(ROOT, "Saved")
 LOG_PATH = os.path.join(SRC, "sols_masks.progress.log")
 OSM_PATH = os.path.join(SRC, "toulouse10.json")
+# SOLVERT : polygones vegetaux OCS GE CS2.* deja convertis en repere local (metres,
+# x = est, y = sud). Produit par work/SOLVERT/solvert_prep.py depuis les GeoJSON MVT.
+OCSGE_PATH = os.path.join(SRC, "ocsge_verts.json")
 
 CELL_M = 500.0          # cote d'une cellule (== CellSizeM du generateur)
 OUT_PX = 1024           # cote du masque cuit : 48,83 cm/px
@@ -76,6 +93,14 @@ CLS_TROTTOIR = 1        # corridor public hors chaussee : trottoirs, places, par
 CLS_CHAUSSEE = 2
 CLS_PRIVEE = 3
 CLS_GRAVIER = 4
+CLS_HERBE = 5           # SOLVERT : sol vegetal OCS GE (apercu/selftest seulement)
+
+# SOLVERT : rayon de l'ouverture morphologique vectorielle appliquee a l'herbe
+# (buffer -r puis +r). 1 m efface toute structure de moins de 2 m de large — la
+# languette le long d'un trottoir meurt, une vraie pelouse ne perd que son lisere.
+# Le rayon d'influence (2 m) reste sous la marge de calcul des cellules (~3,9 m) :
+# l'operation par cellule est identique a l'operation globale.
+HERBE_OUVERTURE_M = 1.0
 
 # Natures BD TOPO qui ne portent PAS de bordure : sur autoroute et bretelle, la
 # chaussee finit en accotement, pas en trottoir.
@@ -278,6 +303,35 @@ def charger_routes_bdtopo(fen):
         "mesurees %d / replis %d"
         % (len(out), stats["gardes"], stats["pont"], stats["souterrain"], stats["nature"],
            stats["autre"], stats["mesure"], stats["repli"]))
+    return out
+
+
+def charger_verts_ocsge(fen):
+    """Polygones vegetaux OCS GE CS2.* (SourceData/ocsge_verts.json, deja en repere
+    local). C'est le SOCLE national de la couche herbe — partition sans trou, UMC
+    500 m2 (cf. work/SOLVERT/ocsge_eval.md). Retourne aussi la fraction de la
+    fenetre couverte par OCS GE toutes classes confondues : si elle est faible, la
+    fenetre depasse l'AOI recuperee et il faut refetcher (MVT, 4 pieges documentes)."""
+    if not os.path.exists(OCSGE_PATH):
+        log("ATTENTION : %s absent, la couche HERBE du masque sera VIDE" % OCSGE_PATH)
+        return []
+    with open(OCSGE_PATH, encoding="utf-8") as f:
+        data = json.load(f)
+    out = []
+    n_lus = 0
+    for rec in data.get("cs2", []):
+        n_lus += 1
+        pts = rec.get("pts") or []
+        if len(pts) < 3 or not C.bbox_hit(C.bbox_of(pts), *fen):
+            continue
+        holes = [h for h in (rec.get("holes") or []) if len(h) >= 3]
+        try:
+            g = C.valide(Polygon(pts, holes))
+        except Exception:
+            continue
+        if not g.is_empty:
+            out.append(g)
+    log("verts OCS GE : %d polygones CS2.* lus, %d dans la fenetre" % (n_lus, len(out)))
     return out
 
 
@@ -596,7 +650,8 @@ def axial_dashes(routes, chaussee, cell_box, jonctions):
     return out
 
 
-def cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, batis=None, preview=True):
+def cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, batis=None, verts=None,
+                  preview=True):
     t0 = time.time()
     x0, y0 = cx * CELL_M, cy * CELL_M
     cell_box = box(x0, y0, x0 + CELL_M, y0 + CELL_M)
@@ -611,6 +666,24 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, batis=None, preview=
     corridor, chaussee, privee, gravier, u_bati = classes_de_cellule(
         zone, loc_parc, loc_eau, loc_routes, loc_bati)
 
+    # --- SOLVERT : la couche HERBE, complement de la voirie peinte.
+    # herbe = union(OCS GE CS2.*) - chaussee - privee - gravier - bati - eau, puis
+    # ouverture morphologique vectorielle de HERBE_OUVERTURE_M. La soustraction se
+    # fait contre LA GEOMETRIE MEME qui sera peinte : deborder est impossible.
+    loc_verts = [v for v in (verts or []) if v.intersects(zone)]
+    herbe = zone.difference(zone)                       # vide, du bon type
+    if loc_verts:
+        herbe = C.valide(unary_union(loc_verts).intersection(zone))
+        for g in (chaussee, privee, gravier):
+            if g is not None and not g.is_empty:
+                herbe = C.valide(herbe.difference(g))
+        if u_bati is not None and not u_bati.is_empty:
+            herbe = C.valide(herbe.difference(u_bati))
+        if loc_eau:
+            herbe = C.valide(herbe.difference(unary_union(loc_eau)))
+        if not herbe.is_empty:
+            herbe = C.valide(herbe.buffer(-HERBE_OUVERTURE_M).buffer(HERBE_OUVERTURE_M))
+
     # --- rasterisation (grille de calcul : cellule + marge, a 24,41 cm/px)
     size = OUT_PX * SS + 2 * MARGIN_PX
     ox, oy = x0 - marge_m, y0 - marge_m
@@ -618,13 +691,16 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, batis=None, preview=
     m_priv = rasterize(privee, size, ox, oy, px_ss)
     m_grav = rasterize(gravier, size, ox, oy, px_ss)
     m_road = rasterize(chaussee, size, ox, oy, px_ss)
-    # Priorite du melange : chaussee > gravier > privee > trottoir. Les masques des
-    # SDF sont rendus DISJOINTS dans le meme ordre, sinon le shader (qui empile les
-    # SDF) et le canal de classe se contrediraient sur les recouvrements.
+    m_grass = rasterize(herbe, size, ox, oy, px_ss)
+    # Priorite du melange : chaussee > gravier > privee > herbe > trottoir. Les
+    # masques des SDF sont rendus DISJOINTS dans le meme ordre, sinon le shader (qui
+    # empile les SDF) et le canal de classe se contrediraient sur les recouvrements.
     m_grav = m_grav & ~m_road
     m_priv = m_priv & ~m_road & ~m_grav
+    m_grass = m_grass & ~m_road & ~m_grav & ~m_priv
     cls = np.zeros((size, size), dtype=np.uint8)
     cls[m_corr] = CLS_TROTTOIR
+    cls[m_grass] = CLS_HERBE
     cls[m_priv] = CLS_PRIVEE
     cls[m_grav] = CLS_GRAVIER
     cls[m_road] = CLS_CHAUSSEE
@@ -632,6 +708,7 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, batis=None, preview=
     sdf_road = signed_distance_px(m_road, BAND_PX)
     sdf_priv = signed_distance_px(m_priv, BAND_PX)
     sdf_grav = signed_distance_px(m_grav, BAND_PX)
+    sdf_grass = signed_distance_px(m_grass, BAND_PX)
 
     def reduire_sdf(sdf):
         c = sdf[MARGIN_PX:MARGIN_PX + OUT_PX * SS, MARGIN_PX:MARGIN_PX + OUT_PX * SS]
@@ -639,8 +716,14 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, batis=None, preview=
         return encode_sdf(c, px_ss)
 
     crop = (slice(MARGIN_PX, MARGIN_PX + OUT_PX * SS), slice(MARGIN_PX, MARGIN_PX + OUT_PX * SS))
-    r_chan = cls[crop][::SS, ::SS]                      # classe : echantillon central
-    rgba = np.dstack([r_chan, reduire_sdf(sdf_road), reduire_sdf(sdf_priv), reduire_sdf(sdf_grav)])
+    r_chan = cls[crop][::SS, ::SS]                      # classe : apercu/mesure seulement
+    g_grass = reduire_sdf(sdf_grass)
+    rgba = np.dstack([g_grass, reduire_sdf(sdf_road), reduire_sdf(sdf_priv), reduire_sdf(sdf_grav)])
+
+    # Mesure de fidelite raster (decision 1024 vs 2048, cf. commande SOLVERT) : aire
+    # vectorielle de l'herbe dans la cellule VS aire « SDF cuit > 0,5 » au PNG final.
+    aire_herbe_vec = herbe.intersection(cell_box).area
+    aire_herbe_png = float((g_grass >= 128).sum()) * (CELL_M / OUT_PX) ** 2
 
     os.makedirs(OUT_DIR, exist_ok=True)
     png = os.path.join(OUT_DIR, "mask_%d_%d.png" % (cx, cy))
@@ -658,7 +741,7 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, batis=None, preview=
 
     aires = {}
     for nom, g in (("corridor", corridor), ("chaussee", chaussee),
-                   ("privee", privee), ("gravier", gravier)):
+                   ("privee", privee), ("gravier", gravier), ("herbe", herbe)):
         aires[nom] = round(g.intersection(cell_box).area, 1)
     aires["cellule"] = CELL_M * CELL_M
 
@@ -669,7 +752,9 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, batis=None, preview=
         "maskPx": OUT_PX,
         "sdfRangeM": SDF_RANGE_M,
         "classes": {"hors": CLS_HORS, "trottoir": CLS_TROTTOIR, "chaussee": CLS_CHAUSSEE,
-                    "privee": CLS_PRIVEE, "gravier": CLS_GRAVIER},
+                    "privee": CLS_PRIVEE, "gravier": CLS_GRAVIER, "herbe": CLS_HERBE},
+        "maskChannels": {"R": "sdf_herbe", "G": "sdf_chaussee",
+                         "B": "sdf_privee", "A": "sdf_gravier"},
         "curbs": [[[round(c[0], 2), round(c[1], 2)] for c in ln] for ln in curbs],
         "crossings": crossings,
         "axial": dashes,
@@ -683,23 +768,28 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, batis=None, preview=
         apercu(cx, cy, r_chan, rgba[:, :, 1], curbs, crossings, dashes, x0, y0)
 
     pc = 100.0 * aires["chaussee"] / aires["cellule"]
-    log("cellule %+d,%+d : chaussee %.1f %% | %d bordures (%.0f m) | %d passages | "
-        "%d tirets | masque %.2f Mo | json %.2f Mo | %.1f s"
-        % (cx, cy, pc, len(curbs), sum(LineString(l).length for l in curbs if len(l) > 1),
+    ecart_pc = (100.0 * abs(aire_herbe_png - aire_herbe_vec) / aire_herbe_vec
+                if aire_herbe_vec > 1.0 else 0.0)
+    log("cellule %+d,%+d : chaussee %.1f %% | herbe %.0f m2 (raster %.0f m2, ecart "
+        "%.2f %%) | %d bordures (%.0f m) | %d passages | %d tirets | masque %.2f Mo | "
+        "json %.2f Mo | %.1f s"
+        % (cx, cy, pc, aire_herbe_vec, aire_herbe_png, ecart_pc,
+           len(curbs), sum(LineString(l).length for l in curbs if len(l) > 1),
            len(crossings), len(dashes), os.path.getsize(png) / 1048576.0,
            os.path.getsize(js) / 1048576.0, time.time() - t0))
     return {"cell": [cx, cy], "origin": [x0, y0], "png": png, "json": js, "curbs": len(curbs),
             "crossings": len(crossings), "axial": len(dashes),
             "curbLenM": round(sum(LineString(l).length for l in curbs if len(l) > 1), 1),
             "pngBytes": os.path.getsize(png), "jsonBytes": os.path.getsize(js),
-            "areasM2": aires}
+            "areasM2": aires, "herbeRasterM2": round(aire_herbe_png, 1),
+            "herbeEcartPc": round(ecart_pc, 3)}
 
 
 def apercu(cx, cy, r_chan, g_chan, curbs, crossings, dashes, x0, y0):
     """PNG de controle LISIBLE (le masque, lui, n'est pas fait pour l'oeil)."""
     couleurs = {CLS_HORS: (238, 236, 232), CLS_TROTTOIR: (214, 200, 172),
                 CLS_CHAUSSEE: (96, 100, 104), CLS_PRIVEE: (176, 126, 100),
-                CLS_GRAVIER: (176, 158, 118)}
+                CLS_GRAVIER: (176, 158, 118), CLS_HERBE: (118, 174, 108)}
     img = np.zeros((OUT_PX, OUT_PX, 3), dtype=np.uint8)
     for k, col in couleurs.items():
         img[r_chan == k] = col
@@ -994,6 +1084,56 @@ def selftest():
     check_bool("la cuisson ecrit toujours ses bordures", len(cuit["curbs"]) > 0, True)
     check_bool("la cuisson ecrit toujours ses tirets", len(cuit["axial"]) > 0, True)
 
+    # ------------------------------------------------------------------ SOLVERT
+    # 12. LA COUCHE HERBE (canal R). Scene synthetique : une pelouse de 120 x 120 m
+    #     TRAVERSEE par la chaussee de 10 m, plus une LANGUETTE de 1,6 m de large
+    #     (l'artefact type du grief 4) : la pelouse est peinte MOINS la chaussee
+    #     (complement : deborder est impossible), la languette est effacee par
+    #     l'ouverture morphologique de 1 m, et le canal R du PNG cuit porte bien le
+    #     SDF (>= 200 au coeur de la pelouse, <= 60 sur la chaussee, 128 +/- au bord).
+    X1 = 8888 * CELL_M
+    hp1 = box(X1 - 20, X1 - 20, X1 + 245, X1 + 520)
+    hp2 = box(X1 + 255, X1 - 20, X1 + 520, X1 + 520)
+    hr = [{"line": LineString([(X1 + 250, X1 - 20), (X1 + 250, X1 + 520)]), "largeur": 10.0,
+           "nature": "route a 1 chaussee", "pont": False, "voies": 2,
+           "etroit": False, "sans_bordure": False}]
+    pelouse = box(X1 + 190, X1 + 190, X1 + 310, X1 + 310)          # a cheval sur la rue
+    languette = box(X1 + 50, X1 + 50, X1 + 51.6, X1 + 80)          # 1,6 m x 30 m
+    sav = (OUT_PX, SS, HI)
+    OUT_PX, SS, HI = 128, 1, 2
+    res_h = None
+    try:
+        res_h = cuire_cellule(8888, 8888, [hp1, hp2], [], hr, [], [],
+                              [pelouse, languette], preview=False)
+        px_png = np.asarray(Image.open(res_h["png"]))
+    finally:
+        OUT_PX, SS, HI = sav
+        for p in ((res_h["png"], res_h["json"]) if res_h else ()):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+    aires_h = res_h["areasM2"]
+    # Pelouse 120 x 120 m moins la bande de chaussee de 10 m qui la traverse, moins
+    # le lisere de l'ouverture (les coins convexes de la decoupe sont adoucis) :
+    # l'aire doit etre proche de 120*120 - 10*120 = 13200, jamais au-dessus, et la
+    # languette (48 m2) ne doit PAS y figurer.
+    check_bool("herbe : pelouse peinte", 12600.0 < aires_h["herbe"] <= 13210.0, True)
+    check_bool("herbe : complement de la chaussee",
+               aires_h["herbe"] <= 120.0 * 120.0 - 10.0 * 120.0 + 1.0, True)
+    # Echantillons du canal R du PNG cuit (128 px sur 500 m -> 3,9 m/px ; la cellule
+    # va de X1 a X1+500, la ligne 0 du PNG est y = X1).
+    def png_at(mx, my):
+        px = int((mx - X1) / CELL_M * px_png.shape[1])
+        py = int((my - X1) / CELL_M * px_png.shape[0])
+        return int(px_png[min(py, px_png.shape[0] - 1), min(px, px_png.shape[1] - 1), 0])
+    check_bool("canal R : coeur de pelouse >= 200", png_at(X1 + 220, X1 + 250) >= 200, True)
+    check_bool("canal R : chaussee <= 60", png_at(X1 + 250, X1 + 250) <= 60, True)
+    check_bool("canal R : languette EFFACEE", png_at(X1 + 50.8, X1 + 65) <= 128, True)
+    check_bool("canal R : hors tout vert <= 60", png_at(X1 + 100, X1 + 400) <= 60, True)
+    # Sans verts fournis (retro-compatibilite), le canal R est un SDF vide (plancher).
+    check_bool("herbe absente par defaut (verrou 11)", cuit["areasM2"]["herbe"] == 0.0, True)
+
     log("SELFTEST : " + ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
 
@@ -1031,12 +1171,17 @@ def main():
     # Le BATI entre dans le CALCUL, il ne sert plus seulement aux cartes de controle :
     # un immeuble est un polygone reel, il a sa place dans la soustraction du sol.
     batis = C.charger_bati(fenetres)["proto"]
+    # SOLVERT : source vegetale = OCS GE CS2.* (socle national). Les verts OSM
+    # (_verts) restent charges-et-jetes : repli possible pour des fenetres hors AOI
+    # OCS GE, non active tant que la couverture mesuree est complete (99,9 % sur le
+    # proto, cf. work/SOLVERT/solvert_prep.py).
+    verts = charger_verts_ocsge(fen)
     log("chargements : %.1f s" % (time.time() - t0))
 
     resume = []
     for cx, cy in cells:
         resume.append(cuire_cellule(cx, cy, parcelles, eaux, routes, pietons, batis,
-                                    preview=not args.no_preview))
+                                    verts, preview=not args.no_preview))
     idx = {"cellSizeM": CELL_M, "maskPx": OUT_PX, "sdfRangeM": SDF_RANGE_M,
            "cells": resume, "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%S")}
     os.makedirs(OUT_DIR, exist_ok=True)
@@ -1047,10 +1192,13 @@ def main():
     log("TOTAL %.1f s | %d cellules | masques %.1f Mo (%.2f Mo/cellule) | json %.2f Mo"
         % (time.time() - t0, len(resume), tot_png / 1048576.0,
            tot_png / 1048576.0 / max(len(resume), 1), tot_js / 1048576.0))
-    log("PEINT   : %d m2 de chaussee, %d m2 de voirie privee, %d m2 de gravier"
+    log("PEINT   : %d m2 de chaussee, %d m2 de voirie privee, %d m2 de gravier, "
+        "%d m2 d'HERBE (ecart raster max %.2f %%)"
         % (sum(r["areasM2"]["chaussee"] for r in resume),
            sum(r["areasM2"]["privee"] for r in resume),
-           sum(r["areasM2"]["gravier"] for r in resume)))
+           sum(r["areasM2"]["gravier"] for r in resume),
+           sum(r["areasM2"]["herbe"] for r in resume),
+           max((r["herbeEcartPc"] for r in resume), default=0.0)))
     log("MAILLE  : %d polylignes de bordure (%.0f m), %d passages, %d tirets"
         % (sum(r["curbs"] for r in resume), sum(r["curbLenM"] for r in resume),
            sum(r["crossings"] for r in resume), sum(r["axial"] for r in resume)))

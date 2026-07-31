@@ -16,6 +16,8 @@
 #include "CollisionQueryParams.h"
 #include "Engine/TextRenderActor.h"
 #include "Components/TextRenderComponent.h"
+#include "IImageWrapper.h"
+#include "IImageWrapperModule.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Engine/Texture2D.h"
 #include "Materials/Material.h"
@@ -29,6 +31,9 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "PhysicsEngine/BodySetup.h"
+// Empattement des arbres : lecture des sommets du mesh (donnees de rendu LOD0).
+#include "StaticMeshResources.h"
+#include "Rendering/PositionVertexBuffer.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "StaticMeshAttributes.h"
@@ -631,6 +636,19 @@ namespace
 	// pack de dalle). Un materiau dedie plutot qu'une teinte de sommet : les
 	// M_Surf_* ne lisent PAS la VertexColor (BaseColor = scan x constante).
 	const FSurfaceClass GSurfCurb{ TEXT("curb"), 2.f, false, false, 0.f, false };
+	// LOT3 — LA TERRE DES FOSSES DE PLANTATION. Pack DEDIE (scan dirt_ground 2 x 2 m
+	// assombri, Tools/import_surfaces via work/SOLVERT/lot3_import_soil.py) et non le
+	// gravier : le gravier beige clair sur du pave gris etait precisement le « sticker
+	// de sable » refuse par l'utilisateur. Son materiau est le SEUL du set sols a lire
+	// la VertexColor — c'est par elle que la terre s'assombrit au pied du tronc.
+	// Absent -> repli sur le gravier (l'ancien comportement, jamais un materiau par
+	// defaut gris vif).
+	const FSurfaceClass GSurfPitSoil{ TEXT("treepit_soil"), 2.f, false, false, 0.f, false };
+	// L'ENTOURAGE des fosses : pack DERIVE de la dalle, assombri de moitie
+	// (Tools/import_surfaces via work/SOLVERT/lot3_import_frame.py). Un entourage doit
+	// se VOIR : la bordure de trottoir (dalle x0,92) ne dessinait rien a plat sur le
+	// meme pave — constat par capture. Absent -> repli sur la bordure, puis la terre.
+	const FSurfaceClass GSurfPitFrame{ TEXT("treepit_frame"), 2.f, false, false, 0.f, false };
 	// PASSAGE PIETON. Le scan fait 4 x 2 m : son axe de 4 m porte la REPETITION des
 	// bandes (8 bandes, pas de 50 cm) et son axe de 2 m leur LONGUEUR, avec un trait
 	// blanc en travers a mi-hauteur. L'axe de 4 m part donc EN TRAVERS de la rue
@@ -788,6 +806,244 @@ namespace
 		}
 		return true;
 	}
+
+	// -----------------------------------------------------------------------------
+	// LES MASQUES DE SOL CUITS = LES QUATRE CHAMPS DE DISTANCE DU SHADER DE DALLE.
+	//
+	// mask_<cx>_<cy>.png, une image carree par cellule de 500 m, quatre distances
+	// SIGNEES a la frontiere de chaque couche (octet 128 = frontiere, pleine echelle
+	// +-2 m, soit d = (octet/255 - 0,5) x 4 m) :
+	//     R = HERBE      G = CHAUSSEE      B = VOIRIE PRIVEE      A = GRAVIER
+	//
+	// Convention de coordonnees REPRISE TELLE QUELLE du semis, deja validee a l'oeil
+	// (les touffes tombent bien dans l'herbe) : colonne = X croissant, LIGNE = Y
+	// croissant, aucune inversion verticale.
+	//
+	// LE SOL RENDU N'EST PAS LE CANAL R. Le master M_CityGroundMasked
+	// (Tools/import_ground_masks.py) empile : dalle -> HERBE -> gravier -> privee ->
+	// chaussee, chaque couche remplacant la precedente des que son poids vaut 1, et
+	// le poids est un seuil FRANC a d = 0. Autrement dit LE PEINT GAGNE TOUJOURS SUR
+	// L'HERBE. De plus la frontiere d'herbe est DEPLACEE par deux octaves d'un bruit
+	// tuilable (jusqu'a +-87 cm) : c'est ce bord bruite que l'oeil voit, pas le bord
+	// brut du canal R.
+	// Le sol RENDU est donc vert si et seulement si l'herbe gagne ET qu'aucune couche
+	// peinte ne repasse par-dessus ; sinon il est MINERAL, et un arbre qui y pousse
+	// merite sa fosse. Juger sur le seul canal R laissait sans fosse les arbres de
+	// LISIERE, exactement le defaut signale.
+	//
+	// COUPLAGE ASSUME : les cinq constantes ci-dessous sont celles de
+	// Tools/import_ground_masks.py (SDF_RANGE_M, NOISE1_M/AMP, NOISE2_M/AMP). Elles
+	// decrivent un FORMAT DE DONNEES cuit sur disque — les changer d'un cote sans
+	// l'autre ferait mentir la regle d'attribution.
+	//
+	// Aucun masque ne couvre le point -> on ne DEVINE pas : pas de masque, pas de
+	// fosse (une fosse inventee au hasard serait pire que rien).
+	// -----------------------------------------------------------------------------
+	constexpr float GMaskSdfRangeM = 2.f;    // octet 0/255 = -2 m / +2 m
+	constexpr float GMaskNoise1PeriodM = 9.f;
+	constexpr float GMaskNoise1Amp = 0.55f;
+	constexpr float GMaskNoise2PeriodM = 48.f;
+	constexpr float GMaskNoise2Amp = 1.20f;
+
+	struct FGrassMaskSampler
+	{
+		explicit FGrassMaskSampler(const FString& InDir)
+			: Dir(InDir)
+		{
+			// La taille de cellule est declaree PAR LES MASQUES eux-memes
+			// (SourceData/Sols/index.json) : jamais une constante devinee ici.
+			FString Text;
+			TSharedPtr<FJsonObject> Root;
+			if (FFileHelper::LoadFileToString(Text, *FPaths::Combine(Dir, TEXT("index.json"))) &&
+				FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) &&
+				Root.IsValid())
+			{
+				double V = 0.0;
+				if (Root->TryGetNumberField(TEXT("cellSizeM"), V) && V > 0.0)
+				{
+					CellSizeM = (float)V;
+				}
+			}
+			LoadNoise();
+		}
+
+		/** Les 4 octets du masque au point. false si aucun masque ne couvre. */
+		bool SampleRGBA(double Xcm, double Ycm, uint8 Out[4])
+		{
+			if (CellSizeM <= 0.f)
+			{
+				return false;
+			}
+			const double Xm = Xcm / 100.0;
+			const double Ym = Ycm / 100.0;
+			const FIntPoint Key(FMath::FloorToInt32(Xm / (double)CellSizeM),
+				FMath::FloorToInt32(Ym / (double)CellSizeM));
+			const FCell* Cell = GetCell(Key);
+			if (!Cell || Cell->Size <= 0)
+			{
+				return false;
+			}
+			const double PxM = (double)CellSizeM / (double)Cell->Size;
+			const int32 Col = FMath::Clamp(
+				FMath::FloorToInt32((Xm - (double)Key.X * CellSizeM) / PxM), 0, Cell->Size - 1);
+			const int32 Row = FMath::Clamp(
+				FMath::FloorToInt32((Ym - (double)Key.Y * CellSizeM) / PxM), 0, Cell->Size - 1);
+			const int64 O = ((int64)Row * Cell->Size + Col) * 4;
+			for (int32 c = 0; c < 4; ++c)
+			{
+				Out[c] = Cell->Pixels[O + c];
+			}
+			return true;
+		}
+
+		int32 SampleR(double Xcm, double Ycm)
+		{
+			uint8 P[4];
+			return SampleRGBA(Xcm, Ycm, P) ? (int32)P[0] : -1;
+		}
+
+		/** true seulement si le masque EXISTE et dit « mineral » AU CANAL R BRUT. */
+		bool IsMineral(double Xcm, double Ycm)
+		{
+			const int32 R = SampleR(Xcm, Ycm);
+			return R >= 0 && R < 128;
+		}
+
+		/**
+		 * true seulement si le masque EXISTE et si le sol TEL QUE LE SHADER LE REND
+		 * y est mineral. C'est la regle d'attribution des fosses.
+		 */
+		bool IsRenderedMineral(double Xcm, double Ycm)
+		{
+			uint8 P[4];
+			if (!SampleRGBA(Xcm, Ycm, P))
+			{
+				return false;
+			}
+			const float Ech = 2.f * GMaskSdfRangeM;
+			const float DHerbeBrut = ((float)P[0] / 255.f - 0.5f) * Ech;
+			const float DChaussee = ((float)P[1] / 255.f - 0.5f) * Ech;
+			const float DPrivee = ((float)P[2] / 255.f - 0.5f) * Ech;
+			const float DGravier = ((float)P[3] / 255.f - 0.5f) * Ech;
+			const double Xm = Xcm / 100.0;
+			const double Ym = Ycm / 100.0;
+			const float DHerbe = DHerbeBrut
+				+ (SampleNoise(Xm, Ym, GMaskNoise1PeriodM) - 0.5f) * GMaskNoise1Amp
+				+ (SampleNoise(Xm, Ym, GMaskNoise2PeriodM) - 0.5f) * GMaskNoise2Amp;
+			const bool bHerbeGagne = DHerbe > 0.f;
+			const bool bPeint = (DChaussee > 0.f) || (DPrivee > 0.f) || (DGravier > 0.f);
+			return !bHerbeGagne || bPeint;
+		}
+
+		int32 NumCellsLoaded() const { return Loaded; }
+		bool HasNoise() const { return NoiseSize > 0; }
+		/** Taille de cellule DECLAREE par les masques (index.json), jamais devinee. */
+		float GetCellSizeM() const { return CellSizeM; }
+
+	private:
+		struct FCell
+		{
+			int32 Size = 0;
+			TArray<uint8> Pixels;   // RGBA entrelace
+		};
+
+		void LoadNoise()
+		{
+			TArray<uint8> Bytes;
+			if (!FFileHelper::LoadFileToArray(Bytes,
+				*FPaths::Combine(Dir, TEXT("noise512.png"))))
+			{
+				return;
+			}
+			IImageWrapperModule& Module =
+				FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
+			const TSharedPtr<IImageWrapper> Wrapper = Module.CreateImageWrapper(EImageFormat::PNG);
+			TArray64<uint8> Raw;
+			if (Wrapper.IsValid() && Wrapper->SetCompressed(Bytes.GetData(), Bytes.Num()) &&
+				Wrapper->GetWidth() == Wrapper->GetHeight() &&
+				Wrapper->GetRaw(ERGBFormat::RGBA, 8, Raw))
+			{
+				const int32 N = (int32)Wrapper->GetWidth();
+				if (Raw.Num() >= (int64)N * N * 4)
+				{
+					NoiseSize = N;
+					Noise.SetNumUninitialized(N * N);
+					for (int32 i = 0; i < N * N; ++i)
+					{
+						Noise[i] = Raw[(int64)i * 4];
+					}
+				}
+			}
+		}
+
+		/** Bruit tuilable, echantillonnage BILINEAIRE en UV monde metriques —
+		    exactement le noeud TextureCoordinate(1/periode) du materiau. */
+		float SampleNoise(double Xm, double Ym, float PeriodM) const
+		{
+			if (NoiseSize <= 0 || PeriodM <= 0.f)
+			{
+				return 0.5f;   // neutre : le bruit ne deplace rien
+			}
+			const double U = (Xm / (double)PeriodM) * (double)NoiseSize;
+			const double V = (Ym / (double)PeriodM) * (double)NoiseSize;
+			const int64 X0 = (int64)FMath::FloorToDouble(U);
+			const int64 Y0 = (int64)FMath::FloorToDouble(V);
+			const float Fx = (float)(U - (double)X0);
+			const float Fy = (float)(V - (double)Y0);
+			auto Texel = [&](int64 X, int64 Y) -> float
+			{
+				const int32 Cx = (int32)(((X % NoiseSize) + NoiseSize) % NoiseSize);
+				const int32 Cy = (int32)(((Y % NoiseSize) + NoiseSize) % NoiseSize);
+				return (float)Noise[Cy * NoiseSize + Cx] / 255.f;
+			};
+			const float A = FMath::Lerp(Texel(X0, Y0), Texel(X0 + 1, Y0), Fx);
+			const float B = FMath::Lerp(Texel(X0, Y0 + 1), Texel(X0 + 1, Y0 + 1), Fx);
+			return FMath::Lerp(A, B, Fy);
+		}
+
+		const FCell* GetCell(const FIntPoint& Key)
+		{
+			if (TUniquePtr<FCell>* Found = Cells.Find(Key))
+			{
+				return Found->Get();
+			}
+			TUniquePtr<FCell> Cell = MakeUnique<FCell>();
+			const FString Path = FPaths::Combine(Dir,
+				FString::Printf(TEXT("mask_%d_%d.png"), Key.X, Key.Y));
+			TArray<uint8> Bytes;
+			if (FFileHelper::LoadFileToArray(Bytes, *Path))
+			{
+				IImageWrapperModule& Module =
+					FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
+				const TSharedPtr<IImageWrapper> Wrapper = Module.CreateImageWrapper(EImageFormat::PNG);
+				TArray64<uint8> Raw;
+				if (Wrapper.IsValid() && Wrapper->SetCompressed(Bytes.GetData(), Bytes.Num()) &&
+					Wrapper->GetWidth() == Wrapper->GetHeight() &&
+					Wrapper->GetRaw(ERGBFormat::RGBA, 8, Raw))
+				{
+					const int32 N = (int32)Wrapper->GetWidth();
+					if (Raw.Num() >= (int64)N * N * 4)
+					{
+						Cell->Size = N;
+						Cell->Pixels.SetNumUninitialized((int64)N * N * 4);
+						FMemory::Memcpy(Cell->Pixels.GetData(), Raw.GetData(),
+							(int64)N * N * 4);
+						++Loaded;
+					}
+				}
+			}
+			const FCell* Out = Cell.Get();
+			Cells.Add(Key, MoveTemp(Cell));
+			return Out;
+		}
+
+		FString Dir;
+		float CellSizeM = 500.f;   // defaut si index.json est absent
+		int32 Loaded = 0;
+		TMap<FIntPoint, TUniquePtr<FCell>> Cells;
+		int32 NoiseSize = 0;
+		TArray<uint8> Noise;
+	};
 
 	// -----------------------------------------------------------------------------
 	// v4 — LE PIETON EST LA DALLE. Verdict DA v3 : « grand puzzle ». Le coupable
@@ -1584,6 +1840,289 @@ namespace
 			QM.AddTri(QM.WallGroup, Ring(170.f, 220.f, i + 1), Ring(170.f, 220.f, i), FVector3f(0, 0, 160.f),
 				FVector3f(0, 0, -1), Shade(Leaf * 0.6f, FVector3f(0, 0, -1), 200.f));
 		}
+	}
+
+	// Fosses de plantation : cote REEL de voirie, quasi constant (0,9 a 1,2 m en
+	// France ; on retient 1,1-1,3 m). Le mesh est genere au cote de reference et
+	// chaque instance ne recoit qu'une echelle de +-8 %.
+	//
+	// v2 (LOT3) — VERDICT UTILISATEUR sur la v1 : « les fosses sont MOCHES ». Elles
+	// etaient un DISQUE plat de gravier beige clair pose sur du pave gris : un
+	// autocollant, pas du mobilier urbain. Trois defauts, trois corrections :
+	//   1. FORME : un CARRE a cadre fin, comme une vraie fosse d'arbre de rue
+	//      (entourage beton/pierre + terre en creux). Le cadre affleure le pave,
+	//      l'interieur est EN CREUX derriere un biseau : c'est ce decrochement qui
+	//      fait lire un objet et non un decalque.
+	//   2. MATIERE : de la TERRE SOMBRE (scan dirt_ground) pour l'interieur, la
+	//      matiere de bordure pour le cadre. Plus de gravier beige.
+	//   3. LUMIERE : la terre s'assombrit vers le tronc (vertex color lue par le
+	//      materiau de la fosse), comme l'ombre portee du houppier.
+	// v3 (LOT4) — VERDICT UTILISATEUR sur la v2, captures a l'appui. Deux defauts :
+	//   1. TAILLE UNIQUE : l'empattement des gros arbres (le disque de litiere/racines
+	//      du mesh Megascans, jusqu'a 1,2 m de rayon a pleine echelle) DEBORDAIT d'une
+	//      fosse de 1,2 m, et 1 256 fosses identiques faisaient un motif repete.
+	//   2. FOSSE PLATE SUR SOL NON PLAT : la dalle rendue est grossiere (~7,8 m par
+	//      triangle) et pentue par endroits, si bien qu'un carre HORIZONTAL pose au Z
+	//      du seul centre avait des coins immerges, des coins flottants, et surtout un
+	//      FOND a -1,5 cm sous le pave : la terre etait MASQUEE et on voyait du pave
+	//      dans le cadre.
+	// v3 : cote PROPORTIONNEL a l'empattement mesure sur le mesh, et pose sur le PLAN
+	// LOCAL du sol (9 traces sous l'emprise) avec le fond garanti au-dessus de la dalle.
+	constexpr float GPitRefM = 1.2f;      // cote du carre de REFERENCE (celui du mesh)
+	constexpr float GPitMinM = 1.0f;      // plus petite fosse admise
+	constexpr float GPitMaxM = 2.2f;      // plus grande (au-dela ce n'est plus une fosse)
+	constexpr float GPitRootMarginM = 0.30f;  // marge demandee autour de l'empattement
+	constexpr float GPitRootClearCm = 5.f;    // jeu entre l'empattement et le cadre
+	// Empattement = rayon XY des sommets du mesh sous cette hauteur LOCALE. Le disque
+	// de litiere des arbres Megascans y est inclus : c'est precisement lui qui debordait.
+	constexpr float GPitBasalHeightCm = 40.f;
+	constexpr float GPitBasalPct = 0.98f;     // centile : un sommet aberrant ne dicte rien
+	// v2b — MESURE PAR CAPTURE de la v2a : le cadre etait INVISIBLE. Pose a plat
+	// 1 cm au-dessus du pave et vetu de M_Surf_curb (la dalle a peine assombrie de
+	// 8 %), il ne dessinait rien : la fosse se lisait comme une tache sombre, pas
+	// comme du mobilier. Trois corrections, toutes geometriques ou de matiere :
+	//   - entourage plus LARGE (12 cm) : au-dela de l'empattement des racines ;
+	//   - entourage plus HAUT (2,5 cm) avec une JUPE verticale qui rejoint le pave :
+	//     c'est l'arete eclairee et son ombre qui font lire un objet pose ;
+	//   - matiere DEDIEE (pack treepit_frame, la dalle assombrie de moitie) au lieu
+	//     de la bordure de trottoir.
+	constexpr float GPitFrameCm = 12.f;   // largeur du cadre (entourage)
+	constexpr float GPitBevelCm = 3.f;    // course horizontale du biseau
+	constexpr int32 GPitSegPerSide = 4;   // subdivision du bord interieur (degrade)
+	// v3 — LE defaut visuel de la v2 : le fond de terre etait a -1,5 cm SOUS le pave,
+	// donc masque par lui. Le creux existe toujours, mais il se mesure desormais par
+	// rapport au CADRE, et le fond reste au-dessus de la dalle EN TOUT POINT :
+	//   fond = haut du cadre - GPitSinkCm, et haut du cadre = plan local + GPitLiftCm
+	//   avec GPitLiftCm = GPitSinkCm + GPitClearCm  =>  fond = plan local + Clear.
+	constexpr float GPitSinkCm = 3.f;     // fond de terre SOUS le haut du cadre
+	constexpr float GPitClearCm = 1.f;    // garde du fond AU-DESSUS de la dalle
+	constexpr float GPitLiftCm = GPitSinkCm + GPitClearCm;  // haut du cadre / dalle
+	// La jupe SCELLE visuellement le cadre au pave. Sur un sol non plan, la fosse est
+	// calee sur le point le plus HAUT de son emprise : la jupe doit descendre d'autant
+	// que la gite locale, sinon un jour s'ouvre du cote bas. 16 cm couvrent une
+	// non-planeite de 12 cm sous l'emprise ; au-dela on lit une jardiniere sur pente,
+	// ce qui est le comportement voulu (et non un carre qui flotte).
+	constexpr float GPitSkirtCm = 16.f;
+	// Gite maximale reprise par la pose : au-dela, la pente vient d'une donnee suspecte
+	// (bord de dalle, triangle degenere) et on prefere l'horizontale a une fosse folle.
+	constexpr float GPitMaxSlope = 0.36f;   // tan(20 deg)
+	// v3b — MESURE de la v3a : caler la fosse sur le point le PLUS HAUT de son emprise
+	// la met en l'air des qu'un sondage tombe sur autre chose que la rue (marche de
+	// bordure, dalle superposee, pied de mur) : 0,96 % des fosses planaient de plus de
+	// 15 cm, jusqu'a 1,04 m. Deux garde-fous, dans cet ordre :
+	//   - les points a plus de GPitOutlierCm du plan ajuste sont des points d'UNE AUTRE
+	//     SURFACE : on les jette et on rajuste le plan sur les survivants ;
+	//   - le relevement restant est borne : mieux vaut un cadre qui mord une marche
+	//     (la jupe de 16 cm le scelle) qu'une fosse qui plane au-dessus de son arbre.
+	constexpr float GPitOutlierCm = 20.f;
+	constexpr float GPitMaxLiftCm = 8.f;
+	constexpr float GPitShadeCenter = 0.45f;  // teinte au pied du tronc
+	constexpr float GPitShadeEdge = 1.f;      // teinte au bord de la fosse
+	// Alignement : une fosse reelle est alignee sur sa rue. On cherche la bordure la
+	// plus proche dans les masques de sol ; au-dela de cette portee, on retombe sur un
+	// lacet QUASI NUL (un carre a 45 deg au milieu d'un trottoir ferait faux).
+	constexpr float GPitAlignRangeCm = 3000.f;
+	constexpr float GPitJitterDeg = 3.f;      // jeu de pose autour de l'axe de la rue
+	constexpr float GPitFreeJitterDeg = 10.f; // sans rue identifiee
+
+	// Touffes d'herbe : fondu 45-60 m et pas d'ombre portee (reglage valide par
+	// l'utilisateur sur la passe de semis dediee, repris ici tel quel).
+	constexpr float GClumpCullStartCm = 4500.f;
+	constexpr float GClumpCullEndCm = 6000.f;
+
+	// FOSSE DE PLANTATION v2 : le carre de terre a cadre, au pied d'un arbre de rue.
+	// Objet urbain REEL — la voirie decoupe le revetement autour du tronc et borde la
+	// coupe d'un entourage — et non un disque pose dessus.
+	//
+	// Repere local : Z = 0 est le HAUT DU CADRE. v3 : l'instance est posee sur le PLAN
+	// LOCAL du sol (pitch/roll compris), a GPitLiftCm au-dessus du point le plus haut
+	// de son emprise, si bien que le fond de terre (Z local = -GPitSinkCm) reste
+	// GPitClearCm AU-DESSUS de la dalle partout. Une seule face vers le haut partout
+	// (une fosse ne se voit jamais par en dessous).
+	//
+	// Deux groupes de polygones :
+	//   WallGroup  = l'INTERIEUR (terre), le seul a porter une vertex color utile —
+	//                son materiau la lit et s'assombrit vers le tronc ;
+	//   GlassGroup = le CADRE et son BISEAU (matiere de bordure).
+	//
+	// Les UV sont EN METRES : les materiaux M_Surf_* divisent l'UV0 par la taille
+	// physique du scan, donc un UV metrique donne l'echelle reelle quel que soit le
+	// pack.
+	void BuildPlantingPit(FCityMeshBuilder& QM, float HalfCm)
+	{
+		const FVector3f Up(0.f, 0.f, 1.f);
+		const FVector3f Blanc(1.f, 1.f, 1.f);   // cadre : materiau sans vertex color
+		const float InnerCm = HalfCm - GPitFrameCm;              // bord interieur du cadre
+		const float SoilCm = FMath::Max(InnerCm - GPitBevelCm, 1.f);  // bord du fond
+		const float ZSoil = -GPitSinkCm;
+
+		// Les 4 coins unitaires, dans le sens trigonometrique vu du dessus.
+		const FVector2f C[4] = { FVector2f(-1.f, -1.f), FVector2f(1.f, -1.f),
+			FVector2f(1.f, 1.f), FVector2f(-1.f, 1.f) };
+		auto Pt = [](const FVector2f& U, float R, float Z)
+		{
+			return FVector3f(U.X * R, U.Y * R, Z);
+		};
+		auto UVof = [](const FVector3f& P) { return FVector2f(P.X * 0.01f, P.Y * 0.01f); };
+
+		for (int32 i = 0; i < 4; ++i)
+		{
+			const FVector2f& U0 = C[i];
+			const FVector2f& U1 = C[(i + 1) % 4];
+
+			// --- le CADRE : couronne carree a onglet, a plat au niveau du pave ---
+			{
+				const FVector3f P[4] = { Pt(U0, HalfCm, 0.f), Pt(U1, HalfCm, 0.f),
+					Pt(U1, InnerCm, 0.f), Pt(U0, InnerCm, 0.f) };
+				const FVector2f UV[4] = { UVof(P[0]), UVof(P[1]), UVof(P[2]), UVof(P[3]) };
+				QM.AddPoly(QM.GlassGroup, P, 4, Up, UV, Blanc);
+			}
+
+			// --- la JUPE : la face verticale de l'entourage, du haut du cadre jusque
+			// SOUS le pave. C'est elle qui fait exister l'objet — une arete verticale
+			// prend la lumiere autrement que le sol et pose une ombre au pied.
+			{
+				const FVector2f Sortante = (U0 + U1) * 0.5f;
+				const FVector3f N(Sortante.X, Sortante.Y, 0.f);
+				const FVector3f P[4] = { Pt(U0, HalfCm, 0.f), Pt(U1, HalfCm, 0.f),
+					Pt(U1, HalfCm, -GPitSkirtCm), Pt(U0, HalfCm, -GPitSkirtCm) };
+				const FVector2f UV[4] = {
+					FVector2f(P[0].X * 0.01f, P[0].Y * 0.01f),
+					FVector2f(P[1].X * 0.01f, P[1].Y * 0.01f),
+					FVector2f(P[2].X * 0.01f, (P[2].Y - GPitSkirtCm) * 0.01f),
+					FVector2f(P[3].X * 0.01f, (P[3].Y - GPitSkirtCm) * 0.01f) };
+				QM.AddPoly(QM.GlassGroup, P, 4, N.GetSafeNormal(), UV, Blanc);
+			}
+
+			// --- le BISEAU : du bord interieur du cadre vers le fond, en pente ---
+			// Normale dans le plan vertical du cote : vers le HAUT et vers l'INTERIEUR
+			// (paroi de cuvette). Sans elle, la pente prendrait la lumiere comme le
+			// pave et le decrochement ne se lirait pas.
+			{
+				const FVector2f Sortante = (U0 + U1) * 0.5f;   // (0,-1), (1,0), (0,1), (-1,0)
+				const FVector3f N = FVector3f(-Sortante.X * GPitSinkCm,
+					-Sortante.Y * GPitSinkCm, GPitBevelCm).GetSafeNormal();
+				const FVector3f P[4] = { Pt(U0, InnerCm, 0.f), Pt(U1, InnerCm, 0.f),
+					Pt(U1, SoilCm, ZSoil), Pt(U0, SoilCm, ZSoil) };
+				const FVector2f UV[4] = { UVof(P[0]), UVof(P[1]), UVof(P[2]), UVof(P[3]) };
+				QM.AddPoly(QM.GlassGroup, P, 4, N, UV, Blanc);
+			}
+		}
+
+		// --- le FOND DE TERRE : eventail depuis le centre, subdivise sur le pourtour.
+		// L'eventail interpole lineairement la couleur du centre vers le bord : c'est
+		// lui qui porte l'assombrissement au pied du tronc, sans texture ni decal.
+		const int32 NSeg = 4 * GPitSegPerSide;
+		auto Bord = [&](int32 k)
+		{
+			const int32 Cote = (k / GPitSegPerSide) % 4;
+			const float T = (float)(k % GPitSegPerSide) / (float)GPitSegPerSide;
+			const FVector2f U = C[Cote] + (C[(Cote + 1) % 4] - C[Cote]) * T;
+			return Pt(U, SoilCm, ZSoil);
+		};
+		const FVector3f Centre(0.f, 0.f, ZSoil);
+		const FVector3f ColCentre(GPitShadeCenter, GPitShadeCenter, GPitShadeCenter);
+		const FVector3f ColBord(GPitShadeEdge, GPitShadeEdge, GPitShadeEdge);
+		for (int32 k = 0; k < NSeg; ++k)
+		{
+			const FVector3f P[3] = { Centre, Bord(k), Bord((k + 1) % NSeg) };
+			const FVector2f UV[3] = { UVof(P[0]), UVof(P[1]), UVof(P[2]) };
+			const FVector3f Cols[3] = { ColCentre, ColBord, ColBord };
+			QM.AddPolyPerVertexColors(QM.WallGroup, P, 3, Up, UV, Cols);
+		}
+	}
+
+	// EMPATTEMENT d'un mesh de vegetation : le rayon XY qu'il occupe AU SOL, c'est-a-dire
+	// le rayon maximal de ses sommets situes sous GPitBasalHeightCm de hauteur locale.
+	// Sur les arbres Megascans cela englobe le disque de litiere/racines pose au pied,
+	// qui est exactement ce qui debordait des fosses v2.
+	//
+	// Centile 98 et non maximum : un unique sommet egare (brindille couchee, feuille
+	// tombee modelisee) ne doit pas dicter la taille d'une fosse.
+	//
+	// Repli en cascade — jamais d'echec silencieux : donnees de rendu, puis description
+	// de maillage (sources non cuites), puis fraction de l'emprise. Le repli est TRACE.
+	float ComputeBasalRadiusCm(UStaticMesh* Mesh, FString& OutMethode)
+	{
+		auto Centile = [](TArray<float>& R) -> float
+		{
+			R.Sort();
+			const int32 Idx = FMath::Clamp((int32)(GPitBasalPct * (R.Num() - 1)),
+				0, R.Num() - 1);
+			return R[Idx];
+		};
+		if (!Mesh)
+		{
+			OutMethode = TEXT("mesh nul");
+			return 0.f;
+		}
+		// --- 1) donnees de rendu (deja en memoire : le mesh est affiche) -------------
+		if (const FStaticMeshRenderData* RD = Mesh->GetRenderData())
+		{
+			if (RD->LODResources.Num() > 0)
+			{
+				const FPositionVertexBuffer& PVB =
+					RD->LODResources[0].VertexBuffers.PositionVertexBuffer;
+				const uint32 N = PVB.GetNumVertices();
+				if (N >= 8)
+				{
+					float MinZ = TNumericLimits<float>::Max();
+					for (uint32 i = 0; i < N; ++i)
+					{
+						MinZ = FMath::Min(MinZ, PVB.VertexPosition(i).Z);
+					}
+					TArray<float> Rayons;
+					Rayons.Reserve(N / 4 + 8);
+					for (uint32 i = 0; i < N; ++i)
+					{
+						const FVector3f P = PVB.VertexPosition(i);
+						if (P.Z <= MinZ + GPitBasalHeightCm)
+						{
+							Rayons.Add(FMath::Sqrt(P.X * P.X + P.Y * P.Y));
+						}
+					}
+					if (Rayons.Num() >= 4)
+					{
+						OutMethode = FString::Printf(TEXT("rendu LOD0 (%d/%u sommets)"),
+							Rayons.Num(), N);
+						return Centile(Rayons);
+					}
+				}
+			}
+		}
+		// --- 2) description de maillage (source) -------------------------------------
+		if (const FMeshDescription* MD = Mesh->GetMeshDescription(0))
+		{
+			FStaticMeshConstAttributes Attrs(*MD);
+			TVertexAttributesConstRef<FVector3f> Pos = Attrs.GetVertexPositions();
+			if (Pos.IsValid() && MD->Vertices().Num() >= 8)
+			{
+				float MinZ = TNumericLimits<float>::Max();
+				for (const FVertexID V : MD->Vertices().GetElementIDs())
+				{
+					MinZ = FMath::Min(MinZ, Pos[V].Z);
+				}
+				TArray<float> Rayons;
+				for (const FVertexID V : MD->Vertices().GetElementIDs())
+				{
+					const FVector3f P = Pos[V];
+					if (P.Z <= MinZ + GPitBasalHeightCm)
+					{
+						Rayons.Add(FMath::Sqrt(P.X * P.X + P.Y * P.Y));
+					}
+				}
+				if (Rayons.Num() >= 4)
+				{
+					OutMethode = FString::Printf(TEXT("description (%d sommets bas)"),
+						Rayons.Num());
+					return Centile(Rayons);
+				}
+			}
+		}
+		// --- 3) repli : fraction de l'emprise (mesure impossible, valeur plausible) ---
+		const FBoxSphereBounds B = Mesh->GetBounds();
+		OutMethode = TEXT("REPLI emprise (sommets illisibles)");
+		return 0.12f * (float)(B.BoxExtent.X + B.BoxExtent.Y) * 0.5f;
 	}
 
 	UMaterialInterface* LoadMaterialOrDefault(const FString& Path)
@@ -2633,8 +3172,9 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 	// La vegetation existante (Sol2Veg/Sol2Grass) a une collision DENSE de canopee
 	// -> on l'IGNORE dans le trace, sinon un arbre se poserait sur un autre arbre.
 	// Le trace ECC_Visibility descend TOUTE la colonne (multi-hit : on traverse les
-	// toits et le mobilier) et rend le hit SOL (SM_Surface_/SM_Slab_) le plus HAUT ;
-	// repli GroundZ (comptabilise) uniquement si AUCUN sol n'existe dans la colonne.
+	// toits et le mobilier) et rend le hit SOL (SM_Surface_/SM_Slab_) le plus HAUT.
+	// AUCUN SOL DANS LA COLONNE = AUCUNE INSTANCE (plus de repli GroundZ analytique,
+	// dernier vestige du modele MNT dans la pose : il faisait flotter les bordures).
 
 	FCollisionQueryParams TraceParams(SCENE_QUERY_STAT(VegPlaceSurface), /*bTraceComplex=*/true);
 	for (TActorIterator<AActor> It(World); It; ++It)
@@ -2649,6 +3189,9 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 
 	// --- Proxys de trace : duplicatas transient (collision qui cuit VRAIMENT) ---
 	TArray<AStaticMeshActor*> TraceProxies;
+	// Acteurs de sol d'ORIGINE effectivement doubles par un proxy : leurs hits sont
+	// collectes pour le diagnostic mais N'ENTRENT PLUS dans la decision de pose.
+	TSet<const AActor*> ProxySources;
 	{
 		TArray<AStaticMeshActor*> SolActors;
 		for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
@@ -2690,6 +3233,19 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 				Src->GetActorLabel().StartsWith(TEXT("SM_Surface_"))
 					? TEXT("SM_Surface") : TEXT("SM_Slab"), ProxyIdx++));
 			TraceProxies.Add(P);
+			// LOT5 / defaut « arbre qui flotte AVEC sa fosse » : la source est DESORMAIS
+			// retiree de la DECISION de pose. Sans cela, la colonne offrait DEUX surfaces
+			// de sol — le proxy (geometrie RENDUE) et l'original, dont la collision est le
+			// mesh DEDIE SM_Slab_*_Col (grille 16x16, ~32 m de pas) — et la regle « hit
+			// sol le plus HAUT » retenait le MAXIMUM des deux. Sur toute bosse ou pente,
+			// la collision grossiere passe AU-DESSUS du rendu : l'arbre montait dessus, et
+			// ses 9 sondages de fosse aussi (ils voient la meme surface, coherente entre
+			// eux) — d'ou un arbre ET sa fosse en l'air au-dessus d'un pave visible. Les
+			// proxys existent justement pour porter le Z du RENDU : l'original n'a plus
+			// voix au chapitre. Il n'est ecarte QUE parce que SON proxy existe : aucune
+			// surface ne disparait du trace. Son hit reste NEANMOINS collecte, pour le
+			// DIAGNOSTIC (ampleur exacte de l'ancien defaut, publiee dans .floating.json).
+			ProxySources.Add(Src);
 		}
 		// Le Build des duplicatas peut etre asynchrone : tout finir AVANT de tracer.
 		FStaticMeshCompilingManager::Get().FinishAllCompilation();
@@ -2697,37 +3253,320 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 
 	int32 TraceMiss = 0, NumFilmCentral = 0, NumDalleCentral = 0;
 	int32 NumFosseCorrige = 0, NumMultiHitRecup = 0;
-	// Hit SOL le plus haut de la colonne. Multi-hit : tout impact non-sol (toit de
-	// batiment, mobilier) est TRAVERSE en re-traçant juste sous lui, 8 etages max.
-	auto TraceColumnSol = [&](double Xcm, double Ycm, float& OutZ, bool& bOutFilm,
-		bool& bOutTraversee) -> bool
+	// Compteurs du garde-fou « hit isole qui domine » (voir plus bas).
+	int32 NumHitIsoleEcarte = 0, NumHitIsoleGarde = 0;
+	// Sondages retombes sur une surface d'origine faute de proxy (doit rester a 0).
+	int32 NumSansProxy = 0;
+
+	// --- COLONNE COMPLETE --------------------------------------------------------
+	// On ne s'arrete plus au PREMIER sol rencontre : on descend toute la colonne et on
+	// COLLECTE chaque surface de sol, en distinguant le PROXY (geometrie RENDUE, la
+	// seule que l'oeil voit) de l'ORIGINAL (sa collision dediee, grossiere). La regle
+	// de pose ne lit que les proxys ; les originaux ne servent plus qu'a mesurer
+	// l'ancien defaut. 24 etages : un original + son proxy par cellule, plus les toits
+	// et le mobilier traverses.
+	struct FSolHit
 	{
+		float Z = 0.f;
+		bool bFilm = false;
+		bool bProxy = false;
+		FString Acteur;
+	};
+	auto TraceColumnAll = [&](double Xcm, double Ycm,
+		TArray<FSolHit, TInlineAllocator<16>>& Out, bool& bOutTraversee)
+	{
+		Out.Reset();
 		FVector Start(Xcm, Ycm, 50000.0);
 		const FVector End(Xcm, Ycm, -50000.0);
 		bOutTraversee = false;
-		for (int32 Step = 0; Step < 8; ++Step)
+		// Plancher d'arret : des qu'un sol est vu, on ne descend plus que de 20 m. Tout
+		// ce qui compte (l'autre surface de la meme cellule, la dalle sous son film,
+		// l'ecart rendu/collision) tient tres largement dedans ; au-dela on ne ferait
+		// que payer les faces inferieures et les jupes.
+		double Plancher = -50000.0;
+		for (int32 Step = 0; Step < 24; ++Step)
 		{
 			FHitResult Hit;
 			if (!World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, TraceParams))
 			{
-				return false;
+				return;
 			}
 			const AActor* HitActor = Hit.GetActor();
 			const FString HL = HitActor ? HitActor->GetActorLabel() : FString();
 			if (HL.StartsWith(TEXT("SM_Surface_")) || HL.StartsWith(TEXT("SM_Slab_")))
 			{
-				OutZ = (float)Hit.ImpactPoint.Z;
-				bOutFilm = HL.StartsWith(TEXT("SM_Surface_"));
-				return true;
+				FSolHit H;
+				H.Z = (float)Hit.ImpactPoint.Z;
+				H.bFilm = HL.StartsWith(TEXT("SM_Surface_"));
+				H.bProxy = HL.Contains(TEXT("TraceProxy"));
+				H.Acteur = HL;
+				Out.Add(MoveTemp(H));
+				Plancher = FMath::Max(Plancher, Hit.ImpactPoint.Z - 2000.0);
 			}
-			bOutTraversee = true;
+			else if (Out.Num() == 0)
+			{
+				// « Traversee » garde son sens d'origine : un toit ou du mobilier
+				// FRANCHI avant d'atteindre le sol.
+				bOutTraversee = true;
+			}
 			Start.Z = Hit.ImpactPoint.Z - 1.0;
-			if (Start.Z <= End.Z + 1.0)
+			if (Start.Z <= End.Z + 1.0 || Start.Z <= Plancher)
+			{
+				return;
+			}
+		}
+	};
+
+	// Z de pose = surface RENDUE la plus haute de la colonne (proxys uniquement).
+	//
+	// GARDE-FOU « hit isole qui domine » : si la surface rendue la plus haute domine la
+	// SUIVANTE de plus de 50 cm, elle est suspecte (couture entre deux cellules en
+	// pente qui divergent, chant de dalle, marche). On demande alors leur avis a
+	// QUATRE colonnes voisines a 1 m : si la majorite d'entre elles se range du cote du
+	// hit BAS, c'est le hit haut qui est l'accident et il est ecarte. Sinon on le
+	// garde : une marche ou un muret REELS sont vus par les voisins aussi. Le garde-fou
+	// ne se declenche que sur un ecart franc, il est donc sans effet sur le cas normal
+	// (film d'herbe drape quelques cm au-dessus de sa dalle).
+	constexpr float GSolIsoleCm = 50.f;   // ecart a partir duquel on demande les voisins
+	constexpr float GSolVoisinCm = 100.f; // portee de la consultation
+	auto ChoisitSol = [&](double Xcm, double Ycm,
+		const TArray<FSolHit, TInlineAllocator<16>>& Hits, float& OutZ, bool& bOutFilm) -> bool
+	{
+		int32 IdxHaut = INDEX_NONE, IdxSuiv = INDEX_NONE;
+		for (int32 i = 0; i < Hits.Num(); ++i)
+		{
+			if (!Hits[i].bProxy)
+			{
+				continue;
+			}
+			if (IdxHaut == INDEX_NONE || Hits[i].Z > Hits[IdxHaut].Z)
+			{
+				IdxSuiv = IdxHaut;
+				IdxHaut = i;
+			}
+			else if (IdxSuiv == INDEX_NONE || Hits[i].Z > Hits[IdxSuiv].Z)
+			{
+				IdxSuiv = i;
+			}
+		}
+		if (IdxHaut == INDEX_NONE)
+		{
+			// FILET DE SECURITE : aucune surface RENDUE dans la colonne alors qu'une
+			// surface d'origine y est. Ecarter l'original serait alors supprimer de la
+			// vegetation pour cause d'outil, pas de terrain : on retombe sur lui et on
+			// COMPTE le cas. Un compteur non nul en fin de passe signale un proxy qui
+			// n'a pas cuit sa collision — c'est un defaut a corriger, pas a subir.
+			for (int32 i = 0; i < Hits.Num(); ++i)
+			{
+				if (IdxHaut == INDEX_NONE || Hits[i].Z > Hits[IdxHaut].Z) { IdxHaut = i; }
+			}
+			if (IdxHaut == INDEX_NONE)
 			{
 				return false;
 			}
+			++NumSansProxy;
+			OutZ = Hits[IdxHaut].Z;
+			bOutFilm = Hits[IdxHaut].bFilm;
+			return true;
 		}
-		return false;
+		int32 Retenu = IdxHaut;
+		if (IdxSuiv != INDEX_NONE && Hits[IdxHaut].Z - Hits[IdxSuiv].Z > GSolIsoleCm)
+		{
+			const float ZHaut = Hits[IdxHaut].Z;
+			const float ZBas = Hits[IdxSuiv].Z;
+			int32 PourBas = 0, PourHaut = 0;
+			static const float DX[4] = { 1.f, -1.f, 0.f, 0.f };
+			static const float DY[4] = { 0.f, 0.f, 1.f, -1.f };
+			TArray<FSolHit, TInlineAllocator<16>> HV;
+			for (int32 K = 0; K < 4; ++K)
+			{
+				bool bTv = false;
+				TraceColumnAll(Xcm + DX[K] * GSolVoisinCm, Ycm + DY[K] * GSolVoisinCm, HV, bTv);
+				float ZV = 0.f;
+				bool bVu = false;
+				for (const FSolHit& H : HV)
+				{
+					if (H.bProxy && (!bVu || H.Z > ZV)) { ZV = H.Z; bVu = true; }
+				}
+				if (!bVu)
+				{
+					continue;
+				}
+				if (FMath::Abs(ZV - ZBas) < FMath::Abs(ZV - ZHaut)) { ++PourBas; }
+				else { ++PourHaut; }
+			}
+			if (PourBas > PourHaut)
+			{
+				Retenu = IdxSuiv;
+				++NumHitIsoleEcarte;
+			}
+			else
+			{
+				++NumHitIsoleGarde;
+			}
+		}
+		OutZ = Hits[Retenu].Z;
+		bOutFilm = Hits[Retenu].bFilm;
+		return true;
+	};
+
+	// Interface historique, inchangee pour tous les appelants (couronne, 9 sondages).
+	auto TraceColumnSol = [&](double Xcm, double Ycm, float& OutZ, bool& bOutFilm,
+		bool& bOutTraversee) -> bool
+	{
+		TArray<FSolHit, TInlineAllocator<16>> Hits;
+		TraceColumnAll(Xcm, Ycm, Hits, bOutTraversee);
+		return ChoisitSol(Xcm, Ycm, Hits, OutZ, bOutFilm);
+	};
+
+	// --- DIAGNOSTIC DU DEFAUT « FLOTTANT » ---------------------------------------
+	// Pour chaque instance on compare, sur la MEME colonne : l'ANCIENNE regle (hit sol
+	// le plus haut, proxys ET originaux confondus) et la NOUVELLE (rendu seul). L'ecart
+	// est exactement la hauteur a laquelle l'instance flottait. Publie en JSON.
+	struct FFlottant
+	{
+		FString Mesh;
+		double Xm = 0.0, Ym = 0.0;
+		float ZAncien = 0.f, ZNouveau = 0.f;
+		FString Coupable;
+		FString Colonne;
+	};
+	TArray<FFlottant> Flottants;
+	int32 NumFlottant30 = 0, NumFlottant100 = 0;
+	float MaxFlottantCm = 0.f;
+	TMap<FString, int32> CoupablesParActeur;
+
+	// Instances rejetees (aucun sol dans la colonne) : tracees, jamais devinees.
+	struct FSkippedInst
+	{
+		FString Mesh;
+		double Xm = 0.0;
+		double Ym = 0.0;
+	};
+	TArray<FSkippedInst> Skipped;
+	// LOT5 point B — ARBRES SUR PENTE MINERALE : un arbre plante dans un talus pave
+	// n'existe pas, et sa fosse carree posee de biais sur la pente etait l'incoherence
+	// la plus visible du lot precedent. Decision utilisateur : « coherence globale
+	// plutot qu'incoherences visuelles » -> on supprime l'INSTANCE ENTIERE (arbre +
+	// fosse), on ne la rattrape pas. Les haies et les touffes ne sont pas concernees :
+	// elles n'ont pas de fosse et un buisson sur talus est parfaitement credible.
+	// Le plan local des 9 sondages de la fosse donne deja la pente : rien a mesurer en
+	// plus. Seuil sur la pente BRUTE (avant l'ecretage a 20 deg du plan de pose).
+	constexpr float GPenteMaxArbreMineralDeg = 15.f;
+	TArray<FSkippedInst> SkippedPente;
+	TArray<float> SkippedPenteDeg;
+
+	// Fosses de plantation a poser (un seul HISM, construit apres la boucle).
+	// v3 : rotation COMPLETE (la fosse epouse le plan local du sol) et echelle
+	// individuelle (le cote suit l'empattement de SON arbre).
+	struct FPitInst
+	{
+		double Xcm = 0.0;
+		double Ycm = 0.0;
+		float Zcm = 0.f;
+		FRotator Rot = FRotator::ZeroRotator;
+		float Scale = 1.f;
+	};
+	TArray<FPitInst> Pits;
+	// Diagnostic de pose, publie dans le log de fin : sans lui, « ca a l'air mieux »
+	// resterait une impression.
+	int32 NumPitPlan = 0, NumPitPlat = 0, NumPitClampMin = 0, NumPitClampMax = 0;
+	int32 NumPitOutliers = 0, NumPitLiftBorne = 0;
+	double SumPitCoteCm = 0.0;
+	float MaxPitGiteCm = 0.f;
+	// COMPARATIF EXACT v2 / v3, sur LA MEME dalle rendue et les memes traces. Il est
+	// gratuit (les 9 sondages de l'emprise servent deja a la pose) et il repond aux
+	// trois defauts signales sans dependre d'une mesure exterieure, qui ne peut tracer
+	// que la collision GROSSIERE des dalles (maillage de collision dedie, bien plus
+	// large que le triangle rendu) et sous-estime donc les deux premiers.
+	//   regle v2 = carre horizontal de 1,2 m cale au Z du centre, fond a -1,5 cm ;
+	//   regle v3 = carre dimensionne, pose sur le plan local, fond a +1 cm.
+	int32 NumCmpPits = 0;
+	int32 N2Fond = 0, N2Coin = 0, N2Debord = 0, N2PtsOcc = 0;
+	int32 N3Fond = 0, N3Coin = 0, N3Debord = 0, N3PtsOcc = 0;
+	int32 NumCmpPts = 0;
+	// Constantes de la v2, figees ici pour que le comparatif reste lisible meme quand
+	// les constantes v3 bougeront.
+	constexpr float GV2HalfCm = 60.f, GV2LiftCm = 2.5f, GV2SinkCm = 4.f,
+		GV2InnerCm = 48.f;
+	FRandomStream PitRand(20260730);  // deterministe : deux runs donnent la meme ville
+	FGrassMaskSampler MaskSampler(GroundMasksDir(Gen));
+	// Compteur de diagnostic : arbres que la NOUVELLE regle (sol rendu) classe
+	// autrement que l'ancienne (canal R brut). Publie dans le log de fin.
+	int32 NumFosseGagnee = 0, NumFossePerdue = 0;
+
+	// --- ALIGNEMENT DES FOSSES SUR LA VOIRIE ---------------------------------------
+	// Une fosse d'arbre reelle est alignee sur sa rue, jamais posee de biais. Les
+	// polylignes de BORDURE deja cuites par cellule (sols_<x>_<y>.json, les memes qui
+	// servent a mailler le relief de la rue) donnent cette orientation gratuitement :
+	// on prend la direction du segment de bordure le plus proche. Au-dela de la
+	// portee, plus de rue identifiable -> lacet quasi nul plutot qu'un carre de biais.
+	TArray<FVector4> CurbSegs;   // (ax, ay, bx, by) en cm
+	{
+		const FString MaskDir = GroundMasksDir(Gen);
+		const float CellM = MaskSampler.GetCellSizeM();
+		// Cellules ENUMEREES sur disque (meme patron que la passe de relief) : aucune
+		// etendue devinee, la zone cuite est la seule verite.
+		TArray<FString> Files;
+		IFileManager::Get().FindFiles(Files, *(MaskDir / TEXT("sols_*.json")), true, false);
+		for (const FString& File : Files)
+		{
+			FString Rest = FPaths::GetBaseFilename(File);
+			Rest.RemoveFromStart(TEXT("sols_"));
+			FString Sx, Sy;
+			if (!Rest.Split(TEXT("_"), &Sx, &Sy, ESearchCase::CaseSensitive, ESearchDir::FromEnd))
+			{
+				continue;
+			}
+			FGroundMaskCell Cell;
+			if (!LoadGroundMaskCell(MaskDir, FCString::Atoi(*Sx), FCString::Atoi(*Sy),
+				CellM, Cell))
+			{
+				continue;
+			}
+			for (const TArray<FVector2D>& Line : Cell.Curbs)
+			{
+				for (int32 i = 0; i + 1 < Line.Num(); ++i)
+				{
+					CurbSegs.Add(FVector4(Line[i].X, Line[i].Y,
+						Line[i + 1].X, Line[i + 1].Y));
+				}
+			}
+		}
+	}
+	auto YawFosse = [&](double Xcm, double Ycm) -> float
+	{
+		double Best = (double)GPitAlignRangeCm * (double)GPitAlignRangeCm;
+		float BestYaw = 0.f;
+		bool bFound = false;
+		for (const FVector4& S : CurbSegs)
+		{
+			const double Ax = S.X, Ay = S.Y, Bx = S.Z, By = S.W;
+			const double Dx = Bx - Ax, Dy = By - Ay;
+			const double L2 = Dx * Dx + Dy * Dy;
+			if (L2 < 1.0)
+			{
+				continue;
+			}
+			double T = ((Xcm - Ax) * Dx + (Ycm - Ay) * Dy) / L2;
+			T = FMath::Clamp(T, 0.0, 1.0);
+			const double Px = Ax + T * Dx - Xcm;
+			const double Py = Ay + T * Dy - Ycm;
+			const double D2 = Px * Px + Py * Py;
+			if (D2 < Best)
+			{
+				Best = D2;
+				BestYaw = (float)FMath::RadiansToDegrees(FMath::Atan2(Dy, Dx));
+				bFound = true;
+			}
+		}
+		if (!bFound)
+		{
+			return (float)PitRand.FRandRange(-GPitFreeJitterDeg, GPitFreeJitterDeg);
+		}
+		// Un carre a la symetrie d'ordre 4 : seul le reste modulo 90 deg compte.
+		BestYaw = FMath::Fmod(FMath::Fmod(BestYaw, 90.f) + 90.f, 90.f);
+		return BestYaw + (float)PitRand.FRandRange(-GPitJitterDeg, GPitJitterDeg);
 	};
 
 	// Groupe les instances par mesh (contrainte HISM : un composant = un seul mesh).
@@ -2741,6 +3580,10 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 		float Yaw = 0.f;
 	};
 	TMap<FString, TArray<FVegInst>> ByMesh;
+	// « kind » facultatif par instance : tree / hedge / clump. Le generateur de
+	// donnees le pose (une seule autorite) ; en son absence on retombe sur une
+	// heuristique de taille, plus bas, pour ne jamais dependre d'un nom d'asset.
+	TMap<FString, FString> KindByMesh;
 	for (const TSharedPtr<FJsonValue>& V : *Instances)
 	{
 		const TSharedPtr<FJsonObject> O = V->AsObject();
@@ -2760,6 +3603,11 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 		double Yaw = 0.0;   O->TryGetNumberField(TEXT("yaw"), Yaw);
 		Inst.Scale = (float)Scale;
 		Inst.Yaw = (float)Yaw;
+		FString Kind;
+		if (O->TryGetStringField(TEXT("kind"), Kind) && !Kind.IsEmpty())
+		{
+			KindByMesh.FindOrAdd(MeshPath) = Kind.ToLower();
+		}
 		ByMesh.FindOrAdd(MeshPath).Add(Inst);
 	}
 
@@ -2789,13 +3637,78 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 				SM.MaterialInterface->CheckMaterialUsage(MATUSAGE_InstancedStaticMeshes);
 			}
 		}
+		// VENT DES ARBRES : rien a faire ici, et c'est VOULU. Les meshes gardent leurs
+		// materiaux d'origine, et le reglage "vent minimum mais vivant" valide par
+		// l'utilisateur vit desormais DANS CES ASSETS MATERIAUX eux-memes (sauves le
+		// 30/07), pas dans un override de composant ni dans un MIC intermediaire :
+		//   /Game/NorwayMaple/Materials/{SimpleWind,Impostor}/MI_*
+		//   /Game/EuropeanBeech/Materials/{Simplewind,Impostor}/MI_*
+		//   -> Local Wind Strength 1 = 0,05  (tronc : c'est lui qui "etire" l'arbre entier)
+		//      Local Wind Strength 2/3/4     = 0,10
+		//      Wind Animation Strength       = 0,10
+		//      Wind Noise Strength           = 0,10
+		//      Additional Wind Animation Noise Strength = 0,10
+		// (recette d'origine : work/SOL2/fix_drape.py "FIX C", 111 parametres, verifiee
+		//  par verify_drape.log ; elle etait alors posee sur des MIC MI_WZ_* assignes aux
+		//  anciens acteurs Sol2Veg_*, d'ou sa PERTE quand la vege est passee en C++ ici.)
+		// Consequence : toute regeneration, sur n'importe quelle ville, herite du vent
+		// reduit d'office. Ne PAS reintroduire de MIC vent ici, et ne pas toucher
+		// EvaluateWorldPositionOffset : son defaut (true) est justement ce que l'etape
+		// finale de la recette d'epoque avait retabli (fix_wpo_persist.py) — un WPO coupe
+		// donne un arbre MORT, ce qui avait ete refuse.
+		// Mesure de validation (30/07, meme camera, series a intervalles irreguliers,
+		// aire de ciel decoupee par la couronne) : amplitude du mouvement 7856 -> 2212 px
+		// (-72 %), ecart-type 2969 -> 647 (-78 %), pour un plancher de bruit de 7 a vent
+		// nul : le mouvement est fortement reduit mais bien VIVANT.
 		// Rayon de fosse : replique gen_surfaces_v5.py — rayon de canopee reel
 		// (demi-somme des demi-emprises X/Y du mesh) x scale, clamp [4;6] m, +50 cm de
 		// marge. Les touffes d'herbe (Clump) n'ont pas de fosse : pas de couronne (les
 		// relever a l'herbe distante ferait flotter une touffe posee sur dalle visible).
 		const FBoxSphereBounds MeshBounds = Mesh->GetBounds();
 		const float CanopyRUnitCm = (float)(MeshBounds.BoxExtent.X + MeshBounds.BoxExtent.Y) * 0.5f;
-		const bool bClump = Mesh->GetName().Contains(TEXT("Clump"));
+
+		// --- Classe de vegetation : touffe / haie / arbre ---------------------------
+		// Priorite au champ « kind » des donnees (une seule autorite). Sans lui,
+		// heuristique de TAILLE, jamais de nom d'asset : une touffe fait quelques
+		// dizaines de cm, un arbuste de haie moins de 3 m, un arbre davantage.
+		const float UnitHeightCm = (float)MeshBounds.BoxExtent.Z * 2.f;
+		float MedScale = 1.f;
+		{
+			TArray<float> Scales;
+			Scales.Reserve(Pair.Value.Num());
+			for (const FVegInst& I : Pair.Value)
+			{
+				Scales.Add(I.Scale);
+			}
+			Scales.Sort();
+			MedScale = Scales.Num() ? Scales[Scales.Num() / 2] : 1.f;
+		}
+		const FString* KindPtr = KindByMesh.Find(MeshPath);
+		const FString Kind = KindPtr ? *KindPtr : FString();
+		const bool bClump = Kind.IsEmpty()
+			? Mesh->GetName().Contains(TEXT("Clump"))
+			: Kind == TEXT("clump");
+		const bool bHedge = Kind.IsEmpty()
+			? (!bClump && UnitHeightCm * MedScale < 300.f)
+			: Kind == TEXT("hedge");
+		const bool bTree = !bClump && !bHedge;
+
+		// EMPATTEMENT du mesh, mesure UNE FOIS ici (et non par instance : c'est une
+		// propriete du maillage). Il commande la taille des fosses plus bas.
+		float BasalRUnitCm = 0.f;
+		if (bTree)
+		{
+			FString Methode;
+			BasalRUnitCm = ComputeBasalRadiusCm(Mesh, Methode);
+			UE_LOG(LogCityImport, Display,
+				TEXT("Vegetation : empattement de %s = %.1f cm a l'echelle 1 (%s) — ")
+				TEXT("echelle mediane %.2f -> fosse ~%.2f m."),
+				*Mesh->GetName(), BasalRUnitCm, *Methode, MedScale,
+				FMath::Clamp(FMath::Max(2.f * BasalRUnitCm * MedScale + GPitRootMarginM * 100.f,
+					(BasalRUnitCm * MedScale + GPitRootClearCm)
+						/ ((GPitRefM * 50.f - GPitFrameCm) / (GPitRefM * 100.f))),
+					GPitMinM * 100.f, GPitMaxM * 100.f) * 0.01f);
+		}
 
 		AActor* VegActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
 		// Les instances deja posees ont une collision de canopee : sans cette ligne, les
@@ -2815,12 +3728,44 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 		Hism->RegisterComponent();
 		for (const FVegInst& Inst : Pair.Value)
 		{
-			// Base-a-0, ZERO offset min_Z (pivot Megascans au pied) : le sol EST le hit
-			// SOL le plus haut de la colonne (proxys films + dalles), pas GroundZ.
+			// Base-a-0, ZERO offset min_Z (pivot Megascans au pied) : le sol EST la
+			// surface RENDUE la plus haute de la colonne (proxys films + dalles).
 			float SolZ = 0.f;
 			bool bFilm = false;
 			bool bTraversee = false;
-			const bool bSol = TraceColumnSol(Inst.X, Inst.Y, SolZ, bFilm, bTraversee);
+			TArray<FSolHit, TInlineAllocator<16>> Colonne;
+			TraceColumnAll(Inst.X, Inst.Y, Colonne, bTraversee);
+			const bool bSol = ChoisitSol(Inst.X, Inst.Y, Colonne, SolZ, bFilm);
+			// Mesure de l'ANCIEN defaut sur la MEME colonne : l'ancienne regle prenait le
+			// hit sol le plus haut TOUS acteurs confondus, donc la collision grossiere des
+			// dalles des qu'elle depassait le rendu. L'ecart EST la hauteur de flottement.
+			if (bSol)
+			{
+				int32 IdxAnc = INDEX_NONE;
+				for (int32 i = 0; i < Colonne.Num(); ++i)
+				{
+					if (IdxAnc == INDEX_NONE || Colonne[i].Z > Colonne[IdxAnc].Z) { IdxAnc = i; }
+				}
+				const float Ecart = Colonne[IdxAnc].Z - SolZ;
+				if (Ecart > 30.f)
+				{
+					++NumFlottant30;
+					if (Ecart > 100.f) { ++NumFlottant100; }
+					MaxFlottantCm = FMath::Max(MaxFlottantCm, Ecart);
+					CoupablesParActeur.FindOrAdd(Colonne[IdxAnc].Acteur) += 1;
+					if (Flottants.Num() < 500)
+					{
+						FString Col;
+						for (const FSolHit& H : Colonne)
+						{
+							Col += FString::Printf(TEXT("%s%s@%.1f%s"), Col.IsEmpty() ? TEXT("") : TEXT(" | "),
+								*H.Acteur, H.Z, H.bProxy ? TEXT(" (rendu)") : TEXT(" (collision d'origine)"));
+						}
+						Flottants.Add(FFlottant{ MeshPath, Inst.X / 100.0, Inst.Y / 100.0,
+							Colonne[IdxAnc].Z, SolZ, Colonne[IdxAnc].Acteur, Col });
+					}
+				}
+			}
 			if (bSol && bTraversee)
 			{
 				++NumMultiHitRecup;
@@ -2870,18 +3815,369 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 			}
 			else
 			{
-				// Pas de sol dans la colonne : repli GroundZ (comptabilise, pas de hasard).
+				// PAS DE SOL DANS LA COLONNE -> INSTANCE NON POSEE.
+				// L'ancien repli sur Drape.GroundZ etait le DERNIER vestige du modele
+				// MNT analytique dans la pose de la vegetation : il fabriquait un sol
+				// la ou il n'y en a pas (typiquement les haies semees au-dela du km2
+				// de dalle du proto), d'ou des arbres et des haies FLOTTANT dans le
+				// vide en bordure. Regle : pas de sol trouve, pas d'instance. Les
+				// positions rejetees partent dans un JSON de trace, jamais dans le
+				// silence.
 				++TraceMiss;
-				SolZ = Drape.GroundZ(Inst.X, Inst.Y);
+				Skipped.Add(FSkippedInst{ MeshPath, Inst.X / 100.0, Inst.Y / 100.0 });
+				continue;
 			}
+			// LA POSE EST DIFFEREE apres le bloc « fosse » : depuis le lot5, la fosse peut
+			// prononcer le REJET de l'instance (arbre sur pente minerale), et une instance
+			// rejetee ne doit pas avoir ete ajoutee au HISM entre-temps.
+
+			// FOSSE DE PLANTATION : un ARBRE dont le sol est la dalle ET dont le sol
+			// RENDU est mineral pousse a travers un revetement — la voirie y decoupe
+			// une fosse. « Rendu » et non « canal R brut » : le peint gagne sur
+			// l'herbe et la frontiere d'herbe est bruitee, si bien qu'un arbre de
+			// LISIERE se retrouvait sur du pave SANS fosse (defaut signale).
+			// v3 : taille PROPORTIONNELLE a l empattement de SON arbre, alignee sur la
+			// rue, et posee sur le PLAN LOCAL du sol (pitch/roll) — fond de terre garanti
+			// AU-DESSUS de la dalle en tout point de l emprise.
+			if (bTree && bSol && !bFilm)
+			{
+				const bool bRendu = MaskSampler.IsRenderedMineral(Inst.X, Inst.Y);
+				const bool bBrut = MaskSampler.IsMineral(Inst.X, Inst.Y);
+				if (bRendu && !bBrut)
+				{
+					++NumFosseGagnee;
+				}
+				else if (bBrut && !bRendu)
+				{
+					++NumFossePerdue;
+				}
+				if (bRendu)
+				{
+					// --- 1) TAILLE : proportionnelle a l'empattement de CET arbre ---
+					// Deux contraintes, on garde la plus exigeante :
+					//   - la marge demandee : cote >= 2 x rayon + 30 cm ;
+					//   - la CONTENANCE : l'empattement doit tenir dans l'INTERIEUR du
+					//     cadre, dont le demi-cote vaut RatioInterieur x cote (le cadre
+					//     s'echelonne avec la fosse, il n'est pas de largeur fixe).
+					const float RbCm = BasalRUnitCm * Inst.Scale;
+					const float RatioInterieur =
+						(GPitRefM * 50.f - GPitFrameCm) / (GPitRefM * 100.f);
+					const float CoteVoulu = FMath::Max(
+						2.f * RbCm + GPitRootMarginM * 100.f,
+						(RbCm + GPitRootClearCm) / RatioInterieur);
+					const float CoteCm = FMath::Clamp(CoteVoulu,
+						GPitMinM * 100.f, GPitMaxM * 100.f);
+					if (CoteVoulu < GPitMinM * 100.f) { ++NumPitClampMin; }
+					else if (CoteVoulu > GPitMaxM * 100.f) { ++NumPitClampMax; }
+					SumPitCoteCm += CoteCm;
+
+					// --- 2) POSE : sur le PLAN LOCAL du sol -------------------------
+					// La dalle rendue est grossiere (~7,8 m par triangle) : un carre
+					// horizontal cale sur le seul Z du centre plonge ses coins bas dans
+					// le pave et fait flotter les autres. On echantillonne l'emprise en
+					// 9 traces (centre, coins, milieux de cote), on ajuste un plan par
+					// moindres carres, et on cale la fosse sur le point le PLUS HAUT.
+					const float YawDeg = YawFosse(Inst.X, Inst.Y);
+					const float HalfCm = CoteCm * 0.5f;
+					const float CosY = FMath::Cos(FMath::DegreesToRadians(YawDeg));
+					const float SinY = FMath::Sin(FMath::DegreesToRadians(YawDeg));
+					static const float PU[9] = { 0.f, -1.f, 1.f, 1.f, -1.f, 0.f, 1.f, 0.f, -1.f };
+					static const float PV[9] = { 0.f, -1.f, -1.f, 1.f, 1.f, -1.f, 0.f, 1.f, 0.f };
+					float Us[9], Vs[9], Zs[9];
+					int32 Ks[9];
+					int32 NPts = 0;
+					for (int32 K = 0; K < 9; ++K)
+					{
+						const float Lu = PU[K] * HalfCm;
+						const float Lv = PV[K] * HalfCm;
+						float Zc = 0.f;
+						bool bFc = false, bTc = false;
+						if (TraceColumnSol(Inst.X + Lu * CosY - Lv * SinY,
+							Inst.Y + Lu * SinY + Lv * CosY, Zc, bFc, bTc))
+						{
+							Us[NPts] = Lu;
+							Vs[NPts] = Lv;
+							Zs[NPts] = Zc;
+							Ks[NPts] = K;
+							++NPts;
+						}
+					}
+					// 4 sondages de plus AU CONTOUR DE LA v2 (1,2 m fixe) : sans eux, la
+					// regle v2 serait jugee sur une emprise qui n'est pas la sienne.
+					float Z2Coin[4];
+					int32 N2Coins = 0;
+					for (int32 K = 1; K <= 4; ++K)
+					{
+						const float Lu = PU[K] * GV2HalfCm;
+						const float Lv = PV[K] * GV2HalfCm;
+						float Zc = 0.f;
+						bool bFc = false, bTc = false;
+						if (TraceColumnSol(Inst.X + Lu * CosY - Lv * SinY,
+							Inst.Y + Lu * SinY + Lv * CosY, Zc, bFc, bTc))
+						{
+							Z2Coin[N2Coins++] = Zc;
+						}
+					}
+					// Plan z = A.u + B.v + C dans le repere de la fosse. Les 9 points
+					// sont symetriques, mais une trace manquante casse la symetrie :
+					// on centre explicitement avant de resoudre. DEUX passes : la
+					// seconde ignore les points qui n'appartiennent visiblement pas a
+					// la meme surface (marche, mur, dalle superposee).
+					float A = 0.f, B = 0.f, C = SolZ;
+					// Pente BRUTE du plan local, avant l'ecretage a GPitMaxSlope : c'est
+					// elle qui juge la pente reelle du terrain (point B). L'ecretee, elle,
+					// ne sert qu'a poser la fosse sans la mettre de travers.
+					float ARaw = 0.f, BRaw = 0.f;
+					bool bGarde[9];
+					for (int32 K = 0; K < 9; ++K) { bGarde[K] = true; }
+					int32 NGarde = NPts;
+					auto Ajuste = [&]() -> bool
+					{
+						if (NGarde < 4) { return false; }
+						float Mu = 0.f, Mv = 0.f, Mz = 0.f;
+						for (int32 K = 0; K < NPts; ++K)
+						{
+							if (!bGarde[K]) { continue; }
+							Mu += Us[K]; Mv += Vs[K]; Mz += Zs[K];
+						}
+						Mu /= NGarde; Mv /= NGarde; Mz /= NGarde;
+						float Su2 = 0.f, Sv2 = 0.f, Suz = 0.f, Svz = 0.f;
+						for (int32 K = 0; K < NPts; ++K)
+						{
+							if (!bGarde[K]) { continue; }
+							const float Du = Us[K] - Mu, Dv = Vs[K] - Mv, Dz = Zs[K] - Mz;
+							Su2 += Du * Du; Sv2 += Dv * Dv;
+							Suz += Du * Dz; Svz += Dv * Dz;
+						}
+						A = Su2 > 1.f ? Suz / Su2 : 0.f;
+						B = Sv2 > 1.f ? Svz / Sv2 : 0.f;
+						ARaw = A; BRaw = B;
+						A = FMath::Clamp(A, -GPitMaxSlope, GPitMaxSlope);
+						B = FMath::Clamp(B, -GPitMaxSlope, GPitMaxSlope);
+						C = Mz - A * Mu - B * Mv;
+						return true;
+					};
+					if (Ajuste())
+					{
+						// Purge des points d'une AUTRE surface, puis rajustement.
+						int32 NRejet = 0;
+						for (int32 K = 0; K < NPts; ++K)
+						{
+							if (FMath::Abs(Zs[K] - (A * Us[K] + B * Vs[K] + C))
+								> GPitOutlierCm)
+							{
+								bGarde[K] = false;
+								++NRejet;
+							}
+						}
+						if (NRejet > 0 && NPts - NRejet >= 4)
+						{
+							NGarde = NPts - NRejet;
+							NumPitOutliers += NRejet;
+							Ajuste();
+						}
+						else
+						{
+							for (int32 K = 0; K < NPts; ++K) { bGarde[K] = true; }
+							NGarde = NPts;
+						}
+						++NumPitPlan;
+					}
+					else
+					{
+						++NumPitPlat;   // emprise mal echantillonnee : horizontale
+					}
+
+					// --- POINT B : ARBRE SUR PENTE MINERALE -> INSTANCE SUPPRIMEE ---
+					// On est ici sur un arbre pose sur du sol MINERAL rendu (bRendu) : la
+					// pente du plan local dit si ce mineral est un talus. Au-dela du
+					// seuil, ni arbre ni fosse : un tronc plante dans un talus pave et
+					// un cadre carre couche sur la pente sont deux incoherences que
+					// l'utilisateur a demande de trancher par la suppression. Le rejet
+					// est trace (compteur + positions) comme tout rejet de cette passe.
+					{
+						const float PenteDeg = FMath::RadiansToDegrees(
+							FMath::Atan(FMath::Sqrt(ARaw * ARaw + BRaw * BRaw)));
+						if (PenteDeg > GPenteMaxArbreMineralDeg)
+						{
+							SkippedPente.Add(FSkippedInst{ MeshPath,
+								Inst.X / 100.0, Inst.Y / 100.0 });
+							SkippedPenteDeg.Add(PenteDeg);
+							continue;   // ni instance, ni fosse
+						}
+					}
+
+					// Residu MAXIMAL sur les points RETENUS : c'est lui qui garantit
+					// qu'aucun point de la rue ne depasse le plan de la fosse. Borne,
+					// pour qu'un relief non filtre ne mette jamais la fosse en l'air.
+					float MaxRes = 0.f, MinRes = 0.f;
+					for (int32 K = 0; K < NPts; ++K)
+					{
+						if (!bGarde[K]) { continue; }
+						const float R = Zs[K] - (A * Us[K] + B * Vs[K] + C);
+						MaxRes = FMath::Max(MaxRes, R);
+						MinRes = FMath::Min(MinRes, R);
+					}
+					MaxPitGiteCm = FMath::Max(MaxPitGiteCm, MaxRes - MinRes);
+					if (MaxRes > GPitMaxLiftCm)
+					{
+						++NumPitLiftBorne;
+						MaxRes = GPitMaxLiftCm;
+					}
+
+					// Rotation : l'axe Z local devient la normale du plan local. Le lacet
+					// de rue est conserve comme direction d'avant (MakeFromZX projette).
+					const FVector NLoc(-A, -B, 1.0);
+					const FVector NW(NLoc.X * CosY - NLoc.Y * SinY,
+						NLoc.X * SinY + NLoc.Y * CosY, 1.0);
+					const FRotator PitRot = FRotationMatrix::MakeFromZX(
+						NW.GetSafeNormal(), FVector(CosY, SinY, 0.0)).Rotator();
+					const float ZFrame = C + MaxRes + GPitLiftCm;
+					Pits.Add(FPitInst{ Inst.X, Inst.Y, ZFrame,
+						PitRot, CoteCm / (GPitRefM * 100.f) });
+
+					// --- 3) COMPARATIF v2 / v3 sur les memes sondages ----------------
+					if (NPts == 9 && N2Coins == 4)
+					{
+						++NumCmpPits;
+						// v2 : tout est plat, cale sur le seul Z du centre.
+						const float Z2Sol = SolZ + GV2LiftCm - GV2SinkCm;   // -1,5 cm
+						if (Z2Sol < Zs[0]) { ++N2Fond; }
+						for (int32 K = 0; K < NPts; ++K)
+						{
+							++NumCmpPts;
+							if (Z2Sol < Zs[K]) { ++N2PtsOcc; }
+							// v3 : le fond suit le plan de la fosse.
+							const float Z3Sol = ZFrame + A * Us[K] + B * Vs[K] - GPitSinkCm;
+							if (Z3Sol < Zs[K]) { ++N3PtsOcc; }
+							if (K == 0 && Z3Sol < Zs[K]) { ++N3Fond; }
+						}
+						bool b2Coin = false;
+						for (int32 K = 0; K < N2Coins; ++K)
+						{
+							if (SolZ + GV2LiftCm < Z2Coin[K]) { b2Coin = true; }
+						}
+						if (b2Coin) { ++N2Coin; }
+						bool b3Coin = false;
+						for (int32 K = 0; K < NPts; ++K)
+						{
+							if (Ks[K] < 1 || Ks[K] > 4) { continue; }
+							if (ZFrame + A * Us[K] + B * Vs[K] < Zs[K]) { b3Coin = true; }
+						}
+						if (b3Coin) { ++N3Coin; }
+						// Debordement : empattement vs demi-cote INTERIEUR du cadre.
+						if (RbCm > GV2InnerCm) { ++N2Debord; }
+						if (RbCm > RatioInterieur * CoteCm) { ++N3Debord; }
+					}
+				}
+			}
+
+			// POSE EFFECTIVE : plus aucun rejet possible passe ce point.
 			const FTransform Xf(FRotator(0, Inst.Yaw, 0),
 				FVector(Inst.X, Inst.Y, SolZ), FVector(Inst.Scale));
 			Hism->AddInstance(Xf, /*bWorldSpace*/ true);
 			++Summary.Instances;
 		}
+		// Touffes d'herbe : reglages de RENDU valides par l'utilisateur sur la passe
+		// dediee (fondu 45-60 m, pas d'ombre portee). Ils vivent ici, dans l'unique
+		// autorite de pose, et non plus dans un script de semis parallele.
+		if (bClump)
+		{
+			Hism->InstanceStartCullDistance = GClumpCullStartCm;
+			Hism->InstanceEndCullDistance = GClumpCullEndCm;
+			Hism->SetCastShadow(false);
+		}
 		VegActor->SetActorLabel(FString::Printf(TEXT("CityVeg_%s"), *Mesh->GetName()));
 		++Summary.Meshes;
 		++Summary.Actors;
+	}
+
+	// --- FOSSES DE PLANTATION : un mesh, un HISM, toutes les fosses --------------
+	if (Pits.Num() > 0)
+	{
+		// Deux matieres : la TERRE (pack dedie treepit_soil, seul materiau du set a
+		// lire la VertexColor) pour l'interieur, la BORDURE pour le cadre. Repli sur
+		// le gravier puis sur la terre elle-meme : jamais de materiau /Engine/.
+		FSurfaceLibrary SurfLib;
+		SurfLib.Init(true, Gen.SurfacesFolder);
+		const FResolvedSurface* Soil = SurfLib.Resolve(&GSurfPitSoil);
+		UMaterialInterface* PitMat = Soil ? Soil->Material : nullptr;
+		if (!PitMat)
+		{
+			const FResolvedSurface* Repli = SurfLib.Resolve(&GSurfGravel);
+			PitMat = Repli ? Repli->Material : nullptr;
+			UE_LOG(LogCityImport, Display,
+				TEXT("Vegetation : pack de terre '%s' absent — repli sur '%s'."),
+				GSurfPitSoil.Slug, GSurfGravel.Slug);
+		}
+		const FResolvedSurface* Frame = SurfLib.Resolve(&GSurfPitFrame);
+		UMaterialInterface* FrameMat = Frame ? Frame->Material : nullptr;
+		if (!FrameMat)
+		{
+			const FResolvedSurface* Curb = SurfLib.Resolve(&GSurfCurb);
+			FrameMat = Curb && Curb->Material ? Curb->Material : PitMat;
+		}
+		if (!PitMat)
+		{
+			// Pas de materiau terre = PAS de fosses. Des carres en materiau par
+			// defaut (gris vif) seraient un defaut visible, pire que l'absence.
+			UE_LOG(LogCityImport, Warning,
+				TEXT("Vegetation : materiau de fosse absent (%s / %s) — %d fosses non generees."),
+				GSurfPitSoil.Slug, GSurfGravel.Slug, Pits.Num());
+			Pits.Reset();
+		}
+
+		FCityMeshBuilder PitBuilder;
+		PitBuilder.bLinearColors = Gen.bDesktop;
+		BuildPlantingPit(PitBuilder, GPitRefM * 50.f /*demi-cote cm*/);
+		// Pas de collision : une fosse est une decoration de sol, elle ne doit ni
+		// gener le drone ni polluer les traces de la prochaine passe.
+		// Slot 0 (Wall) = la terre, slot 1 (Glass) = le cadre : c'est le decoupage en
+		// groupes de polygones de BuildPlantingPit.
+		UStaticMesh* PitMesh = PitMat
+			? CreateMeshAsset(AssetFolder / TEXT("SM_TreePit"), PitBuilder,
+				PitMat, FrameMat, /*bWithCollision=*/false)
+			: nullptr;
+		if (PitMesh)
+		{
+			for (const FStaticMaterial& SM : PitMesh->GetStaticMaterials())
+			{
+				if (SM.MaterialInterface)
+				{
+					SM.MaterialInterface->CheckMaterialUsage(MATUSAGE_InstancedStaticMeshes);
+				}
+			}
+			AActor* PitActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
+			USceneComponent* PitRoot =
+				NewObject<USceneComponent>(PitActor, TEXT("Root"), RF_Transactional);
+			PitActor->SetRootComponent(PitRoot);
+			PitActor->AddInstanceComponent(PitRoot);
+			PitRoot->RegisterComponent();
+			PitRoot->SetWorldLocation(Location);
+			UHierarchicalInstancedStaticMeshComponent* PitHism =
+				NewObject<UHierarchicalInstancedStaticMeshComponent>(PitActor, TEXT("Pits"),
+					RF_Transactional);
+			PitHism->SetStaticMesh(PitMesh);
+			PitHism->SetupAttachment(PitRoot);
+			PitActor->AddInstanceComponent(PitHism);
+			PitHism->RegisterComponent();
+			PitHism->SetCastShadow(false);   // un disque plat au sol n'ombre rien
+			for (const FPitInst& P : Pits)
+			{
+				// Echelle (S,S,1) : le carre grandit, mais le relief VERTICAL du cadre
+				// (hauteur, creux, jupe) reste absolu — une grande fosse n'a pas un
+				// cadre deux fois plus haut.
+				PitHism->AddInstance(FTransform(P.Rot,
+					FVector(P.Xcm, P.Ycm, P.Zcm), FVector(P.Scale, P.Scale, 1.f)),
+					/*bWorldSpace*/ true);
+			}
+			// Le prefixe CityVeg est VOULU : la passe vege-seule suivante detruit ces
+			// acteurs comme les autres (idempotence), et le trace les ignore.
+			PitActor->SetActorLabel(TEXT("CityVeg_TreePits"));
+			Summary.Pits = Pits.Num();
+			++Summary.Actors;
+			++Summary.Meshes;
+		}
 	}
 
 	// Cleanup des proxys de trace : acteurs detruits, duplicatas transient au GC.
@@ -2891,13 +4187,133 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 		World->DestroyActor(P);
 	}
 
+	// --- TRACE DES INSTANCES REJETEES -------------------------------------------
+	// Le repli GroundZ ayant disparu, un « sol introuvable » se solde par une
+	// instance en moins : elle doit rester VERIFIABLE, pas silencieuse.
+	Summary.Skipped = Skipped.Num();
+	{
+		const FString SkipPath = VegJsonPath + TEXT(".skipped.json");
+		FString Out = FString::Printf(
+			TEXT("{\"skipped\":%d,\"raison\":\"aucun sol (SM_Surface_/SM_Slab_) dans la colonne")
+			TEXT(" — instance NON posee, plus de repli GroundZ\",\"positions\":["), Skipped.Num());
+		for (int32 i = 0; i < Skipped.Num(); ++i)
+		{
+			Out += FString::Printf(TEXT("%s{\"mesh\":\"%s\",\"x\":%.2f,\"y\":%.2f}"),
+				i ? TEXT(",") : TEXT(""), *Skipped[i].Mesh, Skipped[i].Xm, Skipped[i].Ym);
+		}
+		Out += TEXT("]}");
+		// UTF-8 FORCE : par defaut FFileHelper bascule tout le fichier en UTF-16 des
+		// qu'un caractere sort de l'ASCII (ici le tiret cadratin du message), ce qui
+		// donnait un JSON illisible pour les outils qui le relisent.
+		FFileHelper::SaveStringToFile(Out, *SkipPath,
+			FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	}
+
+	// --- TRACE DES ARBRES SUPPRIMES POUR PENTE MINERALE (point B) ----------------
+	{
+		const FString P = VegJsonPath + TEXT(".slope_skipped.json");
+		float MaxDeg = 0.f;
+		double SomDeg = 0.0;
+		for (float D : SkippedPenteDeg) { MaxDeg = FMath::Max(MaxDeg, D); SomDeg += D; }
+		FString Out = FString::Printf(
+			TEXT("{\"supprimes\":%d,\"seuil_deg\":%.1f,\"pente_moyenne_deg\":%.1f,")
+			TEXT("\"pente_max_deg\":%.1f,\"raison\":\"arbre sur sol MINERAL rendu dont la ")
+			TEXT("pente locale depasse le seuil : arbre ET fosse supprimes\",\"positions\":["),
+			SkippedPente.Num(), GPenteMaxArbreMineralDeg,
+			SkippedPente.Num() ? (float)(SomDeg / SkippedPente.Num()) : 0.f, MaxDeg);
+		for (int32 i = 0; i < SkippedPente.Num(); ++i)
+		{
+			Out += FString::Printf(TEXT("%s{\"mesh\":\"%s\",\"x\":%.2f,\"y\":%.2f,\"pente_deg\":%.1f}"),
+				i ? TEXT(",") : TEXT(""), *SkippedPente[i].Mesh,
+				SkippedPente[i].Xm, SkippedPente[i].Ym, SkippedPenteDeg[i]);
+		}
+		Out += TEXT("]}");
+		FFileHelper::SaveStringToFile(Out, *P, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	}
+
+	// --- MESURE DU DEFAUT « FLOTTANT » CORRIGE (point A) -------------------------
+	// Chaque ligne dit, pour une instance : ou l'ANCIENNE regle l'aurait posee, ou la
+	// NOUVELLE la pose, et la colonne complete (chaque surface avec son Z et sa nature)
+	// — la preuve est dans le fichier, pas dans le commentaire.
+	{
+		const FString P = VegJsonPath + TEXT(".floating.json");
+		FString Coupables;
+		for (const TPair<FString, int32>& Pr : CoupablesParActeur)
+		{
+			Coupables += FString::Printf(TEXT("%s\"%s\":%d"),
+				Coupables.IsEmpty() ? TEXT("") : TEXT(","), *Pr.Key, Pr.Value);
+		}
+		FString Out = FString::Printf(
+			TEXT("{\"instances_corrigees_sup_30cm\":%d,\"dont_sup_1m\":%d,\"flottement_max_cm\":%.1f,")
+			TEXT("\"hits_isoles_ecartes\":%d,\"hits_isoles_gardes\":%d,\"sans_proxy\":%d,")
+			TEXT("\"regle\":\"pose sur la surface RENDUE (proxys) la plus haute ; la collision ")
+			TEXT("d'origine des dalles (SM_Slab_*_Col, grille 16x16) ne decide plus\",")
+			TEXT("\"coupables\":{%s},\"exemples\":["),
+			NumFlottant30, NumFlottant100, MaxFlottantCm,
+			NumHitIsoleEcarte, NumHitIsoleGarde, NumSansProxy, *Coupables);
+		for (int32 i = 0; i < Flottants.Num(); ++i)
+		{
+			const FFlottant& F = Flottants[i];
+			Out += FString::Printf(
+				TEXT("%s{\"mesh\":\"%s\",\"x\":%.2f,\"y\":%.2f,\"z_ancienne_regle\":%.1f,")
+				TEXT("\"z_nouvelle_regle\":%.1f,\"flottement_cm\":%.1f,\"coupable\":\"%s\",")
+				TEXT("\"colonne\":\"%s\"}"),
+				i ? TEXT(",") : TEXT(""), *F.Mesh, F.Xm, F.Ym, F.ZAncien, F.ZNouveau,
+				F.ZAncien - F.ZNouveau, *F.Coupable, *F.Colonne);
+		}
+		Out += TEXT("]}");
+		FFileHelper::SaveStringToFile(Out, *P, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	}
+
 	FStaticMeshCompilingManager::Get().FinishAllCompilation();
 	UE_LOG(LogCityImport, Display,
 		TEXT("Vegetation importee : %d instances, %d meshes, %d acteurs — central film=%d, ")
 		TEXT("central dalle=%d, fosses corrigees (couronne)=%d, multi-hit recuperes=%d, ")
-		TEXT("replis GroundZ=%d, proxys sol=%d."),
+		TEXT("REJETEES (sans sol)=%d, fosses de plantation=%d, cellules de masque=%d, ")
+		TEXT("proxys sol=%d — regle SOL RENDU : +%d fosses gagnees, -%d perdues vs ")
+		TEXT("canal R brut, bruit de bord %s, segments de bordure pour l'alignement=%d."),
 		Summary.Instances, Summary.Meshes, Summary.Actors, NumFilmCentral, NumDalleCentral,
-		NumFosseCorrige, NumMultiHitRecup, TraceMiss, TraceProxies.Num());
+		NumFosseCorrige, NumMultiHitRecup, TraceMiss, Summary.Pits,
+		MaskSampler.NumCellsLoaded(), TraceProxies.Num(),
+		NumFosseGagnee, NumFossePerdue,
+		MaskSampler.HasNoise() ? TEXT("CHARGE") : TEXT("ABSENT"), CurbSegs.Num());
+	UE_LOG(LogCityImport, Display,
+		TEXT("Pose sur SURFACE RENDUE (lot5) : %d instances que l'ancienne regle aurait ")
+		TEXT("posees plus de 30 cm trop haut (dont %d de plus d'1 m, maximum %.0f cm) — la ")
+		TEXT("collision d'origine des dalles ne decide plus. Garde-fou hit isole : %d ")
+		TEXT("ecartes, %d gardes (avis des 4 colonnes voisines). Sondages sans surface ")
+		TEXT("rendue (repli sur la collision d'origine, DOIT valoir 0)=%d. Detail : ")
+		TEXT("%s.floating.json"),
+		NumFlottant30, NumFlottant100, MaxFlottantCm, NumHitIsoleEcarte, NumHitIsoleGarde,
+		NumSansProxy, *VegJsonPath);
+	UE_LOG(LogCityImport, Display,
+		TEXT("Arbres sur pente minerale (lot5) : %d instances SUPPRIMEES (arbre + fosse) ")
+		TEXT("au-dela de %.0f deg de pente locale. Detail : %s.slope_skipped.json"),
+		SkippedPente.Num(), GPenteMaxArbreMineralDeg, *VegJsonPath);
+	UE_LOG(LogCityImport, Display,
+		TEXT("Fosses v3 : cote moyen %.2f m (clamp bas=%d, clamp haut=%d), pose sur plan ")
+		TEXT("local=%d, pose horizontale (emprise mal echantillonnee)=%d, non-planeite ")
+		TEXT("max sous une emprise=%.1f cm, sondages rejetes (autre surface)=%d, ")
+		TEXT("relevements bornes a %.0f cm=%d — fond de terre a +%.1f cm de la dalle, ")
+		TEXT("haut du cadre a +%.1f cm, jupe %.0f cm."),
+		Summary.Pits ? (float)(SumPitCoteCm / Summary.Pits * 0.01) : 0.f,
+		NumPitClampMin, NumPitClampMax, NumPitPlan, NumPitPlat, MaxPitGiteCm,
+		NumPitOutliers, GPitMaxLiftCm, NumPitLiftBorne,
+		GPitClearCm, GPitLiftCm, GPitSkirtCm);
+	if (NumCmpPits > 0)
+	{
+		auto Pc = [](int32 N, int32 D) { return D ? 100.f * N / D : 0.f; };
+		UE_LOG(LogCityImport, Display,
+			TEXT("Fosses AVANT/APRES sur %d fosses et %d sondages de la MEME dalle rendue — ")
+			TEXT("fond occlus au centre : v2 %.1f %% -> v3 %.1f %% ; points de fond occlus : ")
+			TEXT("v2 %.1f %% -> v3 %.1f %% ; coin immerge : v2 %.1f %% -> v3 %.1f %% ; ")
+			TEXT("debordement racinaire : v2 %.1f %% -> v3 %.1f %%."),
+			NumCmpPits, NumCmpPts,
+			Pc(N2Fond, NumCmpPits), Pc(N3Fond, NumCmpPits),
+			Pc(N2PtsOcc, NumCmpPts), Pc(N3PtsOcc, NumCmpPts),
+			Pc(N2Coin, NumCmpPits), Pc(N3Coin, NumCmpPits),
+			Pc(N2Debord, NumCmpPits), Pc(N3Debord, NumCmpPits));
+	}
 	return Summary;
 }
 
