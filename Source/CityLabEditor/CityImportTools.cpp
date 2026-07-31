@@ -935,6 +935,30 @@ namespace
 			return !bHerbeGagne || bPeint;
 		}
 
+		/**
+		 * LOT6 — DISTANCE SIGNEE A LA CHAUSSEE PEINTE, en centimetres (>0 = SUR la
+		 * chaussee, <0 = a cote, la valeur EST la distance au bord).
+		 *
+		 * Le canal G du masque N'EST PAS un booleen : c'est deja le champ de distance
+		 * signee de la couche chaussee, sature a +-GMaskSdfRangeM. Il porte donc a la
+		 * fois la direction (par son gradient) et la distance (par sa valeur) dont la
+		 * retraction des plantations a besoin. Aucun bruit ne lui est applique : seule
+		 * la frontiere d'HERBE est deplacee par le bruit du materiau, le peint garde son
+		 * bord franc — c'est ce bord-la que l'oeil voit comme « le bord de la route ».
+		 *
+		 * Hors masque, on ne DEVINE pas : valeur tres negative = aucune chaussee connue
+		 * ici, donc rien a retracter (une retraction inventee serait pire que rien).
+		 */
+		float RoadDistCm(double Xcm, double Ycm)
+		{
+			uint8 P[4];
+			if (!SampleRGBA(Xcm, Ycm, P))
+			{
+				return -1.0e6f;
+			}
+			return ((float)P[1] / 255.f - 0.5f) * (2.f * GMaskSdfRangeM) * 100.f;
+		}
+
 		int32 NumCellsLoaded() const { return Loaded; }
 		bool HasNoise() const { return NoiseSize > 0; }
 		/** Taille de cellule DECLAREE par les masques (index.json), jamais devinee. */
@@ -1929,6 +1953,137 @@ namespace
 	// l'utilisateur sur la passe de semis dediee, repris ici tel quel).
 	constexpr float GClumpCullStartCm = 4500.f;
 	constexpr float GClumpCullEndCm = 6000.f;
+
+	// -----------------------------------------------------------------------------
+	// LOT6 point A/D — RETRACTION DES PLANTATIONS QUI MORDENT LA CHAUSSEE.
+	//
+	// Le semis vient du LiDAR, qui donne l'APEX DE COURONNE et non le pied : un arbre
+	// d'alignement penche naturellement vers la rue, si bien que sa position tombe trop
+	// pres du bord — sa fosse se retrouve a cheval sur la chaussee (defaut signale,
+	// captures a l'appui). Ces alignements de boulevard sont REELS et precieux : on ne
+	// les supprime pas, ON LES RECULE. Meme regle pour les haies (point D) : leur filtre
+	// d'epoque utilisait les buffers OSM alors que la voirie VISIBLE est la chaussee
+	// peinte BD TOPO, d'ou des haies au milieu de la route.
+	//
+	// Le masque de sol PORTE DEJA le champ de distance qu'il faut : son canal G est la
+	// distance SIGNEE a la chaussee. Il donne donc a la fois la DIRECTION (son gradient)
+	// et la DISTANCE (sa valeur) — rien a re-deriver.
+	// Regle : reculer jusqu'a ce que le degagement demande (demi-emprise + marge) soit
+	// atteint ; au-dela de la course maximale (rue etroite bordee des deux cotes), on ne
+	// pose PAS l'instance et on la compte. Jamais de deplacement devine, jamais de
+	// suppression silencieuse.
+	constexpr float GRetraitMargeCm = 20.f;   // degagement demande au-dela de l'emprise
+	constexpr float GRetraitMaxCm = 250.f;    // course maximale d'une retraction
+	constexpr float GRetraitPasCm = 10.f;     // pas de la marche le long du gradient
+	// Le gradient se lit par differences finies : le pas doit depasser LA TAILLE D'UN
+	// PIXEL de masque (500 m / 1024 = 48,8 cm), sinon les deux echantillons tombent dans
+	// le meme pixel et le gradient est nul par construction.
+	constexpr float GRetraitGradPasCm = 60.f;
+	constexpr int32 GRetraitDirs = 32;        // directions du balayage de secours
+
+	// -----------------------------------------------------------------------------
+	// LOT6 point C — FOSSE RONDE DES ARBUSTES ET DES HAIES SUR SOL MINERAL.
+	//
+	// Verdict utilisateur : les haies Elderberry posees sur du pave n'ont ni socle ni
+	// racines, ce sont des tiges fines plantees dans la pierre. Meme remede que pour les
+	// arbres, a l'echelle de l'arbuste : la voirie decoupe une petite fosse RONDE (les
+	// fosses d'arbustes reelles le sont), avec un fin anneau de cadre et de la terre en
+	// leger MONTICULE vers la tige — c'est le monticule qui fait lire un pied enracine,
+	// la ou le creux de la fosse d'arbre fait lire une cuvette d'arrosage.
+	// Les haies plantees DANS L'HERBE n'en ont pas : il n'y a rien a decouper.
+	constexpr float GShrubPitRefM = 0.9f;     // diametre du disque de REFERENCE (mesh)
+	constexpr float GShrubPitMinM = 0.6f;     // plus petite fosse d'arbuste
+	constexpr float GShrubPitMaxM = 0.9f;     // plus grande
+	constexpr float GShrubPitMarginCm = 10.f; // marge autour de la touffe de tiges
+	// MESURE (run du 31/07) : l'empattement rendu par ComputeBasalRadiusCm sur un
+	// Elderberry vaut 87 a 202 cm A SON ECHELLE — c'est l'etalement du BUISSON ENTIER,
+	// ses basses branches comprises, et non la touffe de tiges. Le prendre tel quel
+	// saturait 100 % des fosses au plafond de 0,9 m : 268 disques identiques, exactement
+	// le motif repete deja reproche aux fosses carrees v2. La decoupe du revetement suit
+	// LES TIGES, soit environ un cinquieme de cet etalement — ce qui redonne toute la
+	// plage 0,6-0,9 m demandee, proportionnelle a la taille de l'arbuste.
+	constexpr float GShrubPitBasalFrac = 0.20f;
+	// Une fosse est une decoupe HORIZONTALE dans un revetement : couchee a 25 deg sur un
+	// talus, elle ne se lit plus comme telle (meme verdict que pour les fosses carrees au
+	// lot5). Au-dela du seuil, l'ARBUSTE RESTE — un buisson sur talus est credible — mais
+	// il n'a PAS de fosse. On ne supprime pas la plante, on renonce a la decoupe.
+	constexpr float GShrubPitMaxSlopeDeg = 15.f;
+	constexpr float GShrubFrameCm = 5.f;      // FIN anneau de cadre (vs 12 cm pour l'arbre)
+	constexpr float GShrubMoundCm = 5.f;      // hauteur du monticule de terre au centre
+	constexpr int32 GShrubSegs = 20;          // segments du disque
+	constexpr float GShrubSkirtCm = 10.f;     // jupe qui scelle l'anneau au pave
+
+	// FOSSE RONDE : meme convention de repere que la fosse carree — Z = 0 est le HAUT DE
+	// L'ANNEAU, l'instance est posee sur le plan local du sol a GPitLiftCm au-dessus du
+	// point le plus haut de son emprise, si bien que le point le plus BAS de la terre
+	// (Z local = -GPitSinkCm, au pourtour) reste GPitClearCm AU-DESSUS de la dalle.
+	// Le centre monte a -GPitSinkCm + GShrubMoundCm : de la terre AMASSEE contre la tige.
+	//   WallGroup  = la TERRE (seule a porter une vertex color utile) ;
+	//   GlassGroup = l'ANNEAU et sa JUPE (matiere de bordure).
+	void BuildRoundPit(FCityMeshBuilder& QM, float RadiusCm)
+	{
+		const FVector3f Up(0.f, 0.f, 1.f);
+		const FVector3f Blanc(1.f, 1.f, 1.f);
+		const float InnerCm = FMath::Max(RadiusCm - GShrubFrameCm, 1.f);
+		const float ZSoilBord = -GPitSinkCm;
+		const float ZSoilCentre = ZSoilBord + GShrubMoundCm;
+		auto UVof = [](const FVector3f& P) { return FVector2f(P.X * 0.01f, P.Y * 0.01f); };
+
+		for (int32 k = 0; k < GShrubSegs; ++k)
+		{
+			const float A0 = (float)(2.0 * PI * k / GShrubSegs);
+			const float A1 = (float)(2.0 * PI * (k + 1) / GShrubSegs);
+			const FVector2f D0(FMath::Cos(A0), FMath::Sin(A0));
+			const FVector2f D1(FMath::Cos(A1), FMath::Sin(A1));
+
+			// --- l'ANNEAU : couronne plate au niveau du pave -------------------------
+			{
+				const FVector3f P[4] = {
+					FVector3f(D0.X * RadiusCm, D0.Y * RadiusCm, 0.f),
+					FVector3f(D1.X * RadiusCm, D1.Y * RadiusCm, 0.f),
+					FVector3f(D1.X * InnerCm, D1.Y * InnerCm, 0.f),
+					FVector3f(D0.X * InnerCm, D0.Y * InnerCm, 0.f) };
+				const FVector2f UV[4] = { UVof(P[0]), UVof(P[1]), UVof(P[2]), UVof(P[3]) };
+				QM.AddPoly(QM.GlassGroup, P, 4, Up, UV, Blanc);
+			}
+			// --- la JUPE : la face verticale, du haut de l'anneau jusque sous le pave --
+			{
+				const FVector2f Sortante = (D0 + D1) * 0.5f;
+				const FVector3f N(Sortante.X, Sortante.Y, 0.f);
+				const FVector3f P[4] = {
+					FVector3f(D0.X * RadiusCm, D0.Y * RadiusCm, 0.f),
+					FVector3f(D1.X * RadiusCm, D1.Y * RadiusCm, 0.f),
+					FVector3f(D1.X * RadiusCm, D1.Y * RadiusCm, -GShrubSkirtCm),
+					FVector3f(D0.X * RadiusCm, D0.Y * RadiusCm, -GShrubSkirtCm) };
+				const FVector2f UV[4] = {
+					FVector2f(P[0].X * 0.01f, P[0].Y * 0.01f),
+					FVector2f(P[1].X * 0.01f, P[1].Y * 0.01f),
+					FVector2f(P[2].X * 0.01f, (P[2].Y - GShrubSkirtCm) * 0.01f),
+					FVector2f(P[3].X * 0.01f, (P[3].Y - GShrubSkirtCm) * 0.01f) };
+				QM.AddPoly(QM.GlassGroup, P, 4, N.GetSafeNormal(), UV, Blanc);
+			}
+			// --- la TERRE : eventail du centre (haut) vers le bord interieur (bas) -----
+			// Le degrade de vertex color assombrit le pied de la tige, comme la fosse
+			// carree assombrit le pied du tronc.
+			{
+				const FVector3f P[3] = {
+					FVector3f(0.f, 0.f, ZSoilCentre),
+					FVector3f(D0.X * InnerCm, D0.Y * InnerCm, ZSoilBord),
+					FVector3f(D1.X * InnerCm, D1.Y * InnerCm, ZSoilBord) };
+				const FVector2f UV[3] = { UVof(P[0]), UVof(P[1]), UVof(P[2]) };
+				const FVector3f Cols[3] = {
+					FVector3f(GPitShadeCenter, GPitShadeCenter, GPitShadeCenter),
+					FVector3f(GPitShadeEdge, GPitShadeEdge, GPitShadeEdge),
+					FVector3f(GPitShadeEdge, GPitShadeEdge, GPitShadeEdge) };
+				// Normale du cone : penchee vers l'exterieur, sinon le monticule prend la
+				// lumiere exactement comme le pave et ne se lit pas en relief.
+				const FVector2f Sortante = (D0 + D1) * 0.5f;
+				const FVector3f N = FVector3f(Sortante.X * GShrubMoundCm,
+					Sortante.Y * GShrubMoundCm, InnerCm).GetSafeNormal();
+				QM.AddPolyPerVertexColors(QM.WallGroup, P, 3, N, UV, Cols);
+			}
+		}
+	}
 
 	// FOSSE DE PLANTATION v2 : le carre de terre a cadre, au pied d'un arbre de rue.
 	// Objet urbain REEL — la voirie decoupe le revetement autour du tronc et borde la
@@ -3495,6 +3650,32 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 	// autrement que l'ancienne (canal R brut). Publie dans le log de fin.
 	int32 NumFosseGagnee = 0, NumFossePerdue = 0;
 
+	// --- LOT6 : retraction hors chaussee (points A et D) et fosses rondes (point C) ---
+	// Fosses RONDES d'arbustes : meme mecanique que les carrees, un HISM dedie.
+	TArray<FPitInst> ShrubPits;
+	// Trace de CHAQUE deplacement : position d'origine, position retenue, course.
+	struct FRetrait
+	{
+		FString Mesh;
+		bool bArbre = false;
+		double X0m = 0.0, Y0m = 0.0, X1m = 0.0, Y1m = 0.0;
+		float CourseCm = 0.f;
+		float DAvantCm = 0.f, DApresCm = 0.f, RequisCm = 0.f;
+	};
+	TArray<FRetrait> Retraits;
+	TArray<FSkippedInst> RetraitImpossible;
+	int32 NumRetractArbre = 0, NumRetractHaie = 0;
+	int32 NumRetractRateArbre = 0, NumRetractRateHaie = 0;
+	int32 NumRetractInchangeArbre = 0, NumRetractInchangeHaie = 0;
+	int32 NumRetractParGradient = 0, NumRetractParBalayage = 0;
+	double SumCourseCm = 0.0;
+	float MaxCourseCm = 0.f;
+	// Fosses rondes : diagnostic aligne sur celui des carrees.
+	int32 NumShrubPitPlan = 0, NumShrubPitPlat = 0, NumShrubLiftBorne = 0;
+	// Arbustes sur pente : l'arbuste reste, la fosse tombe (mesure du premier run).
+	int32 NumShrubPitPente = 0;
+	double SumShrubRayonCm = 0.0;
+
 	// --- ALIGNEMENT DES FOSSES SUR LA VOIRIE ---------------------------------------
 	// Une fosse d'arbre reelle est alignee sur sa rue, jamais posee de biais. Les
 	// polylignes de BORDURE deja cuites par cellule (sols_<x>_<y>.json, les memes qui
@@ -3567,6 +3748,104 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 		// Un carre a la symetrie d'ordre 4 : seul le reste modulo 90 deg compte.
 		BestYaw = FMath::Fmod(FMath::Fmod(BestYaw, 90.f) + 90.f, 90.f);
 		return BestYaw + (float)PitRand.FRandRange(-GPitJitterDeg, GPitJitterDeg);
+	};
+
+	// --- LOT6 points A et D : RETRACTION HORS DE LA CHAUSSEE -----------------------
+	// Rend  1 = position deplacee (X/Y modifies), 0 = deja degagee (rien touche),
+	//      -1 = impossible dans la course maximale -> l'appelant NE POSE PAS l'instance.
+	//
+	// Deux etages, du moins cher au plus sur :
+	//   1. LE GRADIENT du champ de distance, exactement ce que le brief demande : il
+	//      pointe vers l'interieur de la chaussee, on recule donc dans son oppose. Pour
+	//      un vrai champ de distance |grad| = 1, si bien que la course a parcourir vaut
+	//      (d + requis) — on marche quand meme par pas de 10 cm et on RELIT le champ a
+	//      chaque pas plutot que de faire confiance a cette estimation (le champ est
+	//      quantifie sur 8 bits et sature a 2 m).
+	//   2. UN BALAYAGE de 32 directions si le gradient est degenere (au fond d'une rue
+	//      large, le champ sature : deux echantillons voisins lisent la meme valeur et
+	//      leur difference est nulle) ou si la marche n'a rien trouve. On garde la
+	//      direction dont la course est la PLUS COURTE : reculer d'un metre a l'oppose
+	//      de la rue est juste, traverser la rue ne le serait pas.
+	// Une position n'est acceptee que si elle est REELLEMENT degagee (relecture du
+	// champ) : jamais de deplacement au juge.
+	auto DegageChaussee = [&](double& Xcm, double& Ycm, float RequisCm,
+		float& OutD0, float& OutD1, float& OutCourse) -> int32
+	{
+		OutD0 = MaskSampler.RoadDistCm(Xcm, Ycm);
+		OutD1 = OutD0;
+		OutCourse = 0.f;
+		if (OutD0 <= -RequisCm)
+		{
+			return 0;   // deja assez loin du bord : on ne touche a rien
+		}
+		const int32 NPas = FMath::CeilToInt32(GRetraitMaxCm / GRetraitPasCm);
+
+		// --- 1) le gradient ---------------------------------------------------------
+		const float H = GRetraitGradPasCm;
+		const float Gx = MaskSampler.RoadDistCm(Xcm + H, Ycm)
+			- MaskSampler.RoadDistCm(Xcm - H, Ycm);
+		const float Gy = MaskSampler.RoadDistCm(Xcm, Ycm + H)
+			- MaskSampler.RoadDistCm(Xcm, Ycm - H);
+		const FVector2D G(Gx, Gy);
+		if (G.SizeSquared() > 1.f)
+		{
+			const FVector2D Dir = -G.GetSafeNormal();   // vers l'EXTERIEUR de la chaussee
+			for (int32 K = 1; K <= NPas; ++K)
+			{
+				const float L = K * GRetraitPasCm;
+				const double Nx = Xcm + Dir.X * L;
+				const double Ny = Ycm + Dir.Y * L;
+				const float D = MaskSampler.RoadDistCm(Nx, Ny);
+				if (D <= -RequisCm)
+				{
+					Xcm = Nx;
+					Ycm = Ny;
+					OutD1 = D;
+					OutCourse = L;
+					++NumRetractParGradient;
+					return 1;
+				}
+			}
+		}
+
+		// --- 2) le balayage de secours ----------------------------------------------
+		float BestL = TNumericLimits<float>::Max();
+		double BestX = Xcm, BestY = Ycm;
+		float BestD = OutD0;
+		for (int32 A = 0; A < GRetraitDirs; ++A)
+		{
+			const double Ang = 2.0 * PI * A / GRetraitDirs;
+			const double Cx = FMath::Cos(Ang), Cy = FMath::Sin(Ang);
+			for (int32 K = 1; K <= NPas; ++K)
+			{
+				const float L = K * GRetraitPasCm;
+				if (L >= BestL)
+				{
+					break;   // cette direction ne peut plus faire mieux
+				}
+				const double Nx = Xcm + Cx * L;
+				const double Ny = Ycm + Cy * L;
+				const float D = MaskSampler.RoadDistCm(Nx, Ny);
+				if (D <= -RequisCm)
+				{
+					BestL = L;
+					BestX = Nx;
+					BestY = Ny;
+					BestD = D;
+					break;
+				}
+			}
+		}
+		if (BestL < TNumericLimits<float>::Max())
+		{
+			Xcm = BestX;
+			Ycm = BestY;
+			OutD1 = BestD;
+			OutCourse = BestL;
+			++NumRetractParBalayage;
+			return 1;
+		}
+		return -1;   // rue etroite bordee des deux cotes : instance non posee, comptee
 	};
 
 	// Groupe les instances par mesh (contrainte HISM : un composant = un seul mesh).
@@ -3695,19 +3974,57 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 
 		// EMPATTEMENT du mesh, mesure UNE FOIS ici (et non par instance : c'est une
 		// propriete du maillage). Il commande la taille des fosses plus bas.
+		// LOT6 : mesure aussi pour les HAIES — elles ont desormais une fosse RONDE sur
+		// sol mineral (point C), et leur empattement sert de degagement minimal a la
+		// retraction hors chaussee (point D) quand elles poussent dans l'herbe.
 		float BasalRUnitCm = 0.f;
+		FString BasalMethode;
+		if (bTree || bHedge)
+		{
+			BasalRUnitCm = ComputeBasalRadiusCm(Mesh, BasalMethode);
+		}
+		// Cote de la fosse CARREE d'un arbre : deux contraintes, on garde la plus
+		// exigeante — la marge racinaire demandee, et la CONTENANCE de l'interieur du
+		// cadre (qui s'echelonne avec la fosse). Sorti de la boucle d'instances au
+		// lot6 : la RETRACTION doit connaitre l'emprise de la fosse AVANT de decider ou
+		// poser l'arbre, une fosse ne peut pas etre dimensionnee apres coup sur une
+		// position qu'elle aurait du commander.
+		const float RatioInterieur = (GPitRefM * 50.f - GPitFrameCm) / (GPitRefM * 100.f);
+		auto CoteFosseCm = [&](float Scale) -> float
+		{
+			const float RbCm = BasalRUnitCm * Scale;
+			return FMath::Clamp(FMath::Max(2.f * RbCm + GPitRootMarginM * 100.f,
+				(RbCm + GPitRootClearCm) / RatioInterieur),
+				GPitMinM * 100.f, GPitMaxM * 100.f);
+		};
+		// Rayon de la fosse RONDE d'un arbuste (lot6 point C) : diametre 0,6 a 0,9 m,
+		// proportionnel a la taille REELLE de l'arbuste — une fraction de son etalement
+		// basal (voir GShrubPitBasalFrac : l'empattement mesure est celui du buisson
+		// entier, la decoupe ne suit que la touffe de tiges).
+		auto RayonFosseArbusteCm = [&](float Scale) -> float
+		{
+			return FMath::Clamp(
+				GShrubPitBasalFrac * BasalRUnitCm * Scale + GShrubPitMarginCm,
+				GShrubPitMinM * 50.f, GShrubPitMaxM * 50.f);
+		};
+		// Le REPLI de la mesure d'empattement reste trace (donnees de rendu -> description
+		// de maillage -> fraction d'emprise) : un empattement obtenu par repli explique a
+		// lui seul une fosse trop grande ou trop petite.
 		if (bTree)
 		{
-			FString Methode;
-			BasalRUnitCm = ComputeBasalRadiusCm(Mesh, Methode);
 			UE_LOG(LogCityImport, Display,
 				TEXT("Vegetation : empattement de %s = %.1f cm a l'echelle 1 (%s) — ")
-				TEXT("echelle mediane %.2f -> fosse ~%.2f m."),
-				*Mesh->GetName(), BasalRUnitCm, *Methode, MedScale,
-				FMath::Clamp(FMath::Max(2.f * BasalRUnitCm * MedScale + GPitRootMarginM * 100.f,
-					(BasalRUnitCm * MedScale + GPitRootClearCm)
-						/ ((GPitRefM * 50.f - GPitFrameCm) / (GPitRefM * 100.f))),
-					GPitMinM * 100.f, GPitMaxM * 100.f) * 0.01f);
+				TEXT("echelle mediane %.2f -> fosse carree ~%.2f m."),
+				*Mesh->GetName(), BasalRUnitCm, *BasalMethode, MedScale,
+				CoteFosseCm(MedScale) * 0.01f);
+		}
+		else if (bHedge)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("Vegetation : empattement de %s = %.1f cm a l'echelle 1 (%s) — ")
+				TEXT("echelle mediane %.2f -> fosse RONDE ~%.2f m de diametre."),
+				*Mesh->GetName(), BasalRUnitCm, *BasalMethode, MedScale,
+				2.f * RayonFosseArbusteCm(MedScale) * 0.01f);
 		}
 
 		AActor* VegActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
@@ -3726,8 +4043,69 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 		Hism->SetupAttachment(Root2);
 		VegActor->AddInstanceComponent(Hism);
 		Hism->RegisterComponent();
-		for (const FVegInst& Inst : Pair.Value)
+		for (const FVegInst& InstSrc : Pair.Value)
 		{
+			// Copie MUTABLE : la retraction hors chaussee (lot6) DEPLACE X/Y, et tout ce
+			// qui suit — trace du sol, couronne, plan de fosse, pose — doit travailler
+			// sur la position RETENUE. Deplacer apres coup laisserait l'instance posee
+			// au Z de son ancienne colonne et sa fosse ajustee sur l'ancienne emprise.
+			FVegInst Inst = InstSrc;
+
+			// --- LOT6 points A et D : LA PLANTATION NE DOIT PAS MORDRE LA CHAUSSEE ---
+			// Le degagement demande est la demi-emprise de LA FOSSE, plus une marge.
+			//
+			// PERIMETRE VOLONTAIREMENT ETROIT : seules les plantations sur sol MINERAL
+			// rendu sont concernees, c'est-a-dire exactement celles qui recoivent une
+			// fosse (carree pour un arbre, ronde pour un arbuste depuis le point C) —
+			// et c'est aussi, par construction, l'ensemble qui contient toute plantation
+			// posee SUR la chaussee, puisque le peint gagne toujours sur l'herbe. Un
+			// arbre plante dans une pelouse dont le feuillage, ou meme le disque de
+			// litiere, surplombe un peu la rue n'est pas un defaut : c'est un arbre
+			// d'alignement normal, et le deplacer serait retoucher un semis valide.
+			if (bTree || bHedge)
+			{
+				const bool bMinRetrait = MaskSampler.IsRenderedMineral(Inst.X, Inst.Y);
+				// L'emprise a degager est le rayon CIRCONSCRIT, pas le demi-cote : une
+				// fosse carree est alignee sur SA rue, ses coins pointent donc en biais
+				// et ce sont eux qui mordaient encore le bitume de quelques centimetres
+				// (mesure du premier run : 9 fosses, jusqu'a 9 cm) quand le degagement
+				// n'etait demande que sur le demi-cote. Le disque circonscrit garantit
+				// qu'aucun coin ne depasse, quelle que soit l'orientation retenue.
+				const float EmpriseCm = bTree
+					? CoteFosseCm(Inst.Scale) * 0.5f * UE_SQRT_2
+					: RayonFosseArbusteCm(Inst.Scale);
+				const float RequisCm = bMinRetrait ? EmpriseCm + GRetraitMargeCm : 0.f;
+				const double X0 = Inst.X, Y0 = Inst.Y;
+				float D0 = 0.f, D1 = 0.f, Course = 0.f;
+				const int32 Verdict =
+					DegageChaussee(Inst.X, Inst.Y, RequisCm, D0, D1, Course);
+				if (Verdict > 0)
+				{
+					if (bTree) { ++NumRetractArbre; } else { ++NumRetractHaie; }
+					SumCourseCm += Course;
+					MaxCourseCm = FMath::Max(MaxCourseCm, Course);
+					if (Retraits.Num() < 500)
+					{
+						Retraits.Add(FRetrait{ MeshPath, bTree, X0 / 100.0, Y0 / 100.0,
+							Inst.X / 100.0, Inst.Y / 100.0, Course, D0, D1, RequisCm });
+					}
+				}
+				else if (Verdict < 0)
+				{
+					// Rue etroite bordee des deux cotes : aucune position degagee dans
+					// la course maximale. On NE POSE PAS plutot que de laisser un arbre
+					// et sa fosse au milieu de la chaussee, et on le COMPTE.
+					if (bTree) { ++NumRetractRateArbre; } else { ++NumRetractRateHaie; }
+					RetraitImpossible.Add(FSkippedInst{ MeshPath, X0 / 100.0, Y0 / 100.0 });
+					continue;
+				}
+				else
+				{
+					if (bTree) { ++NumRetractInchangeArbre; }
+					else { ++NumRetractInchangeHaie; }
+				}
+			}
+
 			// Base-a-0, ZERO offset min_Z (pivot Megascans au pied) : le sol EST la
 			// surface RENDUE la plus haute de la colonne (proxys films + dalles).
 			float SolZ = 0.f;
@@ -3859,14 +4237,15 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 					//   - la CONTENANCE : l'empattement doit tenir dans l'INTERIEUR du
 					//     cadre, dont le demi-cote vaut RatioInterieur x cote (le cadre
 					//     s'echelonne avec la fosse, il n'est pas de largeur fixe).
+					// RatioInterieur et le calcul du cote sont remontes avant la boucle
+					// d'instances (lambda CoteFosseCm) : la retraction du lot6 a besoin
+					// de l'emprise de la fosse AVANT de choisir la position. Meme
+					// formule, meme resultat.
 					const float RbCm = BasalRUnitCm * Inst.Scale;
-					const float RatioInterieur =
-						(GPitRefM * 50.f - GPitFrameCm) / (GPitRefM * 100.f);
 					const float CoteVoulu = FMath::Max(
 						2.f * RbCm + GPitRootMarginM * 100.f,
 						(RbCm + GPitRootClearCm) / RatioInterieur);
-					const float CoteCm = FMath::Clamp(CoteVoulu,
-						GPitMinM * 100.f, GPitMaxM * 100.f);
+					const float CoteCm = CoteFosseCm(Inst.Scale);
 					if (CoteVoulu < GPitMinM * 100.f) { ++NumPitClampMin; }
 					else if (CoteVoulu > GPitMaxM * 100.f) { ++NumPitClampMax; }
 					SumPitCoteCm += CoteCm;
@@ -4072,6 +4451,138 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 				}
 			}
 
+			// --- LOT6 point C : FOSSE RONDE DE L'ARBUSTE SUR SOL MINERAL -------------
+			// Verdict utilisateur : les haies posees sur du pave n'ont ni socle ni
+			// racines — des tiges fines qui sortent de la pierre. La voirie decoupe la
+			// aussi, mais en ROND et en petit (les fosses d'arbustes reelles le sont),
+			// avec un fin anneau et de la terre en monticule contre la tige.
+			// Les haies dans l'HERBE n'en ont pas : il n'y a rien a decouper.
+			//
+			// La mecanique est celle de la fosse carree — plan local echantillonne,
+			// purge des sondages tombes sur une autre surface, relevement borne, fond
+			// garanti au-dessus de la dalle. Elle est ECRITE A PART et non factorisee :
+			// la fosse carree est validee par l'utilisateur et instrumentee par son
+			// comparatif v2/v3, on ne la refactorise pas dans le meme lot que l'ajout.
+			// Les sondages sont pris dans les axes du MONDE (un disque n'a pas de lacet
+			// a respecter), si bien que le plan ajuste donne directement la normale.
+			if (bHedge && bSol && !bFilm &&
+				MaskSampler.IsRenderedMineral(Inst.X, Inst.Y))
+			{
+				const float RCm = RayonFosseArbusteCm(Inst.Scale);
+				float Us[9], Vs[9], Zs[9];
+				int32 NPts = 0;
+				for (int32 K = 0; K < 9; ++K)
+				{
+					float Lu = 0.f, Lv = 0.f;
+					if (K > 0)
+					{
+						const double Ang = 2.0 * PI * (K - 1) / 8.0;
+						Lu = RCm * (float)FMath::Cos(Ang);
+						Lv = RCm * (float)FMath::Sin(Ang);
+					}
+					float Zc = 0.f;
+					bool bFc = false, bTc = false;
+					if (TraceColumnSol(Inst.X + Lu, Inst.Y + Lv, Zc, bFc, bTc))
+					{
+						Us[NPts] = Lu;
+						Vs[NPts] = Lv;
+						Zs[NPts] = Zc;
+						++NPts;
+					}
+				}
+				float A = 0.f, B = 0.f, C = SolZ;
+				float ARaw = 0.f, BRaw = 0.f;   // pente BRUTE, avant ecretage
+				bool bGarde[9];
+				for (int32 K = 0; K < 9; ++K) { bGarde[K] = true; }
+				int32 NGarde = NPts;
+				auto AjusteRond = [&]() -> bool
+				{
+					if (NGarde < 4) { return false; }
+					float Mu = 0.f, Mv = 0.f, Mz = 0.f;
+					for (int32 K = 0; K < NPts; ++K)
+					{
+						if (!bGarde[K]) { continue; }
+						Mu += Us[K]; Mv += Vs[K]; Mz += Zs[K];
+					}
+					Mu /= NGarde; Mv /= NGarde; Mz /= NGarde;
+					float Su2 = 0.f, Sv2 = 0.f, Suz = 0.f, Svz = 0.f;
+					for (int32 K = 0; K < NPts; ++K)
+					{
+						if (!bGarde[K]) { continue; }
+						const float Du = Us[K] - Mu, Dv = Vs[K] - Mv, Dz = Zs[K] - Mz;
+						Su2 += Du * Du; Sv2 += Dv * Dv;
+						Suz += Du * Dz; Svz += Dv * Dz;
+					}
+					A = Su2 > 1.f ? Suz / Su2 : 0.f;
+					B = Sv2 > 1.f ? Svz / Sv2 : 0.f;
+					ARaw = A; BRaw = B;
+					A = FMath::Clamp(A, -GPitMaxSlope, GPitMaxSlope);
+					B = FMath::Clamp(B, -GPitMaxSlope, GPitMaxSlope);
+					C = Mz - A * Mu - B * Mv;
+					return true;
+				};
+				if (AjusteRond())
+				{
+					int32 NRejet = 0;
+					for (int32 K = 0; K < NPts; ++K)
+					{
+						if (FMath::Abs(Zs[K] - (A * Us[K] + B * Vs[K] + C)) > GPitOutlierCm)
+						{
+							bGarde[K] = false;
+							++NRejet;
+						}
+					}
+					if (NRejet > 0 && NPts - NRejet >= 4)
+					{
+						NGarde = NPts - NRejet;
+						AjusteRond();
+					}
+					else
+					{
+						for (int32 K = 0; K < NPts; ++K) { bGarde[K] = true; }
+						NGarde = NPts;
+					}
+					++NumShrubPitPlan;
+				}
+				else
+				{
+					++NumShrubPitPlat;
+				}
+				// PENTE : une fosse est une decoupe HORIZONTALE dans un revetement.
+				// MESURE du premier run : 113 des 268 disques sortaient couches a
+				// 20-27 deg, plantes dans les talus paves — exactement le faux des cadres
+				// carres couches, tranche au lot5. Ici l'ARBUSTE RESTE (un buisson sur
+				// talus est credible, c'est la regle du lot5) : seule la fosse tombe.
+				// Le juge est la pente BRUTE, avant l'ecretage qui sert a poser.
+				const float PenteRondeDeg = FMath::RadiansToDegrees(
+					FMath::Atan(FMath::Sqrt(ARaw * ARaw + BRaw * BRaw)));
+				if (PenteRondeDeg > GShrubPitMaxSlopeDeg)
+				{
+					++NumShrubPitPente;
+				}
+				else
+				{
+					float MaxRes = 0.f;
+					for (int32 K = 0; K < NPts; ++K)
+					{
+						if (!bGarde[K]) { continue; }
+						MaxRes = FMath::Max(MaxRes, Zs[K] - (A * Us[K] + B * Vs[K] + C));
+					}
+					if (MaxRes > GPitMaxLiftCm)
+					{
+						++NumShrubLiftBorne;
+						MaxRes = GPitMaxLiftCm;
+					}
+					const float YawR = FMath::DegreesToRadians(Inst.Yaw);
+					const FRotator ShrubRot = FRotationMatrix::MakeFromZX(
+						FVector(-A, -B, 1.0).GetSafeNormal(),
+						FVector(FMath::Cos(YawR), FMath::Sin(YawR), 0.0)).Rotator();
+					SumShrubRayonCm += RCm;
+					ShrubPits.Add(FPitInst{ Inst.X, Inst.Y, C + MaxRes + GPitLiftCm,
+						ShrubRot, RCm / (GShrubPitRefM * 50.f) });
+				}
+			}
+
 			// POSE EFFECTIVE : plus aucun rejet possible passe ce point.
 			const FTransform Xf(FRotator(0, Inst.Yaw, 0),
 				FVector(Inst.X, Inst.Y, SolZ), FVector(Inst.Scale));
@@ -4180,6 +4691,86 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 		}
 	}
 
+	// --- LOT6 point C : FOSSES RONDES DES ARBUSTES — un mesh, un HISM -------------
+	// Meme matieres que la fosse carree (terre treepit_soil qui lit la vertex color,
+	// cadre treepit_frame) : c'est le meme objet de voirie, a une autre echelle.
+	// Meme regle sans appel : pas de materiau de terre, pas de fosses — des disques en
+	// materiau par defaut seraient un defaut visible, pire que l'absence.
+	int32 NumShrubPitsPoses = 0;
+	if (ShrubPits.Num() > 0)
+	{
+		FSurfaceLibrary SurfLib;
+		SurfLib.Init(true, Gen.SurfacesFolder);
+		const FResolvedSurface* Soil = SurfLib.Resolve(&GSurfPitSoil);
+		UMaterialInterface* PitMat = Soil ? Soil->Material : nullptr;
+		if (!PitMat)
+		{
+			const FResolvedSurface* Repli = SurfLib.Resolve(&GSurfGravel);
+			PitMat = Repli ? Repli->Material : nullptr;
+		}
+		const FResolvedSurface* Frame = SurfLib.Resolve(&GSurfPitFrame);
+		UMaterialInterface* FrameMat = Frame ? Frame->Material : nullptr;
+		if (!FrameMat)
+		{
+			const FResolvedSurface* Curb = SurfLib.Resolve(&GSurfCurb);
+			FrameMat = Curb && Curb->Material ? Curb->Material : PitMat;
+		}
+		if (!PitMat)
+		{
+			UE_LOG(LogCityImport, Warning,
+				TEXT("Vegetation : materiau de fosse absent — %d fosses rondes non generees."),
+				ShrubPits.Num());
+			ShrubPits.Reset();
+		}
+		else
+		{
+			FCityMeshBuilder ShrubBuilder;
+			ShrubBuilder.bLinearColors = Gen.bDesktop;
+			BuildRoundPit(ShrubBuilder, GShrubPitRefM * 50.f /*rayon de reference cm*/);
+			UStaticMesh* ShrubMesh = CreateMeshAsset(AssetFolder / TEXT("SM_ShrubPit"),
+				ShrubBuilder, PitMat, FrameMat, /*bWithCollision=*/false);
+			if (ShrubMesh)
+			{
+				for (const FStaticMaterial& SM : ShrubMesh->GetStaticMaterials())
+				{
+					if (SM.MaterialInterface)
+					{
+						SM.MaterialInterface->CheckMaterialUsage(MATUSAGE_InstancedStaticMeshes);
+					}
+				}
+				AActor* SPActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
+				USceneComponent* SPRoot =
+					NewObject<USceneComponent>(SPActor, TEXT("Root"), RF_Transactional);
+				SPActor->SetRootComponent(SPRoot);
+				SPActor->AddInstanceComponent(SPRoot);
+				SPRoot->RegisterComponent();
+				SPRoot->SetWorldLocation(Location);
+				UHierarchicalInstancedStaticMeshComponent* SPHism =
+					NewObject<UHierarchicalInstancedStaticMeshComponent>(SPActor,
+						TEXT("ShrubPits"), RF_Transactional);
+				SPHism->SetStaticMesh(ShrubMesh);
+				SPHism->SetupAttachment(SPRoot);
+				SPActor->AddInstanceComponent(SPHism);
+				SPHism->RegisterComponent();
+				SPHism->SetCastShadow(false);
+				for (const FPitInst& P : ShrubPits)
+				{
+					// Echelle (S,S,1) : le disque grandit, le relief VERTICAL (anneau,
+					// monticule, jupe) reste absolu.
+					SPHism->AddInstance(FTransform(P.Rot,
+						FVector(P.Xcm, P.Ycm, P.Zcm), FVector(P.Scale, P.Scale, 1.f)),
+						/*bWorldSpace*/ true);
+				}
+				// Prefixe CityVeg VOULU : detruit comme les autres au prochain re-import
+				// (idempotence) et ignore par le trace.
+				SPActor->SetActorLabel(TEXT("CityVeg_ShrubPits"));
+				NumShrubPitsPoses = ShrubPits.Num();
+				++Summary.Actors;
+				++Summary.Meshes;
+			}
+		}
+	}
+
 	// Cleanup des proxys de trace : acteurs detruits, duplicatas transient au GC.
 	// Les films/dalles d'ORIGINE n'ont jamais ete touches (rien de dirty).
 	for (AStaticMeshActor* P : TraceProxies)
@@ -4265,7 +4856,81 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 		FFileHelper::SaveStringToFile(Out, *P, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 	}
 
+	// --- LOT6 : RETRACTIONS ET FOSSES RONDES, CHIFFREES ET TRACEES ---------------
+	// Tout ce que ce lot a deplace ou ajoute tient dans ce fichier : position de
+	// depart, position retenue, course, distances a la chaussee avant/apres et
+	// degagement demande. Un deplacement qui n'y figure pas n'a pas eu lieu.
+	{
+		const FString P = VegJsonPath + TEXT(".lot6.json");
+		FString Out = FString::Printf(
+			TEXT("{\"retraction\":{\"regle\":\"une plantation dont l'emprise (fosse ou ")
+			TEXT("pied) mord la chaussee peinte est RECULEE le long du gradient du canal G ")
+			TEXT("du masque jusqu'a un degagement de demi-emprise + %.0f cm ; course bornee ")
+			TEXT("a %.0f cm ; sans position degagee l'instance n'est PAS posee\",")
+			TEXT("\"arbres_retractes\":%d,\"haies_retractees\":%d,")
+			TEXT("\"arbres_non_poses\":%d,\"haies_non_posees\":%d,")
+			TEXT("\"arbres_inchanges\":%d,\"haies_inchangees\":%d,")
+			TEXT("\"par_gradient\":%d,\"par_balayage\":%d,")
+			TEXT("\"course_moyenne_cm\":%.1f,\"course_max_cm\":%.1f,\"deplacements\":["),
+			GRetraitMargeCm, GRetraitMaxCm,
+			NumRetractArbre, NumRetractHaie, NumRetractRateArbre, NumRetractRateHaie,
+			NumRetractInchangeArbre, NumRetractInchangeHaie,
+			NumRetractParGradient, NumRetractParBalayage,
+			(NumRetractArbre + NumRetractHaie)
+				? (float)(SumCourseCm / (NumRetractArbre + NumRetractHaie)) : 0.f,
+			MaxCourseCm);
+		for (int32 i = 0; i < Retraits.Num(); ++i)
+		{
+			const FRetrait& R = Retraits[i];
+			Out += FString::Printf(
+				TEXT("%s{\"mesh\":\"%s\",\"type\":\"%s\",\"x0\":%.2f,\"y0\":%.2f,")
+				TEXT("\"x1\":%.2f,\"y1\":%.2f,\"course_cm\":%.1f,\"d_chaussee_avant_cm\":%.1f,")
+				TEXT("\"d_chaussee_apres_cm\":%.1f,\"degagement_requis_cm\":%.1f}"),
+				i ? TEXT(",") : TEXT(""), *R.Mesh, R.bArbre ? TEXT("arbre") : TEXT("haie"),
+				R.X0m, R.Y0m, R.X1m, R.Y1m, R.CourseCm, R.DAvantCm, R.DApresCm, R.RequisCm);
+		}
+		Out += FString::Printf(
+			TEXT("],\"non_poses\":["));
+		for (int32 i = 0; i < RetraitImpossible.Num(); ++i)
+		{
+			Out += FString::Printf(TEXT("%s{\"mesh\":\"%s\",\"x\":%.2f,\"y\":%.2f}"),
+				i ? TEXT(",") : TEXT(""), *RetraitImpossible[i].Mesh,
+				RetraitImpossible[i].Xm, RetraitImpossible[i].Ym);
+		}
+		Out += FString::Printf(
+			TEXT("]},\"fosses_rondes\":{\"regle\":\"un ARBUSTE dont le sol rendu est ")
+			TEXT("mineral recoit une fosse RONDE (diametre %.2f a %.2f m, proportionnel a ")
+			TEXT("son etalement), terre en monticule vers la tige, fin anneau de %.0f cm, ")
+			TEXT("fond garanti au-dessus de la dalle ; dans l'herbe, aucune fosse ; ")
+			TEXT("au-dela de %.0f deg de pente locale l'arbuste RESTE mais sa fosse tombe ")
+			TEXT("(une decoupe de revetement couchee sur un talus ne se lit plus)\",")
+			TEXT("\"posees\":%d,\"rayon_moyen_cm\":%.1f,\"plan_local\":%d,")
+			TEXT("\"pose_horizontale\":%d,\"relevements_bornes\":%d,")
+			TEXT("\"abandonnees_pente\":%d}}"),
+			GShrubPitMinM, GShrubPitMaxM, GShrubFrameCm, GShrubPitMaxSlopeDeg,
+			NumShrubPitsPoses,
+			NumShrubPitsPoses ? (float)(SumShrubRayonCm / NumShrubPitsPoses) : 0.f,
+			NumShrubPitPlan, NumShrubPitPlat, NumShrubLiftBorne, NumShrubPitPente);
+		FFileHelper::SaveStringToFile(Out, *P, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	}
+
 	FStaticMeshCompilingManager::Get().FinishAllCompilation();
+	UE_LOG(LogCityImport, Display,
+		TEXT("Retraction hors chaussee (lot6) : %d arbres et %d haies RECULES (course ")
+		TEXT("moyenne %.0f cm, maximum %.0f cm — %d par le gradient, %d par balayage), ")
+		TEXT("%d arbres et %d haies NON POSES faute de position degagee, %d arbres et ")
+		TEXT("%d haies inchanges. Fosses rondes d'arbustes : %d posees (rayon moyen ")
+		TEXT("%.0f cm, plage %.2f-%.2f m de diametre), %d abandonnees pour pente > ")
+		TEXT("%.0f deg (l'arbuste reste). Detail : %s.lot6.json"),
+		NumRetractArbre, NumRetractHaie,
+		(NumRetractArbre + NumRetractHaie)
+			? (float)(SumCourseCm / (NumRetractArbre + NumRetractHaie)) : 0.f,
+		MaxCourseCm, NumRetractParGradient, NumRetractParBalayage,
+		NumRetractRateArbre, NumRetractRateHaie,
+		NumRetractInchangeArbre, NumRetractInchangeHaie, NumShrubPitsPoses,
+		NumShrubPitsPoses ? (float)(SumShrubRayonCm / NumShrubPitsPoses) : 0.f,
+		GShrubPitMinM, GShrubPitMaxM, NumShrubPitPente, GShrubPitMaxSlopeDeg,
+		*VegJsonPath);
 	UE_LOG(LogCityImport, Display,
 		TEXT("Vegetation importee : %d instances, %d meshes, %d acteurs — central film=%d, ")
 		TEXT("central dalle=%d, fosses corrigees (couronne)=%d, multi-hit recuperes=%d, ")
