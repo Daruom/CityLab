@@ -18,8 +18,8 @@
    "crossings": 0,
    "axial": 4,
    "curbLenM": 7974.0,
-   "pngBytes": 159738,
-   "jsonBytes": 16202,
+   "pngBytes": 159914,
+   "jsonBytes": 16205,
    "areasM2": {
     "corridor": 47548.0,
     "chaussee": 16548.1,
@@ -28,8 +28,8 @@
     "herbe": 27695.3,
     "cellule": 250000.0
    },
-   "herbeRasterM2": 27951.0,
-   "herbeEcartPc": 0.923,
+   "herbeRasterM2": 27821.8,
+   "herbeEcartPc": 0.894,
    "herbeReleveM2": 27210.9,
    "herbeRegulM2": -521.4,
    "herbeAccostM2": 1005.7,
@@ -39,7 +39,7 @@
    "miettes": 1,
    "miettesAireM2": 7.44,
    "grassEdges": 67,
-   "grassEdgeLenM": 1188.7,
+   "grassEdgeLenM": 1193.7,
    "grassContourM": 3187.1,
    "grassCourtsM": 3.6,
    "trousVus": 1,
@@ -61,7 +61,7 @@
    "crossings": 0,
    "axial": 27,
    "curbLenM": 8389.1,
-   "pngBytes": 128733,
+   "pngBytes": 129126,
    "jsonBytes": 13947,
    "areasM2": {
     "corridor": 46208.9,
@@ -71,8 +71,8 @@
     "herbe": 10398.0,
     "cellule": 250000.0
    },
-   "herbeRasterM2": 10522.8,
-   "herbeEcartPc": 1.2,
+   "herbeRasterM2": 10468.7,
+   "herbeEcartPc": 1.223,
    "herbeReleveM2": 10343.7,
    "herbeRegulM2": -244.2,
    "herbeAccostM2": 298.5,
@@ -82,7 +82,7 @@
    "miettes": 1,
    "miettesAireM2": 2.2,
    "grassEdges": 11,
-   "grassEdgeLenM": 555.3,
+   "grassEdgeLenM": 555.9,
    "grassContourM": 1256.9,
    "grassCourtsM": 0.7,
    "trousVus": 0,
@@ -104,7 +104,7 @@
    "crossings": 0,
    "axial": 143,
    "curbLenM": 13232.2,
-   "pngBytes": 154772,
+   "pngBytes": 154753,
    "jsonBytes": 18834,
    "areasM2": {
     "corridor": 89892.5,
@@ -114,8 +114,8 @@
     "herbe": 5607.4,
     "cellule": 250000.0
    },
-   "herbeRasterM2": 5669.6,
-   "herbeEcartPc": 1.109,
+   "herbeRasterM2": 5628.8,
+   "herbeEcartPc": 1.093,
    "herbeReleveM2": 5357.2,
    "herbeRegulM2": -161.2,
    "herbeAccostM2": 411.4,
@@ -125,7 +125,7 @@
    "miettes": 0,
    "miettesAireM2": 0.0,
    "grassEdges": 11,
-   "grassEdgeLenM": 379.3,
+   "grassEdgeLenM": 383.6,
    "grassContourM": 867.9,
    "grassCourtsM": 1.2,
    "trousVus": 0,
@@ -147,8 +147,8 @@
    "crossings": 0,
    "axial": 113,
    "curbLenM": 10611.3,
-   "pngBytes": 115618,
-   "jsonBytes": 14677,
+   "pngBytes": 115790,
+   "jsonBytes": 14678,
    "areasM2": {
     "corridor": 61228.0,
     "chaussee": 25135.0,
@@ -157,8 +157,8 @@
     "herbe": 6317.1,
     "cellule": 250000.0
    },
-   "herbeRasterM2": 6439.4,
-   "herbeEcartPc": 1.937,
+   "herbeRasterM2": 6394.1,
+   "herbeEcartPc": 2.069,
    "herbeReleveM2": 6071.6,
    "herbeRegulM2": -217.2,
    "herbeAccostM2": 462.6,
@@ -168,7 +168,7 @@
    "miettes": 0,
    "miettesAireM2": 0.0,
    "grassEdges": 15,
-   "grassEdgeLenM": 512.8,
+   "grassEdgeLenM": 517.7,
    "grassContourM": 1302.3,
    "grassCourtsM": 1.7,
    "trousVus": 1,
@@ -176,5 +176,5 @@
    "trousAireM2": 0.0
   }
  ],
- "generatedAt": "2026-08-01T14:14:18"
+ "generatedAt": "2026-08-01T17:07:02"
 }

@@ -35,6 +35,9 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
 ## 3. Exécuter du Python dans l'éditeur ouvert
 - **Méthode fiable : le guetteur de fichiers** (`C:\LidarPoC\work\LIDARC\install_watcher.py` +
   `run.ps1`/`lidarc_submit.ps1`) : dépose `queue/*.py`, exécution au tick, `.done` en retour.
+- ⚠️ **Le guetteur NE SURVIT PAS à un redémarrage d'éditeur.** Il se réinstalle par MCP :
+  `& C:\LidarPoC\work\SOLVERT\lot2_py.ps1 -PyFile C:\LidarPoC\work\LIDARC\install_watcher.py`.
+  Sans ça, `run.ps1` sort en TIMEOUT sans aucun autre symptôme (payé le 01/08).
 - Console de barre d'état : possible MAIS vérifier qu'elle est en mode **Python** (mode « Cmd » →
   dialogue MODAL invisible qui gèle le thread de jeu ET le MCP ; diagnostic : capture PrintWindow).
 - **JAMAIS `time.sleep()`** dans la console (gèle le jeu → mesures de streaming fausses).
@@ -47,6 +50,19 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
 ## 4. Captures & validation (pack standard)
 - `EditorAppToolset.CaptureViewport` : `captureTransform` ET `annotations` **obligatoires** même si
   « optionnels » (grille/labels à 0 pour une capture propre).
+- ⚠️ **`CaptureViewport` NE DÉPLACE PAS la caméra du viewport** (payé le 01/08, lot v3) : il rend
+  hors champ avec un transform temporaire. Toute mesure « à la pose courante » (`stat`,
+  `ListStreamingTextures`, `NaniteStats`) doit donc passer par `set_level_viewport_camera_info`
+  d'abord — sinon on mesure la pose PRÉCÉDENTE.
+- ⚠️ **Après une régé, la première capture est FLOUE** (TAA non convergé, streaming non stabilisé)
+  → toujours une passe `_WARM` jetable avant la passe `APRES`, supprimée après usage.
+- **Mesurer un pop-in / un streaming se fait EN MOUVEMENT**, jamais sur pose statique : une pose
+  statique laisse converger tous les systèmes à latence et ne montre plus rien. Rig prêt à
+  réutiliser : `work/FINITION_SOL/v4_vol.py` — un callback `register_slate_post_tick_callback`
+  pilote `set_level_viewport_camera_info` le long d'un axe, `HighResShot 1` aux distances voulues,
+  et fait DEUX passes (STAT parkée + convergence, VOL à 20 m/s). L'écart STAT/VOL à distance égale
+  isole les systèmes à latence ; l'absence d'écart prouve que le phénomène est purement fonction
+  de la distance (mips / LOD / cull).
 - Caméras de référence sauvegardées dans les `.meta.txt` de `C:\LidarPoC\work\SOLVERT\` — réutilise
   les MÊMES poses pour tout avant/après.
 - Mouvement (vent…) : séries de ≥8 images à intervalles IRRÉGULIERS (l'intervalle régulier fait de
@@ -55,6 +71,23 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
   `Sampler type`). Cohérence VT↔samplers obligatoire. En cas d'échec sans texte d'erreur : ouvrir le
   matériau EN GUI et lire l'erreur (ne pas bisecter en aveugle >15 min).
 - **AUTO-VALIDATION : regarde tes captures et REJETTE ta propre version si elle ne convainc pas.**
+- ⚠️ **UN ÉDITEUR NON FOCALISÉ NE REND PAS** (payé trois fois le 01/08). Symptômes :
+  delta-time clampé à **125,000 ms** exactement ; `ProfileGPU` profile une frame
+  d'**INTERFACE** (mêmes draws/primitives au ras du sol et à 150 m d'altitude) ; la spec
+  d'automation reste bloquée sur `FWaitForInteractiveFrameRate` (« Current FPS=3 »,
+  timeout 600 s). `t.IdleWhenNotForeground 0` et `EditorPerformanceSettings` **ne
+  suffisent pas**. Remède : remettre la fenêtre au premier plan (`ShowWindow` +
+  `SetForegroundWindow` par P/Invoke) avant toute mesure de perf ou de rendu.
+  Corollaire : préférer quand c'est possible une métrique qui ne dépend pas du rendu
+  (comptage d'instances dans la portée × triangles, plutôt que des ms).
+- ⚠️ **`unreal.AutomationLibrary.take_high_res_screenshot` ne délivre AUCUN fichier**
+  appelé depuis un callback de tick (26 requêtes, 0 PNG, y compris en Simulate). Pour
+  capturer la pose courante sans transform d'override : `CaptureViewport` accepte
+  d'**omettre** `captureTransform` (il capture alors la caméra du hublot).
+- ⚠️ **Les noms de COMPOSANT ne sont uniques que DANS un acteur.** Indexer des
+  composants par `c.get_name()` dans un dict global l'effondre silencieusement (payé le
+  01/08 : les 12 HISM de touffes se sont retrouvés sur le même maillage). Indexer par
+  label d'acteur, ou par `(acteur, composant)`.
 
 ## 5. Builds & cycle éditeur (atelier permanent)
 - Objectif : **1 redémarrage d'éditeur max par lot.** Données/matériaux/config → MCP live.
@@ -71,6 +104,10 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
   2. Après un `Stop-Process`, la modale **« Restaurer les paquets »** bloque le démarrage AVANT
      le MCP (donc injoignable en MCP). Diagnostic : titre de fenêtre = `Restaurer les paquets` ;
      remède : `PrintWindow` pour lire le dialogue puis clic natif sur **« Ne pas restaurer »**.
+     Précisions payées le 01/08 : `FindWindow(null, titre)` **ne la trouve pas** (titre Slate non
+     indexé) → passer par `Get-Process | MainWindowTitle` puis `MainWindowHandle` ; et le bouton
+     « Ne pas restaurer » n'est **pas une fenêtre enfant** (Slate) → lire la capture `PrintWindow`
+     et cliquer aux coordonnées. Outillage prêt : `work/FINITION_SOL/clic_dialogue.ps1` + `clic_xy.ps1`.
   3. **L'HABILLAGE DESKTOP N'EST PAS PERSISTÉ** (`CitySun`/`CitySkyLight`/`CitySkyAtmosphere`/
      `CityFog`, cf. `work/SOL2/gen_sol2.py`) : il disparaît à chaque rechargement, le monde
      rend alors **entièrement NOIR** et toute capture est un carré noir de ~15 ko. Vérifier
@@ -79,9 +116,26 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
      toutes les captures de référence, sinon l'A/B est faussé).
 
 ## 6. Règles de génération (résumé — détails dans `Doc/Vegetation-Pipeline-Cpp.md` & `Doc/Reseau-Sidecar.md`)
+- 🔒 **DOCTRINE DU SOL RENDU (généralisée le 01/08, lot v4)** : **toute géométrie posée sur le sol
+  échantillonne la surface RENDUE, jamais le terrain abstrait.** C'est la leçon des arbres,
+  industrialisée : la dalle est drapée sur une grille (`GroundGridN`, interpolation triangulée) et
+  tout ce qui prétend s'y poser en lisant directement le MNT (ou pire, un Z constant) s'enterre ou
+  lévite dès qu'il y a du relief. Un seul helper C++ fait foi (`SampleRenderedGroundZ`, cf.
+  `CityImportTools.cpp`) et TOUS les poseurs l'appellent (bordures de chaussée, bordurettes
+  d'herbe, marquages, fosses…). Symptôme quand la règle est violée : pierres à moitié enterrées
+  sur les rues en pente, alors que la même pierre est correcte sur le plat.
 - Pose végé : **trace de la surface RENDUE uniquement** (proxys dupliqués+Build() ; les meshes de
   collision 16×16 d'origine sont EXCLUS du trace) ; base-à-0, zéro offset `min_Z` ; pas de sol → skip
   compté ; jamais un modèle analytique (GroundZ) pour un objet sans socle enterré.
+- ⚠️ **`shapely` peut rendre une `GeometryCollection`** là où on attend un polygone (deux polygones
+  qui se touchent par un seul point) : `.boundary` y est alors VIDE. Tout parcours de contour passe
+  par `polygones()` / `contour_de()` de `j3c_sols_masks.py`. Symptôme payé le 01/08 : une cellule
+  de 10 417 m² d'herbe mesurée avec « 0 m de contour ».
+- ⚠️ **Une opération morphologique se BORNE au voisinage de ce qu'on garde.** L'accostage des
+  façades (v2) coûtait 6,5 s pour UNE cellule parce que la fermeture portait sur l'union des 2 611
+  emprises bâties de la fenêtre ; bornée au voisinage de l'herbe (4 m) elle est exacte pour ce
+  qu'on garde et le bake retombe de 30,5 s à 14,7 s. Corollaire de règle : un accostage annoncé
+  à 2 m ne doit pas produire de langue à 50 m.
 - Cuisson collision : `InvalidatePhysicsData+CreatePhysicsMeshes` ne re-cuit PAS → `Build()`.
 - **CHECKLIST POST-RÉGÉ streamed (`ImportCityStreamed`)** — ALLÉGÉE le 31/07 (lot A-ter) :
   les deux points qu'on rejouait à la main sont désormais posés **par le C++ à la CRÉATION**

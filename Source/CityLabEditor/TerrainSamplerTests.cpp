@@ -82,6 +82,82 @@ void FTerrainSamplerSpec::Define()
 		});
 	});
 
+	// V4 — LE Z DU SOL RENDU. La dalle n'est pas le MNT : c'est une grille de quads
+	// plans. Ce sont ces verrous qui garantissent qu'une pierre posee dessus ne
+	// s'enterre pas (grief utilisateur : bordurettes ET bordures de chaussee a moitie
+	// noyees sur le relief).
+	Describe("RenderedQuadZ", [this]()
+	{
+		It("rend exactement les quatre coins", [this]()
+		{
+			TestEqual(TEXT("coin (0,0)"), RenderedQuadZ(10.f, 20.f, 40.f, 30.f, 0.f, 0.f), 10.f);
+			TestEqual(TEXT("coin (1,0)"), RenderedQuadZ(10.f, 20.f, 40.f, 30.f, 1.f, 0.f), 20.f);
+			TestEqual(TEXT("coin (1,1)"), RenderedQuadZ(10.f, 20.f, 40.f, 30.f, 1.f, 1.f), 40.f);
+			TestEqual(TEXT("coin (0,1)"), RenderedQuadZ(10.f, 20.f, 40.f, 30.f, 0.f, 1.f), 30.f);
+		});
+
+		It("est le plan exact quand les quatre coins sont coplanaires", [this]()
+		{
+			// Z = 100 + 10u + 4v : les deux triangulations donnent le meme plan, donc
+			// l'enveloppe superieure vaut ce plan a la virgule pres.
+			const float Z00 = 100.f, Z10 = 110.f, Z11 = 114.f, Z01 = 104.f;
+			const float UV[][2] = { { 0.25f, 0.5f }, { 0.5f, 0.25f }, { 0.9f, 0.1f }, { 0.5f, 0.5f } };
+			for (const auto& P : UV)
+			{
+				const float Attendu = 100.f + 10.f * P[0] + 4.f * P[1];
+				const float Obtenu = RenderedQuadZ(Z00, Z10, Z11, Z01, P[0], P[1]);
+				TestTrue(FString::Printf(TEXT("plan en (%.2f, %.2f) : %.4f == %.4f"),
+					P[0], P[1], Obtenu, Attendu), FMath::IsNearlyEqual(Obtenu, Attendu, 1e-3f));
+			}
+		});
+
+		It("passe AU-DESSUS d'un creux : c'est la garantie anti-enterrement", [this]()
+		{
+			// Quad en selle : le MNT continu au centre serait la moyenne (5), la dalle
+			// rendue y passe a 10 par l'une des deux diagonales. Une pierre posee a 5
+			// avec 7 cm de relief disparaitrait sous la dalle.
+			const float Centre = RenderedQuadZ(0.f, 10.f, 0.f, 10.f, 0.5f, 0.5f);
+			TestTrue(FString::Printf(TEXT("centre de la selle = %.2f >= 5 (moyenne)"), Centre),
+				Centre >= 5.f - 1e-3f);
+			TestTrue(FString::Printf(TEXT("centre de la selle = %.2f <= 10 (le plus haut coin)"), Centre),
+				Centre <= 10.f + 1e-3f);
+		});
+
+		It("n'est JAMAIS sous la plus basse des deux triangulations", [this]()
+		{
+			// Balayage : l'enveloppe superieure doit majorer les deux triangulations
+			// en tout point. C'est la propriete qui rend l'erreur residuelle POSITIVE
+			// (la pierre depasse d'un poil au lieu de disparaitre).
+			const float Z00 = 0.f, Z10 = 37.f, Z11 = -12.f, Z01 = 25.f;
+			for (int32 i = 0; i <= 10; ++i)
+			{
+				for (int32 j = 0; j <= 10; ++j)
+				{
+					const float u = i * 0.1f, v = j * 0.1f;
+					const float Z = RenderedQuadZ(Z00, Z10, Z11, Z01, u, v);
+					const float TA = (u >= v) ? Z00 + u * (Z10 - Z00) + v * (Z11 - Z10)
+											  : Z00 + u * (Z11 - Z01) + v * (Z01 - Z00);
+					const float TB = (u + v <= 1.f) ? Z00 + u * (Z10 - Z00) + v * (Z01 - Z00)
+												    : Z11 + (1.f - v) * (Z10 - Z11) + (1.f - u) * (Z01 - Z11);
+					if (Z < FMath::Max(TA, TB) - 1e-3f)
+					{
+						AddError(FString::Printf(
+							TEXT("(%.1f, %.1f) : %.4f < max(%.4f, %.4f)"), u, v, Z, TA, TB));
+					}
+				}
+			}
+			TestTrue(TEXT("enveloppe superieure sur tout le quad"), true);
+		});
+
+		It("clampe hors du quad au lieu d'extrapoler", [this]()
+		{
+			TestEqual(TEXT("u = -1 clampe sur le bord"),
+				RenderedQuadZ(10.f, 20.f, 40.f, 30.f, -1.f, 0.f), 10.f);
+			TestEqual(TEXT("v = 3 clampe sur le bord"),
+				RenderedQuadZ(10.f, 20.f, 40.f, 30.f, 0.f, 3.f), 30.f);
+		});
+	});
+
 	Describe("MinMaxAltCmInPolygon", [this]()
 	{
 		It("encadre l'altitude de l'origine dans un carre de 100 m", [this]()

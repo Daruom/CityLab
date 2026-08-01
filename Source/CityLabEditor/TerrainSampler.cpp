@@ -10,6 +10,21 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogTerrainSampler, Log, All);
 
+float RenderedQuadZ(float Z00, float Z10, float Z11, float Z01, float u, float v)
+{
+	u = FMath::Clamp(u, 0.f, 1.f);
+	v = FMath::Clamp(v, 0.f, 1.f);
+	// diagonale 00-11 : triangles (00,10,11) puis (00,11,01)
+	const float ZA = (u >= v)
+		? Z00 + u * (Z10 - Z00) + v * (Z11 - Z10)
+		: Z00 + u * (Z11 - Z01) + v * (Z01 - Z00);
+	// diagonale 10-01 : triangles (00,10,01) puis (10,11,01)
+	const float ZB = (u + v <= 1.f)
+		? Z00 + u * (Z10 - Z00) + v * (Z01 - Z00)
+		: Z11 + (1.f - v) * (Z10 - Z11) + (1.f - u) * (Z01 - Z11);
+	return FMath::Max(ZA, ZB);
+}
+
 namespace
 {
 	// Point-dans-polygone pair-impair (ray casting horizontal), bords inclus "au mieux" :

@@ -86,9 +86,22 @@ EDGE_MIN_M = 0.04
 # la TUILE du bruit (le motif dominant du bruit fait ~1/3 de tuile, cf. gen_noise512).
 NOISE_NAME = 'T_SolNoise512'
 NOISE1_M = 9.0        # octave fine : ondulation ~3 m ...
-NOISE1_AMP = 0.55     # ... amplitude +-27 cm
+# --- V4 : LE MEANDRE EST COUPE (amplitudes a zero) --------------------------
+# Le bruit de bord date des bords ORGANIQUES (SOLVERT, 30/07) : il servait a
+# cacher la corde de 9 m des polygones OCS GE. Depuis, deux choses ont change :
+# la v3 REGULARISE le contour a la regle (Douglas-Peucker 1,25 m) et surtout elle
+# POSE UNE PIERRE dessus. Or le bruit deplacait la frontiere PEINTE de +-87 cm
+# (27 + 60) autour de sa propre pierre : c'est la cause premiere du grief
+# utilisateur « peinture et pierre desalignees », et ca ne pouvait pas se corriger
+# en rapprochant les deux — le bruit est plus large que la pierre elle-meme.
+# Partout ailleurs le contour meurt sur un objet DROIT (facade, bordure de
+# chaussee) ou sur une berge : une frontiere droite y est la bonne reponse.
+# Les trois echantillons de bruit restent cables (N3 sert toujours a la
+# macro-teinte) et les amplitudes sont deux constantes : remettre 0,55 / 1,20
+# restitue le bord organique en une ligne.
+NOISE1_AMP = 0.0      # (etait 0,55 = +-27 cm)
 NOISE2_M = 48.0       # meandre ~16 m ...
-NOISE2_AMP = 1.20     # ... amplitude +-60 cm
+NOISE2_AMP = 0.0      # (etait 1,20 = +-60 cm)
 MACRO_M = 90.0        # macro-teinte : motif dominant ~30 m
 MACRO_MIN = 0.80
 MACRO_MAX = 1.25

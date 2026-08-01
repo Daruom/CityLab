@@ -3,6 +3,21 @@
 #include "CoreMinimal.h"
 
 /**
+ * v4 — Z DE LA SURFACE RENDUE dans UN quad de dalle, a partir des quatre Z de coin
+ * et des coordonnees locales (u, v) dans [0,1] (u vers +X, v vers +Y ; Z00 = coin
+ * (0,0), Z10 = (1,0), Z11 = (1,1), Z01 = (0,1)).
+ *
+ * La dalle est une grille de quads dont SEULS LES COINS lisent le MNT : entre les
+ * coins la surface est PLANE, et une geometrie posee a l'altitude du MNT continu
+ * s'enterre sous elle des qu'il y a de la courbure. Le n-gon du MeshDescription
+ * peut etre triangule par l'une OU l'autre diagonale : on rend l'ENVELOPPE
+ * SUPERIEURE des deux triangulations. L'erreur residuelle est donc toujours
+ * POSITIVE (la pierre depasse d'un poil au lieu de disparaitre), et bornee par la
+ * difference des deux diagonales.
+ */
+float RenderedQuadZ(float Z00, float Z10, float Z11, float Z01, float u, float v);
+
+/**
  * Echantillonneur du MNT (RGE ALTI 1 m) charge depuis un PNG 16 bits gris dont la
  * valeur est l'altitude NGF en CENTIMETRES, plus un JSON de georeferencement
  * (SourceData/toulouse10_mnt.json) : taille de grille, taille de pixel et coin NW

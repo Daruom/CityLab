@@ -59,7 +59,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "pyl
 import numpy as np
 from PIL import Image, ImageDraw
 from shapely.geometry import LineString, Point, Polygon, box
-from shapely.ops import linemerge, unary_union
+from shapely.ops import linemerge, nearest_points, substring, unary_union
 from shapely.prepared import prep
 
 import j3c_sols_corridor as C
@@ -208,6 +208,34 @@ HERBE_REGUL_M = 1.25
 GRASS_EDGE_CLEAR_M = 0.40   # rayon de silence autour du bati, des bordures et de l'eau
 GRASS_EDGE_MIN_LEN_M = 1.5  # = CURB_MIN_LEN_M : meme plancher physique
 GRASS_EDGE_SIMPLIFY_M = 0.15  # = CURB_SIMPLIFY_M : la polyligne maillee, pas le masque
+
+# --- V4, correctif 1 : LA PEINTURE MEURT SOUS LA PIERRE ----------------------
+# Le grief utilisateur « peinture et pierre desalignees » a deux causes distinctes,
+# et une seule des deux est ici :
+#   (a) le MEANDRE DE BRUIT du materiau, qui deplacait la frontiere peinte de
+#       +-87 cm autour de sa propre pierre. Traite dans Tools/import_ground_masks.py
+#       (amplitudes mises a zero : le bruit datait des bords ORGANIQUES, avant que
+#       le contour ne soit regularise a la regle et borde de pierre) ;
+#   (b) ce qui reste apres (a) : la largeur de transition du shader (EdgeMinM = 4 cm
+#       au sol, plus large a distance) et la discretisation du SDF. Meme minuscule,
+#       elle se voit parce qu'elle tombe A COTE de la pierre.
+# Remede : la peinture RECULE sous le chant de la bordurette. Le chant fait
+# GRASS_CURB_TOP_W_M (14 cm cote herbe, valeur C++ GGrassCurbTopWidthCm) : un recul
+# de 10 cm place la frontiere peinte SOUS la pierre avec 4 cm de marge. Aller au-dela
+# (les ~20 cm evoques au brief) exigerait d'elargir le chant d'autant, sinon le recul
+# ressort de l'autre cote de la pierre et rouvre un lisere de dalle — c'est un choix
+# visuel, pas un reglage : il est laisse a l'utilisateur.
+# Le recul s'applique UNIQUEMENT le long des polylignes de bordurette : ailleurs
+# (pied de facade, berge, bordure de chaussee) l'herbe continue de mourir sur son
+# obstacle, ce qui preserve le volet LISERE_MUR valide en v2.
+GRASS_CURB_TOP_W_M = 0.14     # = GGrassCurbTopWidthCm cote C++
+GRASS_PAINT_RETRACT_M = 0.10  # = chant - 4 cm de marge
+# --- V4, correctif 3 : RACCORDS -----------------------------------------------
+# GRASS_EDGE_CLEAR_M coupe le contour a 40 cm des bordures de chaussee : la
+# bordurette s'arrete donc systematiquement 40 cm trop tot et le raccord se lit
+# comme un ratage. Toute extremite a moins de GRASS_EDGE_SNAP_M d'une polyligne
+# `curbs` est RAMENEE dessus (les bouchons de fin, cote C++, ferment le reste).
+GRASS_EDGE_SNAP_M = 1.0
 
 # Natures BD TOPO qui ne portent PAS de bordure : sur autoroute et bretelle, la
 # chaussee finit en accotement, pas en trottoir.
@@ -768,7 +796,7 @@ def grass_edges(herbe, cell_box, curbs, u_bati=None, u_eau=None):
     d'abord ramene a la CELLULE : la partie qui vit dans la marge de calcul
     appartient a la cellule voisine."""
     grass_edges.dernier = {"contour_m": 0.0, "retenu_m": 0.0, "segments": 0,
-                           "courts_m": 0.0}
+                           "courts_m": 0.0, "snaps": 0, "snap_m": 0.0}
     if herbe is None or herbe.is_empty:
         return []
     bnd = contour_de(herbe)
@@ -830,6 +858,22 @@ def grass_edges(herbe, cell_box, curbs, u_bati=None, u_eau=None):
                 votes -= 1
         if votes < 0:
             cs.reverse()
+        # V4 — SNAP DES EXTREMITES sur la bordure de chaussee voisine. Le rayon de
+        # silence de 40 cm autour des `curbs` laisse un trou a chaque raccord : on le
+        # referme en ramenant l'extremite sur la polyligne la plus proche, si elle est
+        # a moins de GRASS_EDGE_SNAP_M. Au-dela, ce n'est pas un raccord rate : c'est
+        # une bordurette qui finit vraiment dans le vide (bouchon de fin cote C++).
+        if lignes_curb and GRASS_EDGE_SNAP_M > 0.0:
+            u_curb = unary_union(lignes_curb)
+            for idx in (0, -1):
+                p = Point(cs[idx])
+                d = p.distance(u_curb)
+                if 1e-9 < d <= GRASS_EDGE_SNAP_M:
+                    q = nearest_points(p, u_curb)[1]
+                    cs[idx] = (q.x, q.y)
+                    grass_edges.dernier["snaps"] += 1
+                    grass_edges.dernier["snap_m"] += d
+            s = LineString(cs)
         out.append(cs)
         grass_edges.dernier["retenu_m"] += s.length
     grass_edges.dernier["segments"] = len(out)
@@ -837,6 +881,33 @@ def grass_edges(herbe, cell_box, curbs, u_bati=None, u_eau=None):
     grass_edges.dernier["courts_m"] = round(grass_edges.dernier["courts_m"], 1)
     return out
 
+
+
+def retracter_peinture(herbe, gedges, recul=None):
+    """V4 — LA PEINTURE MEURT SOUS LA PIERRE.
+
+    Rend le polygone d'herbe A PEINDRE : le meme que celui qui a servi a poser la
+    bordurette, moins une bande de `recul` metres le long des polylignes de
+    bordurette. Le contour VECTORIEL (donc la pierre) n'est pas touche : seule la
+    peinture recule, et seulement la ou il y a une pierre pour la couvrir.
+
+    Bande a bouts DROITS (cap_style=2) : un bout arrondi mangerait l'herbe au-dela
+    de l'extremite de la pierre, c'est-a-dire exactement la ou il n'y a plus rien
+    pour cacher le recul."""
+    retracter_peinture.dernier = {"segments": 0, "recul_m": 0.0, "aire_m2": 0.0}
+    r = GRASS_PAINT_RETRACT_M if recul is None else recul
+    retracter_peinture.dernier["recul_m"] = r
+    if herbe is None or herbe.is_empty or not gedges or r <= 0.0:
+        return herbe
+    lignes = [LineString(l) for l in gedges if len(l) > 1]
+    if not lignes:
+        return herbe
+    retracter_peinture.dernier["segments"] = len(lignes)
+    bande = unary_union([ln.buffer(r, cap_style=2, join_style=1) for ln in lignes])
+    avant = herbe.area
+    out = C.valide(herbe.difference(bande))
+    retracter_peinture.dernier["aire_m2"] = round(avant - out.area, 2)
+    return out
 
 
 def boucher_trous(herbe, obstacles, aire_max=None):
@@ -1404,6 +1475,26 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
     regul = dict(regulariser_herbe.dernier)
     miettes = dict(retirer_miettes.dernier)
 
+    # --- le RELIEF qui restera maille
+    # V4 : ce bloc est REMONTE avant la rasterisation. La peinture d'herbe doit
+    # reculer sous la pierre, il faut donc savoir OU est la pierre avant de peindre.
+    # Aucune de ces trois passes ne depend du raster : elles ne lisent que les
+    # geometries vectorielles deja calculees.
+    # Les passages viennent des NOEUDS OSM `highway=crossing` deja filtres sur le
+    # marquage (parametre `noeuds_pp`). Chaque site coupe la bordure a son droit —
+    # c'est legitime maintenant que la traversee est une DONNEE, pas une inference.
+    crossings = (crossing_sites(chaussee, cell_box, loc_routes, loc_pp, u_bati)
+                 if CROSSINGS_ON else [])
+    curbs = curb_lines(chaussee, cell_box, loc_routes, crossings, u_bati)
+    jonctions = junction_points(loc_routes)
+    dashes = axial_dashes(loc_routes, chaussee, cell_box, jonctions)
+    # BORDURETTE (v3) : APRES les bordures de chaussee, parce qu'elle les evite.
+    gedges = grass_edges(herbe, cell_box, curbs, u_bati, u_eau)
+    ged = dict(grass_edges.dernier)
+    # V4 : la PEINTURE (et elle seule) recule sous le chant de la bordurette.
+    herbe_peinte = retracter_peinture(herbe, gedges)
+    retrait = dict(retracter_peinture.dernier)
+
     # --- rasterisation (grille de calcul : cellule + marge, a 24,41 cm/px)
     size = OUT_PX * SS + 2 * MARGIN_PX
     ox, oy = x0 - marge_m, y0 - marge_m
@@ -1411,7 +1502,7 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
     m_priv = rasterize(privee, size, ox, oy, px_ss)
     m_grav = rasterize(gravier, size, ox, oy, px_ss)
     m_road = rasterize(chaussee, size, ox, oy, px_ss)
-    m_grass = rasterize(herbe, size, ox, oy, px_ss)
+    m_grass = rasterize(herbe_peinte, size, ox, oy, px_ss)
     # Priorite du melange : chaussee > gravier > privee > herbe > trottoir. Les
     # masques des SDF sont rendus DISJOINTS dans le meme ordre, sinon le shader (qui
     # empile les SDF) et le canal de classe se contrediraient sur les recouvrements.
@@ -1442,25 +1533,15 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
 
     # Mesure de fidelite raster (decision 1024 vs 2048, cf. commande SOLVERT) : aire
     # vectorielle de l'herbe dans la cellule VS aire « SDF cuit > 0,5 » au PNG final.
+    # V4 : la reference du raster est l'herbe PEINTE (retractee sous la pierre) —
+    # comparer le PNG a l'herbe vectorielle mesurerait le recul, pas la fidelite.
     aire_herbe_vec = herbe.intersection(cell_box).area
+    aire_peinte_vec = herbe_peinte.intersection(cell_box).area
     aire_herbe_png = float((g_grass >= 128).sum()) * (CELL_M / OUT_PX) ** 2
 
     os.makedirs(OUT_DIR, exist_ok=True)
     png = os.path.join(OUT_DIR, "mask_%d_%d.png" % (cx, cy))
     Image.fromarray(rgba, "RGBA").save(png, "PNG", optimize=True)
-
-    # --- le RELIEF qui restera maille
-    # Les passages viennent des NOEUDS OSM `highway=crossing` deja filtres sur le
-    # marquage (parametre `noeuds_pp`). Chaque site coupe la bordure a son droit —
-    # c'est legitime maintenant que la traversee est une DONNEE, pas une inference.
-    crossings = (crossing_sites(chaussee, cell_box, loc_routes, loc_pp, u_bati)
-                 if CROSSINGS_ON else [])
-    curbs = curb_lines(chaussee, cell_box, loc_routes, crossings, u_bati)
-    jonctions = junction_points(loc_routes)
-    dashes = axial_dashes(loc_routes, chaussee, cell_box, jonctions)
-    # BORDURETTE (v3) : APRES les bordures de chaussee, parce qu'elle les evite.
-    gedges = grass_edges(herbe, cell_box, curbs, u_bati, u_eau)
-    ged = dict(grass_edges.dernier)
 
     aires = {}
     for nom, g in (("corridor", corridor), ("chaussee", chaussee),
@@ -1493,8 +1574,8 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
         apercu(cx, cy, r_chan, rgba[:, :, 1], curbs, crossings, dashes, x0, y0, gedges)
 
     pc = 100.0 * aires["chaussee"] / aires["cellule"]
-    ecart_pc = (100.0 * abs(aire_herbe_png - aire_herbe_vec) / aire_herbe_vec
-                if aire_herbe_vec > 1.0 else 0.0)
+    ecart_pc = (100.0 * abs(aire_herbe_png - aire_peinte_vec) / aire_peinte_vec
+                if aire_peinte_vec > 1.0 else 0.0)
     log("cellule %+d,%+d : chaussee %.1f %% | herbe %.0f m2 (raster %.0f m2, ecart "
         "%.2f %%) | %d bordures (%.0f m) | %d bordurettes (%.0f m) | %d passages | "
         "%d tirets | masque %.2f Mo | json %.2f Mo | %.1f s"
@@ -1510,6 +1591,12 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
            aire_herbe_vec - aire_regul, trous["trous"], trous["combles"],
            trous["aire_m2"], miettes["retires"], miettes["fragments"],
            miettes["aire_m2"], ged["contour_m"], ged["retenu_m"]))
+    log("   bordurette v4 : %d extremites recalees sur une bordure de chaussee "
+        "(%.2f m cumules) | peinture retractee de %.2f m sous %d pierres "
+        "(-%.1f m2, soit %.2f %% de l'herbe)"
+        % (ged.get("snaps", 0), ged.get("snap_m", 0.0), retrait["recul_m"],
+           retrait["segments"], retrait["aire_m2"],
+           100.0 * retrait["aire_m2"] / aire_herbe_vec if aire_herbe_vec > 1.0 else 0.0))
     return {"cell": [cx, cy], "origin": [x0, y0], "png": png, "json": js, "curbs": len(curbs),
             "crossings": len(crossings), "axial": len(dashes),
             "curbLenM": round(sum(LineString(l).length for l in curbs if len(l) > 1), 1),
@@ -2146,8 +2233,24 @@ def selftest():
                % (len(ge), ltot), len(ge) >= 1 and ltot > 150.0, True)
     check_bool("bordurette : rien le long du MUR",
                all(LineString(l).distance(mur_b) > 0.30 for l in ge), True)
-    check_bool("bordurette : rien le long de la BORDURE de chaussee existante",
-               all(LineString(l).distance(LineString(curb_b[0])) > 0.30 for l in ge), True)
+    # V4 : le verrou porte desormais sur le CORPS de la bordurette, pas sur ses bouts.
+    # Le snap v4 POSE volontairement une extremite sur la bordure de chaussee voisine
+    # (c'est le correctif « raccords ») : exiger 30 cm partout interdirait le raccord
+    # qu'on vient d'ajouter. Ce qui reste interdit, et qui est le vrai grief d'origine,
+    # c'est de POSER UNE DEUXIEME PIERRE LE LONG d'une pierre existante.
+    def corps(ligne, marge=1.5):
+        s = LineString(ligne)
+        if s.length <= 2.0 * marge + 0.5:
+            return None
+        return substring(s, marge, s.length - marge)
+
+    corps_ok = True
+    for l in ge:
+        c_ = corps(l)
+        if c_ is not None and c_.distance(LineString(curb_b[0])) <= 0.30:
+            corps_ok = False
+    check_bool("bordurette : rien LE LONG de la bordure de chaussee existante "
+               "(bouts exclus : le raccord v4 y est colle expres)", corps_ok, True)
     check_bool("bordurette : le total vaut les deux cotes libres (200 m, obtenu %.0f)"
                % ltot, 180.0 < ltot < 205.0, True)
     # ORIENTATION : mineral a gauche <=> herbe a droite, sur chaque segment.
@@ -2179,6 +2282,55 @@ def selftest():
     check_bool("bordurette : ce bout est bien compte comme ecarte (trop court)",
                grass_edges.dernier["courts_m"] > 0.0, True)
 
+    # ---- 17. BORDURETTE V4 : la peinture meurt sous la pierre, les bouts se recalent
+    #      (a) RETRACTION : une pelouse carree de 20 m bordee sur UN cote perd
+    #          exactement recul x longueur de peinture, et RIEN de plus. Le polygone
+    #          vectoriel (donc la pierre) n'est pas touche.
+    pel_r = box(0.0, 0.0, 20.0, 20.0)
+    ge_r = [[(0.0, 0.0), (20.0, 0.0)]]
+    peint = retracter_peinture(pel_r, ge_r, 0.10)
+    check("v4 retraction : la peinture perd recul x longueur (0,10 x 20 = 2 m2)",
+          pel_r.area - peint.area, 2.0, 0.02)
+    check("v4 retraction : le polygone d'ORIGINE est intact (la pierre ne bouge pas)",
+          pel_r.area, 400.0, 0.001)
+    check_bool("v4 retraction : le recul se fait bien DANS l'herbe (y=0,05 sorti)",
+               peint.contains(Point(10.0, 0.05)), False)
+    check_bool("v4 retraction : au-dela du recul l'herbe est intacte (y=0,20 garde)",
+               peint.contains(Point(10.0, 0.20)), True)
+    check_bool("v4 retraction : le cote NON borde ne recule pas (x=0,05 garde)",
+               peint.contains(Point(0.05, 10.0)), True)
+    check("v4 retraction : sans bordurette, aucun recul",
+          retracter_peinture(pel_r, [], 0.10).area, 400.0, 0.001)
+    check("v4 retraction : recul nul = polygone inchange",
+          retracter_peinture(pel_r, ge_r, 0.0).area, 400.0, 0.001)
+    #      (b) BOUTS DROITS : une bande a bouts arrondis mangerait l'herbe au-dela de
+    #          l'extremite de la pierre — la ou plus rien ne cache le recul.
+    ge_court_r = [[(5.0, 0.0), (15.0, 0.0)]]
+    peint_c = retracter_peinture(pel_r, ge_court_r, 0.10)
+    check_bool("v4 retraction : bouts DROITS (pas de morsure au-dela de la pierre)",
+               peint_c.contains(Point(4.90, 0.05)), True)
+    #      (c) SNAP DES EXTREMITES : pelouse dont le contour libre s'arrete a 40 cm
+    #          d'une bordure de chaussee (le rayon de silence). La bordurette doit
+    #          RECALER son extremite sur la polyligne de bordure.
+    pel_s = box(0.0, 0.0, 30.0, 30.0)
+    curb_s = [[(-5.0, -1.0), (35.0, -1.0)]]   # bordure droite sous la pelouse
+    ge_s = grass_edges(pel_s, box(-10.0, -10.0, 40.0, 40.0), curb_s, None, None)
+    u_curb_s = unary_union([LineString(l) for l in curb_s])
+    dmin = min(min(Point(l[0]).distance(u_curb_s), Point(l[-1]).distance(u_curb_s))
+               for l in ge_s) if ge_s else 99.0
+    check_bool("v4 snap : au moins une extremite est POSEE sur la bordure (d = 0)",
+               dmin < 1e-6, True)
+    check_bool("v4 snap : le recalage est compte",
+               grass_edges.dernier.get("snaps", 0) > 0, True)
+    #      (d) une extremite VRAIMENT loin (3 m) n'est pas aimantee : ce n'est pas un
+    #          raccord rate, c'est une bordurette qui finit dans le vide.
+    curb_l = [[(-5.0, -3.5), (35.0, -3.5)]]
+    ge_l = grass_edges(pel_s, box(-10.0, -10.0, 40.0, 40.0), curb_l, None, None)
+    u_curb_l = unary_union([LineString(l) for l in curb_l])
+    dmin_l = min(min(Point(l[0]).distance(u_curb_l), Point(l[-1]).distance(u_curb_l))
+                 for l in ge_l) if ge_l else 0.0
+    check_bool("v4 snap : au-dela de 1 m, aucune extremite n'est deplacee",
+               dmin_l > 1.0, True)
 
     log("SELFTEST : " + ("PASS" if ok else "FAIL"))
     return 0 if ok else 1

@@ -1870,7 +1870,9 @@ void FCityImportToolsSpec::Define()
 			// Le TABLIER du pont garde ses propres bordures et ses rives : c'est un
 			// ruban complet, pas un morceau de sol peint. 4 quads (2 cotes x face +
 			// chant) s'ajoutent donc aux 3 quads de la bordure du masque.
-			TestEqual(TEXT("4 quads de bordure du tablier + 3 du masque"), S.CurbQuads, 7);
+			// V4 : + 2 bouchons de fin sur la bordure du masque (profil OUVERT).
+			TestEqual(TEXT("4 quads de bordure du tablier + 3 + 2 bouchons du masque"),
+				S.CurbQuads, 9);
 			TestEqual(TEXT("Rives du tablier"),
 				SlotPolys(LoadTestMesh(TEXT("SM_Ground_0_0")),
 					TEXT("dirty_sidewalk_tiles_ugxjcdpn")), 2);
@@ -1890,7 +1892,9 @@ void FCityImportToolsSpec::Define()
 				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, MaskedProfile());
 
 			TestEqual(TEXT("Aucun ruban : tout est peint"), S.Roads, 0);
-			TestEqual(TEXT("3 quads pour un segment de bordure"), S.CurbQuads, 3);
+			// V4 : 3 quads de section + 2 BOUCHONS DE FIN. Une bordurette est une piece
+			// ouverte : sans bouchon on voit l'interieur de la pierre par ses deux bouts.
+			TestEqual(TEXT("3 quads de section + 2 bouchons de fin"), S.CurbQuads, 5);
 			TestEqual(TEXT("Un passage pieton"), S.Crossings, 1);
 			TestEqual(TEXT("Un tiret axial"), S.AxialDashes, 1);
 
@@ -1899,7 +1903,8 @@ void FCityImportToolsSpec::Define()
 			{
 				return;
 			}
-			TestEqual(TEXT("Bordure : 3 quads sur le mesh"), SlotPolys(Ground, TEXT("curb")), 3);
+			TestEqual(TEXT("Bordure : 3 quads de section + 2 bouchons sur le mesh"),
+				SlotPolys(Ground, TEXT("curb")), 5);
 			TestEqual(TEXT("Passage : 1 quad"),
 				SlotPolys(Ground, TEXT("pedestrian_crossing_lines_veggecd")), 1);
 			TestEqual(TEXT("Tiret : 1 quad"), SlotPolys(Ground, TEXT("marking")), 1);
@@ -1947,7 +1952,10 @@ void FCityImportToolsSpec::Define()
 						TowardWalk = FMath::Min(TowardWalk, N.Y);
 					}
 				}
-				TestEqual(TEXT("Deux faces verticales"), Vertical, 2);
+				// V4 : les 2 BOUCHONS DE FIN sont eux aussi des faces verticales (ils ferment la
+				// section aux extremites), d'ou 4 et non 2. Les deux verrous d'orientation qui
+				// suivent restent les memes : une face regarde la chaussee, l'autre le trottoir.
+				TestEqual(TEXT("Quatre faces verticales : 2 de section + 2 bouchons"), Vertical, 4);
 				TestTrue(FString::Printf(TEXT("Une face regarde la chaussee, +Y (%.2f)"), TowardRoad),
 					TowardRoad > 0.9f);
 				TestTrue(FString::Printf(TEXT("L'autre regarde le trottoir, -Y (%.2f)"), TowardWalk),
@@ -1969,7 +1977,7 @@ void FCityImportToolsSpec::Define()
 				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, MaskedProfile());
 			TestEqual(TEXT("Masque sans grassEdges : aucune bordurette"), S0.GrassCurbQuads, 0);
 			TestEqual(TEXT("Masque sans grassEdges : la bordure de chaussee est intacte"),
-				S0.CurbQuads, 3);
+				S0.CurbQuads, 5);   // V4 : 3 de section + 2 bouchons
 
 			// 2. Le MEME masque avec un segment `grassEdges` de 40 m.
 			const FString Dir2 = FreshMaskDir();
@@ -1979,9 +1987,9 @@ void FCityImportToolsSpec::Define()
 				WriteCityNoBridge(), FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
 				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, MaskedProfile());
 
-			TestEqual(TEXT("3 quads pour un segment de bordurette"), S.GrassCurbQuads, 3);
+			TestEqual(TEXT("3 quads de section + 2 bouchons pour une bordurette"), S.GrassCurbQuads, 5);
 			TestEqual(TEXT("La bordure de CHAUSSEE n'a pas bouge (compteur separe)"),
-				S.CurbQuads, 3);
+				S.CurbQuads, 5);
 
 			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
 			if (!TestNotNull(TEXT("SM_Ground_0_0 genere"), Ground))
@@ -1989,8 +1997,8 @@ void FCityImportToolsSpec::Define()
 				return;
 			}
 			// MEME materiau de bordure : les deux pierres partagent le slot `curb`.
-			TestEqual(TEXT("Meme materiau : 3 + 3 quads dans le slot curb"),
-				SlotPolys(Ground, TEXT("curb")), 6);
+			TestEqual(TEXT("Meme materiau : (3 + 2) + (3 + 2) quads dans le slot curb"),
+				SlotPolys(Ground, TEXT("curb")), 10);
 
 			// PROFIL REDUIT : le chant de la bordurette monte a 7 cm, celui de la
 			// bordure de chaussee a 12 — donc le Z max du slot reste 12 et le Z min
@@ -2036,7 +2044,8 @@ void FCityImportToolsSpec::Define()
 						}
 					}
 				}
-				TestEqual(TEXT("3 polygones appartiennent a la bordurette"), NHerbe, 3);
+				TestEqual(TEXT("5 polygones appartiennent a la bordurette (3 de section + 2 bouchons)"),
+					NHerbe, 5);
 				TestTrue(FString::Printf(TEXT("Profil REDUIT : la bordurette culmine a 7 cm (%.2f)"),
 					HautHerbe), FMath::IsNearlyEqual(HautHerbe, 7.f, 0.05f));
 			}

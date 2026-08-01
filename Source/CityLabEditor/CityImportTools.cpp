@@ -130,6 +130,127 @@ namespace
 		return true;
 	}
 
+	// -------------------------------------------------------------------------
+	// v4 — LE Z DU SOL RENDU (doctrine du Playbook §6 : toute geometrie posee sur
+	// le sol echantillonne la surface RENDUE, jamais le terrain abstrait).
+	//
+	// La dalle n'est PAS le MNT. C'est une grille de quads de Cell / GroundGridN
+	// (7,8125 m en desktop : 500 m / 64) dont SEULS LES QUATRE COINS lisent
+	// Drape.GroundZ ; entre les coins la surface est PLANE. Sur du relief convexe
+	// la dalle passe donc AU-DESSUS du MNT, et une pierre posee a Drape.GroundZ
+	// s'enterre — jusqu'a disparaitre entierement (la bordurette d'herbe ne fait
+	// que 7 cm de relief, la bordure de chaussee 12).
+	//
+	// Le n-gon du MeshDescription peut etre triangule par l'une OU l'autre
+	// diagonale du quad : on prend l'ENVELOPPE SUPERIEURE des deux triangulations.
+	// Elle coincide avec la surface rendue partout sauf sur la moitie de quad ou
+	// la diagonale opposee a ete retenue, ou elle passe AU PLUS de quelques
+	// centimetres au-dessus — et c'est le bon cote de l'erreur : le pied de la
+	// bordure est enterre de 10 cm et absorbe un exces, alors qu'un defaut fait
+	// disparaitre la pierre.
+	struct FRenderedGroundZ
+	{
+		const FDrapeContext* Drape = nullptr;
+		float StepCm = 0.f;   // pas de la grille de dalle ; 0 = pas de discretisation
+
+		void Init(const FDrapeContext& InDrape, int32 GroundGridN, float CellCm)
+		{
+			Drape = &InDrape;
+			const int32 GridN = FMath::Clamp(GroundGridN, 1, 256);
+			StepCm = (CellCm > 0.f) ? CellCm / (float)GridN : 0.f;
+		}
+
+		bool IsDiscretized() const
+		{
+			return Drape && Drape->IsActive() && StepCm > 0.f;
+		}
+
+		/** Z du MNT continu — ce que lisait le code d'avant la v4. */
+		float RawZ(double Xcm, double Ycm) const
+		{
+			return Drape ? Drape->GroundZ(Xcm, Ycm) : 0.f;
+		}
+
+		float At(double Xcm, double Ycm) const
+		{
+			if (!IsDiscretized())
+			{
+				return RawZ(Xcm, Ycm);
+			}
+			const double S = (double)StepCm;
+			const double X0 = FMath::FloorToDouble(Xcm / S) * S;
+			const double Y0 = FMath::FloorToDouble(Ycm / S) * S;
+			const float u = (float)FMath::Clamp((Xcm - X0) / S, 0.0, 1.0);
+			const float v = (float)FMath::Clamp((Ycm - Y0) / S, 0.0, 1.0);
+			return RenderedQuadZ(Drape->GroundZ(X0, Y0), Drape->GroundZ(X0 + S, Y0),
+				Drape->GroundZ(X0 + S, Y0 + S), Drape->GroundZ(X0, Y0 + S), u, v);
+		}
+	};
+
+	// Ecart maximal, sur un segment, entre la corde 3D (Z lineaire de A a B) et la
+	// surface rendue — plus l'abscisse ou il se produit. Sert au decoupage adaptatif.
+	float MaxChordSagCm(const FVector2D& A, const FVector2D& B,
+		const FRenderedGroundZ& RGZ, int32 Samples, float& OutBestT)
+	{
+		const float ZA = RGZ.At(A.X, A.Y);
+		const float ZB = RGZ.At(B.X, B.Y);
+		float Best = 0.f;
+		OutBestT = 0.5f;
+		for (int32 i = 1; i < Samples; ++i)
+		{
+			const float T = (float)i / (float)Samples;
+			const FVector2D P = FMath::Lerp(A, B, (double)T);
+			const float Sag = RGZ.At(P.X, P.Y) - FMath::Lerp(ZA, ZB, T);
+			if (Sag > Best)
+			{
+				Best = Sag;
+				OutBestT = T;
+			}
+		}
+		return Best;
+	}
+
+	// Decoupage ADAPTATIF d'une polyligne pour qu'elle epouse la dalle rendue : on
+	// n'ajoute un sommet que la ou la corde s'enfonce de plus de ToleranceCm sous la
+	// surface. En ville plate (l'immense majorite du lineaire) la polyligne ressort
+	// INCHANGEE — le cout en quads ne se paie que sur le relief.
+	void SubdivideOnRenderedGround(const TArray<FVector2D>& In, const FRenderedGroundZ& RGZ,
+		float ToleranceCm, int32 MaxDepth, TArray<FVector2D>& Out)
+	{
+		Out.Reset();
+		if (In.Num() < 2)
+		{
+			Out = In;
+			return;
+		}
+		if (!RGZ.IsDiscretized() || ToleranceCm <= 0.f)
+		{
+			Out = In;
+			return;
+		}
+		TFunction<void(const FVector2D&, const FVector2D&, int32)> Rec =
+			[&](const FVector2D& A, const FVector2D& B, int32 Depth)
+		{
+			float T = 0.5f;
+			const float Len = (float)(B - A).Size();
+			// Un echantillonnage plus fin que le pas de grille ne sert a rien.
+			const int32 Samples = FMath::Clamp(FMath::CeilToInt32(Len / (RGZ.StepCm * 0.5f)), 2, 32);
+			if (Depth <= 0 || Len < 50.f || MaxChordSagCm(A, B, RGZ, Samples, T) <= ToleranceCm)
+			{
+				Out.Add(B);
+				return;
+			}
+			const FVector2D M = FMath::Lerp(A, B, (double)T);
+			Rec(A, M, Depth - 1);
+			Rec(M, B, Depth - 1);
+		};
+		Out.Add(In[0]);
+		for (int32 i = 0; i + 1 < In.Num(); ++i)
+		{
+			Rec(In[i], In[i + 1], MaxDepth);
+		}
+	}
+
 	// Re-echantillonne une polyligne a pas fixe : chaque segment plus long que
 	// StepCm est subdivise, sommets d'origine conserves — sans cela les longs
 	// segments droits OSM traversent les bosses du MNT (spec J2 §3.2).
@@ -723,6 +844,12 @@ namespace
 	// exactement une bordurette de jardin posee au ras de la terre.
 	constexpr float GGrassCurbHeightCm = 7.f;
 	constexpr float GGrassCurbTopWidthCm = 14.f;
+	// v4 — decoupage adaptatif des bordures sur la dalle rendue. 2 cm : un tiers du
+	// relief de la bordurette (7 cm), donc invisible ; le decoupage ne se declenche
+	// que la ou la corde s'enfonce davantage. Profondeur 6 = au pire 64 morceaux par
+	// segment d'origine, largement de quoi suivre une grille de 7,8 m.
+	constexpr float GCurbSagToleranceCm = 2.f;
+	constexpr int32 GCurbSagMaxDepth = 6;
 	constexpr float GMaskCrossLiftCm = 4.f;    // passage pieton au-dessus de la peinture
 	constexpr float GMaskDashLiftCm = 6.f;     // tiret au-dessus du passage, sous le chant (12)
 
@@ -1643,18 +1770,66 @@ namespace
 	// parcours (mineral A GAUCHE), pied enterre, UV monde du chant, dos visible — est
 	// rigoureusement le meme code : c'est ce qui garantit que les deux pierres se
 	// lisent comme la meme matiere posee de la meme facon.
-	void BuildMaskCurb(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm,
-		const FDrapeContext& Drape, const FResolvedSurface* Surf, const FVector3f& Tint,
-		int32* OutQuads, float HeightCm = GCurbHeightCm, float TopWidthCm = GCurbTopWidthCm)
+	// v4 — DIAGNOSTIC D'ENTERREMENT, mesure sur la vraie donnee (aucun chiffre
+	// magique) : combien de sommets de bordure tombent SOUS la dalle rendue, et de
+	// combien. Rempli par BuildMaskCurb, journalise en fin de passe.
+	struct FCurbSinkStats
 	{
-		if (!Surf || PtsCm.Num() < 2)
+		int32 Vertices = 0;
+		int32 Over7cm = 0;    // la bordurette d'herbe (7 cm) serait invisible
+		int32 Over12cm = 0;   // la bordure de chaussee (12 cm) serait invisible
+		float MaxCm = 0.f;
+		double SumCm = 0.0;
+		int32 AddedVertices = 0;   // sommets ajoutes par le decoupage adaptatif
+
+		void Note(float DeltaCm)
+		{
+			++Vertices;
+			if (DeltaCm > 0.f)
+			{
+				SumCm += DeltaCm;
+				MaxCm = FMath::Max(MaxCm, DeltaCm);
+				if (DeltaCm > GGrassCurbHeightCm) { ++Over7cm; }
+				if (DeltaCm > GCurbHeightCm) { ++Over12cm; }
+			}
+		}
+	};
+
+	// v4 : le Z ne vient plus du MNT continu mais de la SURFACE RENDUE (FRenderedGroundZ),
+	// et la polyligne est decoupee adaptativement pour epouser les facettes de la dalle.
+	// Les deux profils (bordure de chaussee ET bordurette d'herbe) passent par ici :
+	// la capture utilisateur du 01/08 montre que la chaussee est enterree elle aussi.
+	// bCaps : bouchons de fin sur un profil OUVERT (sans eux la pierre se lit comme une
+	// tranche de carton vue par la tranche).
+	void BuildMaskCurb(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCmIn,
+		const FRenderedGroundZ& RGZ, const FResolvedSurface* Surf, const FVector3f& Tint,
+		int32* OutQuads, float HeightCm = GCurbHeightCm, float TopWidthCm = GCurbTopWidthCm,
+		FCurbSinkStats* Stats = nullptr, bool bCaps = true)
+	{
+		if (!Surf || PtsCmIn.Num() < 2)
 		{
 			return;
+		}
+		TArray<FVector2D> PtsCm;
+		SubdivideOnRenderedGround(PtsCmIn, RGZ, GCurbSagToleranceCm, GCurbSagMaxDepth, PtsCm);
+		if (Stats)
+		{
+			Stats->AddedVertices += FMath::Max(0, PtsCm.Num() - PtsCmIn.Num());
+			for (const FVector2D& P : PtsCmIn)
+			{
+				Stats->Note(RGZ.At(P.X, P.Y) - RGZ.RawZ(P.X, P.Y));
+			}
 		}
 		const FVector3f Up(0, 0, 1);
 		const FPolygonGroupID Group = QM.GetOrCreateGroup(Surf->SlotName(), Surf->Material);
 		auto WorldUV = [](const FVector3f& P) { return FVector2f(P.X * 0.01f, P.Y * 0.01f); };
 		float Arc = 0.f;
+		int32 Posed = 0;
+		FVector3f CapA[4];
+		FVector3f CapB[4];
+		FVector3f CapANormal(1.f, 0.f, 0.f);
+		FVector3f CapBNormal(1.f, 0.f, 0.f);
+		bool bHasFirst = false;
 		for (int32 i = 0; i + 1 < PtsCm.Num(); ++i)
 		{
 			const FVector2D A = PtsCm[i];
@@ -1670,8 +1845,8 @@ namespace
 			// (-Dir.Y, Dir.X), le trottoir est du cote oppose.
 			const FVector2D ToRoad(-Dir.Y, Dir.X);
 			const FVector2D ToWalk = -ToRoad;
-			const float ZA = Drape.GroundZ(A.X, A.Y);
-			const float ZB = Drape.GroundZ(B.X, B.Y);
+			const float ZA = RGZ.At(A.X, A.Y);
+			const float ZB = RGZ.At(B.X, B.Y);
 			auto At = [&](const FVector2D& P, float Z, const FVector2D& Lat, float Off, float Lift)
 			{
 				return FVector3f((float)(P.X + Lat.X * Off), (float)(P.Y + Lat.Y * Off), Z + Lift);
@@ -1722,14 +1897,48 @@ namespace
 			{
 				*OutQuads += 3;
 			}
+			++Posed;
+			// v4 — memoire des sections extremes pour les bouchons de fin.
+			if (!bHasFirst)
+			{
+				bHasFirst = true;
+				CapA[0] = At(A, ZA, ToRoad, 0.f, -GMaskCurbSinkCm);
+				CapA[1] = At(A, ZA, ToWalk, TopWidthCm, -GMaskCurbSinkCm);
+				CapA[2] = At(A, ZA, ToWalk, TopWidthCm, HeightCm);
+				CapA[3] = At(A, ZA, ToRoad, 0.f, HeightCm);
+				CapANormal = FVector3f(-(float)Dir.X, -(float)Dir.Y, 0.f).GetSafeNormal();
+			}
+			CapB[0] = At(B, ZB, ToRoad, 0.f, -GMaskCurbSinkCm);
+			CapB[1] = At(B, ZB, ToRoad, 0.f, HeightCm);
+			CapB[2] = At(B, ZB, ToWalk, TopWidthCm, HeightCm);
+			CapB[3] = At(B, ZB, ToWalk, TopWidthCm, -GMaskCurbSinkCm);
+			CapBNormal = FVector3f((float)Dir.X, (float)Dir.Y, 0.f).GetSafeNormal();
+		}
+		// v4 — BOUCHONS DE FIN. Une bordurette est une piece OUVERTE : sans bouchon,
+		// ses deux extremites sont des trous par lesquels on voit l'interieur de la
+		// pierre. Deux quads pour toute la polyligne, quelle que soit sa longueur.
+		if (bCaps && bHasFirst && Posed > 0)
+		{
+			const FVector2f CapUV[4] = {
+				FVector2f(0.f, 0.f), FVector2f(TopWidthCm * 0.01f, 0.f),
+				FVector2f(TopWidthCm * 0.01f, (HeightCm + GMaskCurbSinkCm) * 0.01f),
+				FVector2f(0.f, (HeightCm + GMaskCurbSinkCm) * 0.01f) };
+			QM.AddPoly(Group, CapA, 4, CapANormal, CapUV, Tint);
+			QM.AddPoly(Group, CapB, 4, CapBNormal, CapUV, Tint);
+			if (OutQuads)
+			{
+				*OutQuads += 2;
+			}
 		}
 	}
 
 	// TIRET de ligne axiale : un quad de 15 cm de large. Le debitage (3 m plein /
 	// 1,5 m vide, 8 m d'ecart aux carrefours, dans la chaussee seulement) est fait
 	// au prep — le C++ ne decide de rien ici.
+	// v4 : Z du sol RENDU (le tiret n'est souleve que de 6 cm — sous la dalle il
+	// disparait exactement comme la pierre).
 	void BuildAxialDash(FCityMeshBuilder& QM, const FVector2D& ACm, const FVector2D& BCm,
-		const FDrapeContext& Drape, const FResolvedSurface* Surf, const FVector3f& Tint)
+		const FRenderedGroundZ& RGZ, const FResolvedSurface* Surf, const FVector3f& Tint)
 	{
 		const FVector2D D = BCm - ACm;
 		const float Len = (float)D.Size();
@@ -1744,7 +1953,7 @@ namespace
 		{
 			const FVector2D Q = P + Lat * (Side * H);
 			return FVector3f((float)Q.X, (float)Q.Y,
-				Drape.GroundZ(Q.X, Q.Y) + GMaskDashLiftCm);
+				RGZ.At(Q.X, Q.Y) + GMaskDashLiftCm);
 		};
 		const FVector3f P[4] = { At(ACm, -1.f), At(BCm, -1.f), At(BCm, 1.f), At(ACm, 1.f) };
 		const FVector2f UV[4] = {
@@ -7353,13 +7562,20 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		const FResolvedSurface* CrossSurf = Surfaces.Resolve(&GSurfCrossing);
 		const FResolvedSurface* MarkSurf = Surfaces.Resolve(&GSurfMarking);
 		const FVector3f Tint(0.85f, 0.85f, 0.80f);
+		// v4 — LE Z DU SOL RENDU, un seul objet pour TOUT ce qui se pose sur la dalle
+		// (bordure de chaussee, bordurette d'herbe, passages, tirets axiaux).
+		FRenderedGroundZ RGZ;
+		RGZ.Init(Drape, Gen.GroundGridN, Cell);
+		FCurbSinkStats SinkRoad;
+		FCurbSinkStats SinkGrass;
 		for (const TPair<FIntPoint, FGroundMaskCell>& Pair : MaskCells)
 		{
 			const FGroundMaskCell& Data = Pair.Value;
 			for (const TArray<FVector2D>& Line : Data.Curbs)
 			{
 				BuildMaskCurb(GetIn(GroundCells, Line[0], Cell, bLinearColors, bWorldUVs),
-					Line, Drape, CurbSurf, Tint, &Summary.CurbQuads);
+					Line, RGZ, CurbSurf, Tint, &Summary.CurbQuads,
+					GCurbHeightCm, GCurbTopWidthCm, &SinkRoad);
 			}
 			// V3 : LA BORDURETTE D'HERBE. Meme mecanique, MEME materiau de bordure,
 			// profil reduit (7 / 14 cm au lieu de 12 / 15). Elle vit dans les memes
@@ -7369,12 +7585,12 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			for (const TArray<FVector2D>& Line : Data.GrassEdges)
 			{
 				BuildMaskCurb(GetIn(GroundCells, Line[0], Cell, bLinearColors, bWorldUVs),
-					Line, Drape, CurbSurf, Tint, &Summary.GrassCurbQuads,
-					GGrassCurbHeightCm, GGrassCurbTopWidthCm);
+					Line, RGZ, CurbSurf, Tint, &Summary.GrassCurbQuads,
+					GGrassCurbHeightCm, GGrassCurbTopWidthCm, &SinkGrass);
 			}
 			for (const FMaskCrossing& Site : Data.Crossings)
 			{
-				const float Zcm = Drape.GroundZ(Site.PosCm.X, Site.PosCm.Y) + GMaskCrossLiftCm;
+				const float Zcm = RGZ.At(Site.PosCm.X, Site.PosCm.Y) + GMaskCrossLiftCm;
 				BuildCrossing(GetIn(GroundCells, Site.PosCm, Cell, bLinearColors, bWorldUVs),
 					Site.PosCm, Site.DirCm, Site.HalfWCm, Zcm, CrossSurf, Tint);
 				++Summary.Crossings;
@@ -7383,7 +7599,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			{
 				const FVector2D A(Seg.X, Seg.Y);
 				BuildAxialDash(GetIn(GroundCells, A, Cell, bLinearColors, bWorldUVs),
-					A, FVector2D(Seg.Z, Seg.W), Drape, MarkSurf, Tint);
+					A, FVector2D(Seg.Z, Seg.W), RGZ, MarkSurf, Tint);
 				++Summary.AxialDashes;
 			}
 		}
@@ -7391,6 +7607,20 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			TEXT("Maquette du sol : %d cellules masquees, %d rubans de chaussee supprimes, %d ponts conserves, %d quads de bordure, %d quads de bordurette d'herbe, %d passages, %d tirets axiaux."),
 			MaskCells.Num(), Summary.GroundRibbonsSkipped, Summary.BridgeRibbons,
 			Summary.CurbQuads, Summary.GrassCurbQuads, Summary.Crossings, Summary.AxialDashes);
+		// v4 — CE QUE LE CORRECTIF A RATTRAPE, mesure sur la vraie donnee : ecart entre
+		// la dalle RENDUE et le MNT continu aux sommets de bordure. Chaque sommet
+		// au-dela de la hauteur du profil etait une pierre INVISIBLE avant la v4.
+		auto LogSink = [](const TCHAR* Nom, const FCurbSinkStats& S, float HauteurCm)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("Z du sol rendu (%s) : %d sommets, enterrement moyen %.2f cm, max %.2f cm ; "
+					 "%d sommets > 7 cm, %d > 12 cm (avant v4 : autant de pierres noyees pour un profil de %.0f cm) ; "
+					 "%d sommets ajoutes par le decoupage adaptatif."),
+				Nom, S.Vertices, S.Vertices > 0 ? (float)(S.SumCm / S.Vertices) : 0.f,
+				S.MaxCm, S.Over7cm, S.Over12cm, HauteurCm, S.AddedVertices);
+		};
+		LogSink(TEXT("bordure de chaussee"), SinkRoad, GCurbHeightCm);
+		LogSink(TEXT("bordurette d'herbe"), SinkGrass, GGrassCurbHeightCm);
 	}
 
 	// --- Dalles de sol PEINTES : grilles 12x12 par cellule, sommets teintes par
@@ -7626,6 +7856,33 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			Dyn->bInitiallyLoaded = true;
 			Dyn->bInitiallyVisible = true;
 		}
+		else
+		{
+			// V4 : un sous-niveau d'une AUTRE classe (heritage) ne recevait rien du
+			// tout, et le verificateur ne le voyait pas — il ne relisait que les flags
+			// qu'il venait d'ecrire. On le DIT au lieu de le taire.
+			UE_LOG(LogCityImport, Warning,
+				TEXT("Sous-niveau '%s' de classe %s (pas ULevelStreamingDynamic) : bInitiallyLoaded/Visible NON poses."),
+				*Streaming->GetWorldAssetPackageName(), *Streaming->GetClass()->GetName());
+		}
+		// ---------------------------------------------------------------------
+		// V4 — LA VRAIE CAUSE DE LA RECIDIVE « batiments invisibles en Play ».
+		//
+		// bInitiallyLoaded / bInitiallyVisible ne sont PAS l'etat : ce sont des
+		// GRAINES, recopiees dans bShouldBeLoaded / bShouldBeVisible par
+		// ULevelStreamingDynamic::PostLoad() — et seulement dans un monde de JEU. Or
+		// le monde PIE n'est pas charge depuis le disque : c'est un DUPLICATA du monde
+		// editeur. PostLoad n'y rejoue pas, et le duplicata herite donc de
+		// bShouldBeLoaded / bShouldBeVisible tels quels, c'est-a-dire FALSE, la valeur
+		// par defaut d'un sous-niveau fraichement cree. Poser les seules graines
+		// « marchait » apres un redemarrage d'editeur et ratait dans la session qui
+		// venait de generer : exactement le symptome intermittent paye trois fois.
+		//
+		// On pose donc AUSSI l'etat effectif. Il est serialise avec la map, ce qui rend
+		// le correctif verifiable DEPUIS LE .umap SAUVE — le verificateur d'avant etait
+		// tautologique : il relisait, dans la meme session, ce qu'il venait d'ecrire.
+		Streaming->SetShouldBeLoaded(true);
+		Streaming->SetShouldBeVisible(true);
 		// J3b : visibilite EDITEUR distincte des flags runtime ci-dessus — elle se
 		// sauve avec la map ; invisible, la ville n'affiche que ses proxys.
 		Streaming->SetShouldBeVisibleInEditor(true);
