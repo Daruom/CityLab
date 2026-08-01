@@ -1,0 +1,20 @@
+2026-08-01 10:43:26  Overpass https://overpass-api.de/api/interpreter (bbox 43.559268,1.382172,43.649732,1.506228)
+2026-08-01 10:43:35    echec : HTTP Error 504: Gateway Timeout
+2026-08-01 10:43:37  Overpass https://overpass.kumi.systems/api/interpreter (bbox 43.559268,1.382172,43.649732,1.506228)
+2026-08-01 10:45:18    echec : HTTP Error 504: Gateway Timeout
+2026-08-01 10:45:30  Overpass https://overpass-api.de/api/interpreter (bbox 43.559268,1.382172,43.649732,1.506228)
+2026-08-01 10:45:34  cache ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\_cache\overpass_crossings_carre10.json (3.31 Mo)
+2026-08-01 10:45:34  noeuds highway=crossing : 10236 (dont 8388 PEINTS, 1848 refuses) ; ways footway=crossing : 4432 (dont 1786 peints)
+2026-08-01 10:45:34     motif markings=zebra                5452
+2026-08-01 10:45:34     motif markings=yes                  1103
+2026-08-01 10:45:34     motif crossing=marked                994
+2026-08-01 10:45:34     motif aucun tag de marquage          978
+2026-08-01 10:45:34     motif crossing=traffic_signals       556
+2026-08-01 10:45:34     motif markings=no                    408
+2026-08-01 10:45:34     motif crossing=uncontrolled          291
+2026-08-01 10:45:34     motif markings=zebra;yes             172
+2026-08-01 10:45:34     motif crossing=unmarked               95
+2026-08-01 10:45:34     motif markings=surface                73
+2026-08-01 10:45:34     motif markings=pictograms             66
+2026-08-01 10:45:34     motif markings=lines                  20
+2026-08-01 10:45:34  ecrit C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\osm_crossings_carre10.json : 10236 noeuds (8388 peints), 4432 ways, 1.61 Mo, 3.2 s
