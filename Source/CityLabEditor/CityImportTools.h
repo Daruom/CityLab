@@ -156,6 +156,24 @@ struct FCityGenProfile
 	 */
 	UPROPERTY() int32 WindowMode = 0;
 
+	/**
+	 * V5 (autopsie du 01/08) — VISIBILITE DES PROXYS, decidee ICI et pas dans une
+	 * checklist. Les SM_Proxy_* sont la couche RESIDENTE grossiere : un rectangle
+	 * ORIENTE par batiment (ou un contour reduit a 12 points), retracte de 2 m et
+	 * SANS les cours. Depuis le lot A-ter, le generateur force les sous-niveaux de
+	 * detail a etre charges ET visibles (editeur et runtime) : le proxy n'a donc plus
+	 * aucune occasion utile de s'afficher, et quand il s'affiche il se SUPERPOSE au
+	 * detail — il remplit 96 % de la surface des cours et deborde de 24 858 m2 hors
+	 * de toute emprise (mesure du 01/08 sur les 1 657 batiments du proto).
+	 * C'est LE symptome decrit par l'utilisateur : « cours bouchees, emprises
+	 * gonflees, ancienne construction ». Une douzaine de scripts de generation le
+	 * rattrapaient a la main APRES la passe — donc APRES la sauvegarde faite par le
+	 * C++ lui-meme : la correction ne survivait pas a la fermeture de l'editeur.
+	 * Defaut false = proxys CACHES (rendu editeur ET jeu). true = maquette grossiere
+	 * assumee (blocs seuls).
+	 */
+	UPROPERTY() bool bProxyVisible = false;
+
 	/** Prereglage desktop complet : 64x64 drape, collision 16x16, pas routes 15 m. */
 	static FCityGenProfile Desktop();
 

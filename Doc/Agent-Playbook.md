@@ -94,6 +94,13 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
 - Build : fermer l'éditeur (par CHEMIN), `Build.bat CityLabEditor Win64 Development -project="…\CityLab.uproject" -WaitMutex -NoHotReloadFromIDE` (~12-20 s), rouvrir via **PowerShell**
   (Git Bash mangle `/Game/...`). Corps de fonction → Live Coding OK pour itérer, mais **JAMAIS
   exécuter une passe lourde sous patch Live Coding** (crash D3D12) : build complet avant le run.
+- ⚠️ **La spec d'automation `CityLab` RÉGÉNÈRE LE MONDE COURANT** (payé le 01/08, lot V5) :
+  ses tests appellent `ImportCityStreamed`, qui **purge tous les acteurs `SM_Ground_` /
+  `SM_Slab_` / `SM_Proxy_` / `SM_Bldg_` du monde ouvert** avant de poser les siens. Lancée
+  avec une map de production ouverte, elle la remplace **en mémoire** par la maquette de test.
+  Ce n'est sans conséquence que si l'on **ne sauvegarde pas** ensuite. Règle : ouvrir une map
+  jetable (`/Game/Dev/Test/L_V5Scratch`) **avant** `Automation RunTests CityLab`, puis
+  recharger la map de travail. Idem pour toute sonde qui rejoue un import.
 - **Un processus UE par passe de génération lourde** (commandlet), reprenable par lot de cellules.
 - Crash : `Saved/Crashes/*/CrashContext.runtime-xml` → `IsEnsure=true` = NON-fatal (l'éditeur vit).
 - **REDÉMARRER L'ÉDITEUR : trois pièges payés le 2026-08-01, dans cet ordre.**
@@ -116,6 +123,37 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
      toutes les captures de référence, sinon l'A/B est faussé).
 
 ## 6. Règles de génération (résumé — détails dans `Doc/Vegetation-Pipeline-Cpp.md` & `Doc/Reseau-Sidecar.md`)
+- 🔒 **UNE GÉNÉRATION SE VALIDE PAR SES GÉOMÉTRIES — aires, boucles, retraits — JAMAIS
+  par ses comptes ou ses positions** (doctrine du 01/08, lot V5, payée deux fois).
+  Un compte d'acteurs, un `Buildings=1657` ou un « bâtiments identiques à 0,000 m » sont
+  aveugles **par construction** aux deux défauts qui coûtent le plus cher : une **cour
+  bouchée** et une **emprise gonflée** ne changent ni le nombre, ni la position. Les
+  métriques qui, elles, les voient : **aire d'emprise projetée** (somme des aires XY des
+  faces non verticales du mesh — comparée à l'aire des contours MOINS les trous du JSON),
+  **nombre de boucles intérieures percées** (une sonde au centre de chaque cour : rien
+  au-dessus = percée), **retraits** (distance mesurée au tracé d'origine).
+  Outillage prêt : `Tools/verrou_batiments_sol2.py` (à rejouer après CHAQUE régé du proto ;
+  valeurs de référence en dur, mesurées sur le témoin gelé Sol1) et les deux specs
+  `CityLab.CityImportTools` « V5 VERROU GÉOMÉTRIQUE » / « V5 VERROU PROXY ».
+  > **Post-mortem (comment ça a survécu à N lots).** Le 01/08 l'utilisateur signale
+  > « cours intérieures bouchées, emprises gonflées qui débordent sur le sol, c'est une
+  > ancienne construction ». La cause n'était **pas** la géométrie des bâtiments (mesurée
+  > depuis : les `SM_Bldg_*_Wall` de Sol2 sont **bit-identiques** à ceux du témoin gelé
+  > du 29/07, même hash de sommets, et leur emprise projetée vaut **exactement** l'aire
+  > nette du JSON). C'étaient les **proxys** `SM_Proxy_*` — blocs grossiers de la couche
+  > résidente, cours pleines par construction — **sauvés VISIBLES** et superposés au
+  > détail : 96 % de la surface des cours remplie, 24 858 m² débordant hors de toute
+  > emprise. Pourquoi personne ne l'a vu : (1) une douzaine de scripts de génération les
+  > cachaient **en Python après la passe**, donc **après** la sauvegarde que le C++ fait
+  > lui-même — la correction ne vivait qu'en mémoire et mourait à la fermeture de
+  > l'éditeur ; (2) toutes les captures de validation étaient prises **dans la session
+  > qui venait de générer**, où les proxys étaient cachés : l'agent voyait juste, le
+  > disque était faux, et l'utilisateur — qui rouvre le projet — voyait le disque ;
+  > (3) le seul contrôle de non-régression bâtiments comparait des **positions**.
+  > Correctif : `FCityGenProfile::bProxyVisible` (défaut **false**) posé **à la création
+  > de l'acteur** dans `ImportCityStreamed`. Corollaire général : **tout ce qu'un script
+  > rejoue à la main après une passe doit migrer dans le C++** — une propriété par objet
+  > ne survit ni à sa recréation, ni à une sauvegarde faite avant elle.
 - 🔒 **DOCTRINE DU SOL RENDU (généralisée le 01/08, lot v4)** : **toute géométrie posée sur le sol
   échantillonne la surface RENDUE, jamais le terrain abstrait.** C'est la leçon des arbres,
   industrialisée : la dalle est drapée sur une grille (`GroundGridN`, interpolation triangulée) et
@@ -145,11 +183,17 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
   PAR OBJET : posées après coup elles ne survivent pas à la régé suivante — d'où le C++.
   **Ne plus lancer `fix_pie_sol2.py` ni le script SDM du lot 3** ; les VÉRIFIER suffit
   (`work/SOLROUTES/ater_regen.py` fait la régé et les deux vérifications, `flags_ok`/`sdm_ok`).
+  **V5 (01/08)** : la **visibilité des `SM_Proxy`** rejoint la même liste — elle est posée
+  par le C++ à la création (`FCityGenProfile::bProxyVisible`, défaut false = cachés).
+  **Ne plus les cacher en Python** : les VÉRIFIER suffit (`regen_v5.py` :
+  `proxys_caches_par_le_cpp`). Les cacher après la passe ne servait à rien — la passe
+  sauvegarde la map AVANT, donc le disque gardait des proxys visibles.
   Restent obligatoires après chaque régé : `ImportCitySurfaces` avec le **NOGREEN**
   (`SOLVERT/proto_capitole_surfaces_nogreen.json`, JAMAIS `grass_v3` — 1 407 films verts
   revenus le 31/07), re-run `ImportVegetation`, re-masquer l'ancienne végé `Sol2Veg_*`/
-  `Sol2Grass_*`, cacher les `SM_Proxy`, et comparer les compteurs (CurbQuads / AxialDashes /
-  MaskedCells / instances / fosses) au lot précédent.
+  `Sol2Grass_*`, comparer les compteurs (CurbQuads / AxialDashes / MaskedCells / instances
+  / fosses) au lot précédent, et **jouer le verrou géométrique
+  `Tools/verrou_batiments_sol2.py` (doit sortir `VERROU: PASS`)**.
 - Masques de sol : canal G = SDF chaussée (sert aussi de champ de rétraction) ; l'herbe = complément
   du peint. `SaveStringToFile` bascule UTF-16 sur tiret cadratin → `ForceUTF8WithoutBOM`.
 - **La CHARTE du sol (lot A-ter, `Doc/Sols-Masques-LotA.md` §6)** : la composition est un ARGMAX

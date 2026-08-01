@@ -8,6 +8,7 @@
 #include "Engine/StaticMeshActor.h"
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "HAL/PlatformFileManager.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInstanceConstant.h"
@@ -92,6 +93,65 @@ namespace
 			OutMax = FVector3f(FMath::Max(OutMax.X, C.X), FMath::Max(OutMax.Y, C.Y),
 				FMath::Max(OutMax.Z, C.Z));
 		}
+		return true;
+	}
+
+	// -------------------------------------------------------------------------
+	// V5 (autopsie du 01/08) — LA MESURE GEOMETRIQUE DES BATIMENTS.
+	// Un controle par COMPTES ou par POSITIONS est aveugle aux deux griefs qui ont
+	// coute ce lot : une cour bouchee et une emprise gonflee ne changent NI le
+	// nombre de batiments NI leur position. On mesure donc la GEOMETRIE :
+	//   * AireEmprise = somme des aires XY des faces non verticales situees AU-DESSUS
+	//     de MinCentroidZ (le toit ; le seuil ecarte la modenature — corniches,
+	//     bandeaux d'etage, socle — qui est horizontale elle aussi). Pour un
+	//     batiment a cour percee elle vaut contour MOINS trous.
+	//   * Sondes = points a l'interieur des cours, testes contre TOUTES les faces
+	//     non verticales quelle que soit leur hauteur : une cour PERCEE n'a rien
+	//     au-dessus d'elle, a aucun niveau.
+	// -------------------------------------------------------------------------
+	bool MeasureFootprint(UStaticMesh* Mesh, float MinCentroidZ, float& OutAreaCm2,
+		const TArray<FVector2D>& Probes, TArray<int32>& OutHits)
+	{
+		OutAreaCm2 = 0.f;
+		OutHits.Init(0, Probes.Num());
+		FMeshDescription* MeshDesc = Mesh ? Mesh->GetMeshDescription(0) : nullptr;
+		if (!MeshDesc || MeshDesc->Triangles().Num() == 0)
+		{
+			return false;
+		}
+		TVertexAttributesRef<FVector3f> Pos = FStaticMeshAttributes(*MeshDesc).GetVertexPositions();
+		double AreaUp = 0.0, AreaDown = 0.0;
+		for (const FTriangleID Tri : MeshDesc->Triangles().GetElementIDs())
+		{
+			TArrayView<const FVertexID> V = MeshDesc->GetTriangleVertices(Tri);
+			const FVector3f A = Pos[V[0]], B = Pos[V[1]], C = Pos[V[2]];
+			// Produit vectoriel projete : nul = face VERTICALE (un mur), donc pas
+			// d'emprise ; signe = sens d'enroulement vu de dessus.
+			const double Cz = double(B.X - A.X) * double(C.Y - A.Y)
+				- double(B.Y - A.Y) * double(C.X - A.X);
+			if (Cz == 0.0) { continue; }   // face VERTICALE (un mur) : aucune emprise
+			if ((A.Z + B.Z + C.Z) / 3.f >= MinCentroidZ)
+			{
+				if (Cz > 0.0) { AreaUp += Cz; } else { AreaDown -= Cz; }
+			}
+			const float XMin = FMath::Min3(A.X, B.X, C.X), XMax = FMath::Max3(A.X, B.X, C.X);
+			const float YMin = FMath::Min3(A.Y, B.Y, C.Y), YMax = FMath::Max3(A.Y, B.Y, C.Y);
+			for (int32 k = 0; k < Probes.Num(); ++k)
+			{
+				const double PX = Probes[k].X, PY = Probes[k].Y;
+				if (PX < XMin || PX > XMax || PY < YMin || PY > YMax) { continue; }
+				const double D1 = double(B.X - A.X) * (PY - A.Y) - double(B.Y - A.Y) * (PX - A.X);
+				const double D2 = double(C.X - B.X) * (PY - B.Y) - double(C.Y - B.Y) * (PX - B.X);
+				const double D3 = double(A.X - C.X) * (PY - C.Y) - double(A.Y - C.Y) * (PX - C.X);
+				if ((D1 >= 0 && D2 >= 0 && D3 >= 0) || (D1 <= 0 && D2 <= 0 && D3 <= 0))
+				{
+					++OutHits[k];
+				}
+			}
+		}
+		// Un batiment n'a qu'UNE nappe horizontale (le toit) : le plancher est
+		// enterre et non maille. On retient donc le sens qui porte l'emprise.
+		OutAreaCm2 = float(FMath::Max(AreaUp, AreaDown) * 0.5);
 		return true;
 	}
 }
@@ -208,6 +268,146 @@ void FCityImportToolsSpec::Define()
 				TestTrue(FString::Printf(TEXT("Fallback plat %.1f = h 800"), MaxZ),
 					FMath::Abs(MaxZ - 800.f) <= 1.f);
 			}
+		});
+
+		// ------------------------------------------------------------------ V5
+		// VERROU GEOMETRIQUE DES BATIMENTS (autopsie du 01/08).
+		// Un batiment-temoin a COUR, mesure sur sa GEOMETRIE et non sur des comptes :
+		// c'est exactement le controle qui manquait quand l'utilisateur a signale
+		// « cours bouchees / emprises gonflees » et qu'on lui a repondu avec un
+		// « batiments identiques a 0,000 m » (des POSITIONS, aveugles aux deux).
+		// Le batiment de controle (meme forme, meme cour, mais SANS bloc roof) prouve
+		// que la mesure DISCRIMINE : la cour y est pleine et l'aire vaut le contour.
+		// ---------------------------------------------------------------------
+		It("V5 VERROU GEOMETRIQUE : cour PERCEE et emprise = contour moins trous", [this]()
+		{
+			// Temoin : contour 40x30 m (CCW) avec une cour 20x10 m (CW) au centre, toit
+			// en pente en anneau (egout exterieur ET avant-toit de cour, squelette a
+			// d = 2 m). Emprise attendue = 1200 - 200 = 1000 m2.
+			// Controle : meme forme translatee de 250 m, meme cour, mais SANS bloc
+			// roof -> prisme plein historique (regle documentee : une cour n'est percee
+			// que si le batiment a un toit en pente valide).
+			const FString BldPath = FPaths::Combine(FPaths::ProjectSavedDir(),
+				TEXT("Tests/v5_temoin_cour.json"));
+			const FString BldJson = TEXT(R"({"buildings":[)")
+				TEXT(R"({"pts":[[0,0],[40,0],[40,30],[0,30]],)")
+				TEXT(R"("holes":[[[10,10],[10,20],[30,20],[30,10]]],)")
+				TEXT(R"("h":8,"u":"res","roof":{"eave":5.5,"delta":2,"mat":"tuile",)")
+				TEXT(R"("sv":[[5,5,2],[35,5,2],[35,25,2],[5,25,2]],)")
+				TEXT(R"("f":[[0,1,9,8],[1,2,10,9],[2,3,11,10],[3,0,8,11],)")
+				TEXT(R"([4,5,11,8],[5,6,10,11],[6,7,9,10],[7,4,8,9]]}},)")
+				TEXT(R"({"pts":[[250,0],[290,0],[290,30],[250,30]],)")
+				TEXT(R"("holes":[[[260,10],[260,20],[280,20],[280,10]]],)")
+				TEXT(R"("h":8,"u":"res"}]})");
+			FFileHelper::SaveStringToFile(BldJson, *BldPath);
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/v5_main.json"));
+			FFileHelper::SaveStringToFile(TEXT(R"({"buildings":[]})"), *Path);
+
+			FCityGenProfile Profile;
+			Profile.bSplitWallGlass = true;   // chemin batiments desktop, sans MNT (ZBase = 0)
+			Profile.WindowMode = 1;           // murs pleins : aucune face horizontale parasite
+			Profile.BuildingsJsonPath = BldPath;
+			const FCityStreamedSummary Summary = UCityImportTools::ImportCityStreamed(
+				Path, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, Profile);
+			TestEqual(TEXT("Deux batiments"), Summary.Buildings, 2);
+			TestEqual(TEXT("Un seul toit en pente (le controle n'a pas de bloc roof)"),
+				Summary.RoofsPitched, 1);
+
+			// --- TEMOIN : cour percee, aire = 1000 m2 -----------------------------
+			TArray<FVector2D> Sondes;
+			Sondes.Add(FVector2D(2000.0, 1500.0));   // CENTRE DE LA COUR (20 m ; 15 m)
+			Sondes.Add(FVector2D(200.0, 1500.0));    // sous le versant ouest (2 m ; 15 m)
+			TArray<int32> Hits;
+			float AreaCm2 = 0.f;
+			UStaticMesh* Temoin = LoadTestMesh(TEXT("SM_Bldg_0_0_Wall"));
+			// Seuil 551 cm = juste au-dessus de l'egout (550) : ne retient que les
+			// VERSANTS, pas la corniche ni les bandeaux (mesures : 42 + 42 + 14 + 14
+			// + socle 7 + 7 + bandeaux 4,2 + 4,2 m2 d'horizontales de modenature).
+			if (TestTrue(TEXT("SM_Bldg_0_0_Wall mesurable"),
+				MeasureFootprint(Temoin, 551.f, AreaCm2, Sondes, Hits)))
+			{
+				const float AttenduCm2 = 1000.f * 10000.f;   // 1000 m2
+				AddInfo(FString::Printf(
+					TEXT("V5 temoin a cour : versants projetes %.1f m2 (attendu 1000,0 = contour "
+						"1200 moins cour 200), faces au-dessus de la cour = %d, au-dessus du "
+						"versant = %d"), AreaCm2 / 10000.f, Hits[0], Hits[1]));
+				TestTrue(FString::Printf(TEXT("Emprise du toit %.1f m2 = contour moins cour, a 1 %% pres"),
+					AreaCm2 / 10000.f), FMath::Abs(AreaCm2 - AttenduCm2) <= 0.01f * AttenduCm2);
+				TestEqual(TEXT("LA COUR EST PERCEE : aucune face non verticale au-dessus"), Hits[0], 0);
+				TestTrue(TEXT("La sonde de controle voit bien le versant (la mesure n'est pas muette)"),
+					Hits[1] > 0);
+			}
+
+			// --- CONTROLE : sans toit, la cour est pleine et l'aire vaut le contour --
+			TArray<FVector2D> Sondes2;
+			Sondes2.Add(FVector2D(27000.0, 1500.0));  // centre de la cour du controle
+			TArray<int32> Hits2;
+			float Area2 = 0.f;
+			UStaticMesh* Controle = LoadTestMesh(TEXT("SM_Bldg_2_0_Wall"));
+			// Seuil 790 cm : le toit plat est a 800, la corniche a 784 et en dessous.
+			if (TestTrue(TEXT("SM_Bldg_2_0_Wall mesurable"),
+				MeasureFootprint(Controle, 790.f, Area2, Sondes2, Hits2)))
+			{
+				AddInfo(FString::Printf(
+					TEXT("V5 controle sans toit : toit projete %.1f m2 (contour PLEIN 1200 + "
+						"debord de corniche), faces au-dessus de la cour = %d"),
+					Area2 / 10000.f, Hits2[0]));
+				TestTrue(FString::Printf(
+					TEXT("Sans bloc roof le toit couvre le contour PLEIN (%.1f m2 >= 1150), "
+						"pas les 1000 m2 ajoures"), Area2 / 10000.f), Area2 >= 1150.f * 10000.f);
+				TestTrue(TEXT("Le discriminant fonctionne : cour PLEINE dans ce cas"), Hits2[0] > 0);
+			}
+		});
+
+		// ---------------------------------------------------------------------
+		// V5 — VERROU DE NON-REGRESSION DU 01/08 : le proxy grossier ne doit JAMAIS
+		// etre cree visible. Visible, il se superpose au detail (que ce meme
+		// generateur force charge+visible) : cours bouchees a 96 %, 24 858 m2 de
+		// debordement hors emprise sur le proto. Douze scripts le cachaient APRES la
+		// passe, donc apres la sauvegarde du C++ : rien n'en survivait sur le disque.
+		// ---------------------------------------------------------------------
+		It("V5 VERROU PROXY : les SM_Proxy sont crees CACHES, sauf bProxyVisible", [this]()
+		{
+			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/v5_proxy.json"));
+			const FString Json = TEXT(R"({"buildings":[{"pts":[[0,0],[12,0],[12,10],[0,10]],"h":9.5,"u":"res"},)")
+				TEXT(R"({"pts":[[250,0],[262,0],[262,10],[250,10]],"h":15,"u":"com"}]})");
+			FFileHelper::SaveStringToFile(Json, *Path);
+
+			auto CompteProxys = [](int32& OutTotal, int32& OutVisibles, int32& OutRenduEnJeu)
+			{
+				OutTotal = OutVisibles = OutRenduEnJeu = 0;
+				UWorld* World = GEditor ? GEditor->GetEditorWorldContext().World() : nullptr;
+				if (!World) { return; }
+				for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
+				{
+					if (!It->GetActorLabel().StartsWith(TEXT("SM_Proxy_"))) { continue; }
+					++OutTotal;
+					UStaticMeshComponent* C = It->GetStaticMeshComponent();
+					if (C && C->GetVisibleFlag()) { ++OutVisibles; }
+					if (C && !C->bHiddenInGame) { ++OutRenduEnJeu; }
+				}
+			};
+
+			int32 Total = 0, Visibles = 0, EnJeu = 0;
+			UCityImportTools::ImportCityStreamed(Path, FString(), TEXT("/Game/Dev/Test/City"),
+				TEXT("/Game/Dev/Test/Blocks"), FString(), FString(), 100.f, 200.f, 400.f,
+				FVector::ZeroVector, FCityGenProfile());
+			CompteProxys(Total, Visibles, EnJeu);
+			TestTrue(TEXT("Des proxys ont bien ete generes"), Total >= 1);
+			TestEqual(FString::Printf(TEXT("Par defaut AUCUN proxy visible (%d/%d)"), Visibles, Total),
+				Visibles, 0);
+			TestEqual(FString::Printf(TEXT("Par defaut AUCUN proxy rendu en jeu (%d/%d)"), EnJeu, Total),
+				EnJeu, 0);
+
+			FCityGenProfile Visible;
+			Visible.bProxyVisible = true;
+			UCityImportTools::ImportCityStreamed(Path, FString(), TEXT("/Game/Dev/Test/City"),
+				TEXT("/Game/Dev/Test/Blocks"), FString(), FString(), 100.f, 200.f, 400.f,
+				FVector::ZeroVector, Visible);
+			CompteProxys(Total, Visibles, EnJeu);
+			TestTrue(TEXT("bProxyVisible=true rend bien les proxys visibles (l'option existe)"),
+				Total >= 1 && Visibles == Total);
 		});
 
 		It("raises when the file does not exist", [this]()

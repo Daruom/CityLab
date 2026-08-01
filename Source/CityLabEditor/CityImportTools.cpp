@@ -7817,6 +7817,16 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
 		Actor->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		ApplyGroundTextureStreaming(Actor->GetStaticMeshComponent());
+		// V5 — LA VISIBILITE DU PROXY SE POSE ICI, A LA CREATION (autopsie du 01/08).
+		// Ce bloc grossier (rectangle oriente, cours pleines, 2 m de retrait) n'a de
+		// sens que si le detail n'est PAS affiche ; or le meme generateur force les
+		// sous-niveaux de detail charges+visibles quelques lignes plus bas. Laisse
+		// visible, le proxy se superpose au detail : cours bouchees, emprises gonflees.
+		// C'est une propriete PAR OBJET : posee apres coup par un script, elle ne
+		// survit pas a la sauvegarde que fait cette passe (FEditorFileUtils plus bas),
+		// donc pas non plus a la fermeture de l'editeur. Doctrine du lot A-ter.
+		Actor->GetStaticMeshComponent()->SetVisibility(Gen.bProxyVisible);
+		Actor->GetStaticMeshComponent()->SetHiddenInGame(!Gen.bProxyVisible);
 		Actor->SetActorLabel(Name);
 	}
 
