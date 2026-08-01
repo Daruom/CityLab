@@ -63,6 +63,20 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
   exécuter une passe lourde sous patch Live Coding** (crash D3D12) : build complet avant le run.
 - **Un processus UE par passe de génération lourde** (commandlet), reprenable par lot de cellules.
 - Crash : `Saved/Crashes/*/CrashContext.runtime-xml` → `IsEnsure=true` = NON-fatal (l'éditeur vit).
+- **REDÉMARRER L'ÉDITEUR : trois pièges payés le 2026-08-01, dans cet ordre.**
+  1. `Start-Process -ArgumentList @($uproject, $map)` **ouvre le PROJECT BROWSER** : le chemin
+     contient des espaces et le tableau ne le requote pas. Passer **UNE seule chaîne** avec le
+     `.uproject` entre guillemets internes. Symptôme : 3,5 Go de RAM, aucun `Saved/Logs/*.log`
+     neuf, titre de fenêtre « Unreal Engine 5.8 ».
+  2. Après un `Stop-Process`, la modale **« Restaurer les paquets »** bloque le démarrage AVANT
+     le MCP (donc injoignable en MCP). Diagnostic : titre de fenêtre = `Restaurer les paquets` ;
+     remède : `PrintWindow` pour lire le dialogue puis clic natif sur **« Ne pas restaurer »**.
+  3. **L'HABILLAGE DESKTOP N'EST PAS PERSISTÉ** (`CitySun`/`CitySkyLight`/`CitySkyAtmosphere`/
+     `CityFog`, cf. `work/SOL2/gen_sol2.py`) : il disparaît à chaque rechargement, le monde
+     rend alors **entièrement NOIR** et toute capture est un carré noir de ~15 ko. Vérifier
+     `get_all_actors_of_class(world, unreal.Light)` **avant** toute campagne de captures ;
+     respawn = `work/SOLROUTES/v2_habillage.py` (soleil pitch −35 / yaw 45 — mêmes valeurs que
+     toutes les captures de référence, sinon l'A/B est faussé).
 
 ## 6. Règles de génération (résumé — détails dans `Doc/Vegetation-Pipeline-Cpp.md` & `Doc/Reseau-Sidecar.md`)
 - Pose végé : **trace de la surface RENDUE uniquement** (proxys dupliqués+Build() ; les meshes de

@@ -1,5 +1,12 @@
 # LOT A — architecture des masques de sol & peinture par classe de voie
 
+> ⚠️ **2026-08-01 — LE RENDU DES LOTS A / A-bis / A-ter A ÉTÉ ANNULÉ** (verdict
+> utilisateur : « trop brouillon » ; l'état d'AVANT, 2-3 matériaux et grandes zones
+> simples, était plus cohérent). Le commit `66e8885` remet le visuel du sol à l'état
+> du commit `2397817`. **Les §1 à §6 ci-dessous restent vrais comme MESURES** (coûts
+> de compression, tailles de texel, pièges payés) mais ne décrivent plus le rendu en
+> place. Le rendu actuel est décrit au **§8 (LOT SOL-V2)**.
+
 > 2026-07-31. Décisions D3/D4 du chantier SOL (cf. `C:\LidarPoC\work\SOLROUTES\analyse_sol_routes.md`),
 > tranchées PAR MESURE sur le proto (`L_ProtoSols_E2_Sol2`). Captures et chiffres :
 > `C:\LidarPoC\work\SOLROUTES\captures\` + `lotA_progress.log`.
@@ -360,3 +367,166 @@ historiques + 9 lissage + ~20 charte). md5 protégés intacts (`_E2` 6942C9D6,
   `RoadEdges` dans `FCityStreamedSummary`, refus de générer sans réseau.
 - Appliquer BC7 en production + purger `/Game/City/Ground/A1Proto` (assets de
   mesure conservés pour audit).
+
+---
+
+## 8. LOT SOL-V2 — LE CŒUR PIÉTON PAVÉ, AUX FRONTIÈRES REDRESSÉES (2026-08-01)
+
+> **La donnée décide OÙ sont les zones ; le DESSIN décide de leurs FORMES.**
+> Après le revert (commit `66e8885`), un seul matériau est réintroduit : le pavé du
+> cœur piéton. Rien d'autre ne change vs l'état restauré — pas de `fine_road`, pas
+> de fil d'eau, pas de rive de façade. Outillage : `Tools/j3c_sols_masks.py`
+> (`zone_pavee`, constantes `PAVE_*`), cartes de contrôle
+> `work/SOLROUTES/v2_zoom.py`, captures suffixe `V2AV` (avant) / `V2B` (après).
+
+### 8.1 Le diagnostic : c'étaient les FORMES, pas la donnée
+
+L'union brute « corridor public ∩ voisinage des axes piétons » épouse les limites
+**cadastrales** : des courbes en amibe, des dents de scie de compétition de Voronoï,
+des dizaines de fragments. Mesuré sur la fenêtre du proto élargie : **14 316 sommets,
+45 composantes**. C'est ça, le « brouillon » — pas le choix des rues.
+
+### 8.2 Le pipeline en 8 étapes, chacune mesurée
+
+La zone se construit **UNE FOIS pour toute la fenêtre** (± 500 m au-delà des cellules
+cuites) : une frontière redressée ne peut pas dépendre d'un découpage en cellules de
+500 m. Source des axes : `classe_rendu = pietonne_pavee` du **side-car**
+(`SourceData/Reseau/`, critère hybride BD TOPO ∪ OSM, déjà lissé le long des rues).
+
+| étape | ce qu'elle fait | aire (m²) | sommets | composantes |
+|---|---|---:|---:|---:|
+| 1 brut | corridor ∩ dilatation(axes piétons, **11 m**) | 118 896 | **14 316** | 45 |
+| 2 fermeture | `buffer(+4)(-4)` : fusionne, comble les encoches | 120 141 | 15 719 | 29 |
+| 3 ouverture | `buffer(-2,5)(+2,5)` : tue tentacules et fils | 115 988 | 28 646 | 51 |
+| 4 **redressement** | Douglas-Peucker **3 m** | 115 651 | **684** | 51 |
+| 4-bis rattrapage | `buffer(+3,5)` borné par l'enveloppe des axes | — | — | — |
+| 5 façades | ∩ (fenêtre − bâti) — **pas** ∩ parcelles | 135 880 | 16 123 | 44 |
+| 6 embouchures | − bandes des voiries circulées ≥ 4 m (bout PLAT) | 109 749 | 14 712 | 152 |
+| 7 filtre | composante < 200 m², trou < 40 m² | 105 444 | 12 418 | 42 |
+| 8 DP final | 0,4 m — bruit numérique des booléens (< 1 texel) | 105 424 | **1 812** | 42 |
+
+**Le redressement, chiffré : 14 316 → 684 sommets (÷ 21).** Les 1 812 sommets finaux
+sont, pour l'essentiel, des **façades** rendues par l'étape 5 — c'est-à-dire des
+objets réels, pas du bruit.
+
+### 8.3 Les trois décisions qui font le « dessiné par un urbaniste »
+
+1. **On recolle aux FAÇADES, pas au CADASTRE.** L'étape 5 intersecte
+   `fenêtre − bâti`, jamais les parcelles : la limite de parcelle n'existe pas au sol,
+   la façade si. Troc assumé (cohérence globale > exactitude cadastrale locale) : la
+   zone peut mordre de ~1 fermeture dans une cour privée ouverte.
+2. **Le rattrapage de façade (4-bis)** — mesuré, pas supposé. Douglas-Peucker remplace
+   une suite de sommets par une **corde** : du côté convexe il RENTRE, jusqu'à la
+   tolérance. Sur la rue du Taur (légèrement courbe) il laissait **1 à 3 m de dalle le
+   long des murs** (visible sur `v2_zoom_taur.png`). On redilate donc de la tolérance
+   avant de recoller ; l'intersection avec le bâti fait le travail. Effet mesuré :
+   pavé **59 532 → 69 961 m²** sur les 4 cellules (+17,5 %), bandes résiduelles
+   supprimées (`v2_zoom_taur2.png`).
+3. **Les embouchures sont des DROITES par construction.** On soustrait la bande
+   `largeur/2 + 2 m` des axes NON piétons, au buffer **à bout plat** : la coupure au
+   droit d'une rue circulée est une ligne franche en travers de la rue — un vrai seuil
+   de zone piétonne. Seules les voies ≥ 4 m coupent (`PAVE_EMB_W_MIN`), sinon la
+   moindre venelle hacherait le plateau (152 composantes avant filtre, 42 après).
+
+### 8.4 Le canal du masque : le PAVÉ prend la place du GRAVIER (canal A)
+
+L'architecture d'AVANT n'a que 4 canaux (`R` herbe, `G` chaussée, `B` privée,
+`A` gravier) et le brief interdit d'introduire un 2ᵉ masque. Mesure qui tranche :
+**0,0 m² de gravier sur les 4 cellules du proto** — le centre-ville n'a aucun chemin
+empierré, ce canal était vide. Il porte donc le pavé.
+
+- côté cuiseur : `GRAVIER_EN_CANAL_A = False` (le gravier reste **calculé** et publié
+  dans `areasM2`, donc surveillable — il n'est simplement plus peint) ;
+- côté import : `CLASSES` de `import_ground_masks.py`, 4ᵉ entrée
+  `('grav', 'cobblestone_thjldijbw')`. La clé `grav` est **conservée** : elle nomme le
+  CANAL, pas le revêtement, et la renommer changerait tous les noms de paramètres du
+  master pour rien ;
+- **priorité** : pavé > chaussée > privée > herbe > dalle. Le pavé est passé DEVANT
+  la chaussée (il était derrière quand le canal portait le gravier) : « façade à
+  façade » veut dire qu'à l'intérieur de la zone il n'y a plus ni chaussée ni trottoir ;
+- **conséquence à traiter le jour où une emprise aura du gravier** (parcs de l'agglo,
+  65 km de `chemin` sur le carré 10 km) : il faudra un 2ᵉ masque (+2,67 Mo/cellule,
+  4,8 Go à l'agglo — chiffres du §2) ou lui rendre ce canal.
+
+### 8.5 Ce qui change au relief (aucun objet nouveau, deux suppressions)
+
+Le brief demande **rien de peint** en transition : la frontière nette et les bordures
+3D existantes suffisent. Deux objets existants sont en revanche **retirés là où ils se
+contredisent** :
+
+- **bordures dans la zone** (`BORDURES_DANS_ZONE_PAVEE = False`) : une marche de 12 cm
+  au milieu d'un plateau pavé façade à façade n'a rien à séparer. Les polylignes sont
+  **coupées** à la frontière (aucune n'est créée) ; celles du pourtour restent et font
+  le seuil. **CurbQuads 7 368 → 5 625 (−23,7 %)**, longueur 41 116 → 29 986 m ;
+- **tirets d'axe dans la zone** : idem, une ligne axiale ne se peint pas sur un
+  plateau piétonnier. **AxialDashes 420 → 205 (−51,2 %)**.
+
+### 8.6 Résultat mesuré (proto, 4 cellules)
+
+| | état restauré (V2AV) | V2 (V2B) |
+|---|---:|---:|
+| pavé piéton | 0 m² | **69 962 m²** (7,0 % du km², 28,6 % du corridor public) |
+| polygones de zone | — | **22** (le plus grand 43 899 m² = 62,7 % ; 8 ≥ 1 000 m² = 92,8 % de l'aire) |
+| sommets de la zone | — | 1 178 (dont l'essentiel = façades) |
+| CurbQuads | 7 368 | **5 625** |
+| AxialDashes | 420 | **205** |
+| MaskedCells | 4 | 4 |
+| surfaces NOGREEN | Green = 0 | Green = 0 |
+| végétation | 55 821 inst. / 397 skips / 1 234 fosses | 55 821 / 397 / **1 302** |
+
+Les +68 fosses viennent de l'herbe reprise par le pavé (46 687 → 45 307 m²) : des
+arbres jusque-là jugés « sur pelouse » redeviennent minéraux — direction attendue.
+
+**Palette, mesurée sur `G4_couture_gros_plan` (soleil ET ombre, mêmes poses) :**
+
+| | R | G | B | luminance | R/B |
+|---|---:|---:|---:|---:|---:|
+| dalle, soleil | 188,2 | 181,7 | 168,0 | **182,1** | 1,12 |
+| pavé, soleil | 183,4 | 171,2 | 151,0 | **172,4** | 1,21 |
+| pavé, ombre | 52,7 | 71,8 | 88,0 | 68,9 | 0,60 |
+| dalle, ombre | 34,7 | 56,9 | 76,1 | 53,5 | 0,46 |
+| asphalte, ombre | 31,1 | 49,7 | 68,2 | 47,1 | 0,46 |
+
+Le pavé est **5 % plus sombre que la dalle et plus chaud** (R/B 1,21 vs 1,12), et il
+le reste à l'ombre (0,60 vs 0,46 — pas de « bleu nuit »). C'est la simple
+harmonisation `harmonise_tints` (×0,9101, « hors palette »), **sans le réglage manuel
+du lot A-bis** — lequel avait mesuré l'inverse (pavé lum 184 > dalle 173, jugé trop
+clair). Conclusion : sur ce master, l'harmonisation seule suffit.
+
+### 8.7 Verrous de selftest (7 ajoutés, `--selftest` PASS)
+
+Scène synthétique : rue piétonne de 200 m entre deux rangées de bâtiments distantes de
+12 m (corridor volontairement rétréci de 1,5 m de chaque côté), croisée par une rue
+circulée de 8 m. Vérifient : la zone atteint les **deux** façades (> 80 % de l'aire
+idéale), ne traverse **aucun** mur, divise les sommets par ≥ 5, est **coupée en deux**
+par l'embouchure, coupe **à la bonne distance** de l'axe circulé (4 + marge ± 0,6 m),
+absorbe une composante < 200 m², et rend une zone **vide** sans axe piéton
+(rétro-compatibilité totale).
+
+### 8.8 Ce qu'on apprend pour les matériaux suivants (un par un)
+
+1. **Le redressement est un pipeline, pas un réglage** : fermeture → ouverture → DP →
+   **rattrapage** → recollage aux façades → coupures droites. Sans le rattrapage (4-bis)
+   tout objet redressé rentre de la tolérance dans sa propre zone. À rejouer tel quel
+   pour la prochaine classe.
+2. **Recoller aux façades, jamais au cadastre.** C'est LA règle qui fait la différence
+   entre un plan et une amibe.
+3. **Un seul matériau à la fois, validé avant le suivant.** Le canal A étant pris, le
+   candidat suivant impose de trancher d'abord la question du 2ᵉ masque — c'est une
+   décision de VOLUME (4,8 Go à l'agglo), pas de goût.
+4. **La palette n'a pas besoin de réglage manuel** tant qu'un pack passe par
+   `harmonise_tints` : mesurer d'abord, tweaker seulement si la mesure le demande.
+5. **Le budget de simplicité reste à surveiller** : la zone pavée ajoute un 4ᵉ matériau
+   dans le disque de 20 m aux abords des embouchures. Non mesuré ici (la loi 4 du lot
+   A-ter est partie avec le revert) — à remesurer si le sol se recharge.
+
+## 9. DÉCISION FINALE (2026-08-01) — la différenciation vectorielle du sol est ABANDONNÉE
+
+Après trois itérations (lots A, A-bis/A-ter, V2), le constat est le même à chaque fois : **chaque
+frontière vectorielle nouvelle est une occasion d'échec visuel** (becs de bordure orphelins,
+bandes grignotées au pied des façades, jonctions à trois textures, rampes incohérentes). Le sol
+du jeu revient donc définitivement à ses **3 matériaux** — dalle + asphalte + herringbone, plus
+l'herbe issue du masque, validée de longue date — et l'identité de la ville viendra des **toits et
+des props**, pas du pavage. Seule évolution du sol autorisée à l'avenir : un **fondu continu sans
+frontière** (le polygone piéton redressé du lot V2 est archivé pour ce seul usage). Les leçons et
+l'outillage sont conservés : graphe side-car du réseau, charte du §6, redressement du §8.
