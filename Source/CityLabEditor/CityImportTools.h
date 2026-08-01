@@ -221,6 +221,14 @@ struct FCityStreamedSummary
 	/** J3c point 3 : quads de BORDURE poses (face verticale + chant), toutes rues. */
 	UPROPERTY() int32 CurbQuads = 0;
 
+	/**
+	 * FINITION_SOL V3 : quads de BORDURETTE D'HERBE (meme mecanique et meme materiau
+	 * que la bordure de chaussee, profil reduit 7 / 14 cm). Compteur SEPARE de
+	 * CurbQuads : la bordurette est un ajout, elle ne doit jamais se confondre avec
+	 * la voirie dans les comparaisons de non-regression.
+	 */
+	UPROPERTY() int32 GrassCurbQuads = 0;
+
 	/** J3c point 3 : passages pietons poses (un par noeud chaussee x voie pietonne). */
 	UPROPERTY() int32 Crossings = 0;
 

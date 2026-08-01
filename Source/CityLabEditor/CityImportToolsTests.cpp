@@ -1821,6 +1821,19 @@ void FCityImportToolsSpec::Define()
 				TEXT(R"("crossings":[{"p":[50,50],"d":[1,0],"halfW":3}],)")
 				TEXT(R"("axial":[[30,50,33,50]]})"));
 		};
+		// FINITION_SOL V3 : LE MEME masque, plus une BORDURETTE D'HERBE — un segment
+		// `grassEdges` de 40 m pose loin de la chaussee (y = 80). Masque separe : le
+		// champ absent du masque ci-dessus verrouille du meme coup la
+		// retro-compatibilite (un masque cuit avant la v3 ne pose AUCUNE bordurette).
+		auto WriteMaskHerbe = [WriteJson](const FString& Dir, float CellSizeM)
+		{
+			return WriteJson(FPaths::Combine(Dir, TEXT("sols_0_0.json")),
+				FString::Printf(TEXT(R"({"cell":[0,0],"cellSizeM":%.1f,"origin":[0,0],)"), CellSizeM) +
+				TEXT(R"("curbs":[[[20,47],[80,47]]],)")
+				TEXT(R"("grassEdges":[[[20,80],[60,80]]],)")
+				TEXT(R"("crossings":[{"p":[50,50],"d":[1,0],"halfW":3}],)")
+				TEXT(R"("axial":[[30,50,33,50]]})"));
+		};
 
 		It("sol peint : dalle masquee, ruban de chaussee supprime, pont conserve",
 			[this, MaskedProfile, FreshMaskDir, MakeCellMaterial, WriteCity, WriteMask, SlotPolys]()
@@ -1939,6 +1952,93 @@ void FCityImportToolsSpec::Define()
 					TowardRoad > 0.9f);
 				TestTrue(FString::Printf(TEXT("L'autre regarde le trottoir, -Y (%.2f)"), TowardWalk),
 					TowardWalk < -0.9f);
+			}
+		});
+
+		// -------------------------------------------------- FINITION_SOL V3
+		It("bordurette d'herbe : 3 quads de profil REDUIT, comptes a part, meme materiau",
+			[this, MaskedProfile, FreshMaskDir, MakeCellMaterial, WriteCityNoBridge, WriteMask,
+			 WriteMaskHerbe, SlotPolys, SlotZBounds]()
+		{
+			// 1. Masque SANS grassEdges : aucune bordurette (retro-compatibilite).
+			const FString Dir = FreshMaskDir();
+			WriteMask(Dir, 100.f);
+			MakeCellMaterial(0, 0);
+			const FCityStreamedSummary S0 = UCityImportTools::ImportCityStreamed(
+				WriteCityNoBridge(), FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, MaskedProfile());
+			TestEqual(TEXT("Masque sans grassEdges : aucune bordurette"), S0.GrassCurbQuads, 0);
+			TestEqual(TEXT("Masque sans grassEdges : la bordure de chaussee est intacte"),
+				S0.CurbQuads, 3);
+
+			// 2. Le MEME masque avec un segment `grassEdges` de 40 m.
+			const FString Dir2 = FreshMaskDir();
+			WriteMaskHerbe(Dir2, 100.f);
+			MakeCellMaterial(0, 0);
+			const FCityStreamedSummary S = UCityImportTools::ImportCityStreamed(
+				WriteCityNoBridge(), FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, MaskedProfile());
+
+			TestEqual(TEXT("3 quads pour un segment de bordurette"), S.GrassCurbQuads, 3);
+			TestEqual(TEXT("La bordure de CHAUSSEE n'a pas bouge (compteur separe)"),
+				S.CurbQuads, 3);
+
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
+			if (!TestNotNull(TEXT("SM_Ground_0_0 genere"), Ground))
+			{
+				return;
+			}
+			// MEME materiau de bordure : les deux pierres partagent le slot `curb`.
+			TestEqual(TEXT("Meme materiau : 3 + 3 quads dans le slot curb"),
+				SlotPolys(Ground, TEXT("curb")), 6);
+
+			// PROFIL REDUIT : le chant de la bordurette monte a 7 cm, celui de la
+			// bordure de chaussee a 12 — donc le Z max du slot reste 12 et le Z min
+			// reste le pied enterre a -10 cm, commun aux deux.
+			float ZMin = 0.f, ZMax = 0.f;
+			if (SlotZBounds(Ground, TEXT("curb"), ZMin, ZMax))
+			{
+				TestTrue(FString::Printf(TEXT("Chant le plus haut : la chaussee, 12 cm (%.2f)"), ZMax),
+					FMath::IsNearlyEqual(ZMax, 12.f, 0.05f));
+				TestTrue(FString::Printf(TEXT("Pied enterre a -10 cm (%.2f)"), ZMin),
+					FMath::IsNearlyEqual(ZMin, -10.f, 0.05f));
+			}
+			// Le profil reduit se lit sur les sommets de la bordurette elle-meme :
+			// aucune face de la pierre d'herbe ne monte au-dessus de 7 cm.
+			if (FMeshDescription* Desc = Ground->GetMeshDescription(0))
+			{
+				FStaticMeshAttributes Attr(*Desc);
+				TPolygonGroupAttributesRef<FName> Names = Attr.GetPolygonGroupMaterialSlotNames();
+				TVertexAttributesRef<FVector3f> Pos = Attr.GetVertexPositions();
+				float HautHerbe = -1e9f;
+				int32 NHerbe = 0;
+				for (const FPolygonGroupID G : Desc->PolygonGroups().GetElementIDs())
+				{
+					if (Names[G] != FName(TEXT("curb")))
+					{
+						continue;
+					}
+					for (const FPolygonID P : Desc->GetPolygonGroupPolygons(G))
+					{
+						bool bHerbe = true;
+						float Haut = -1e9f;
+						for (const FVertexInstanceID VI : Desc->GetPolygonVertexInstances(P))
+						{
+							const FVector3f V = Pos[Desc->GetVertexInstanceVertex(VI)];
+							// La bordurette est a y = 8 000 cm, la bordure a y = 4 700.
+							bHerbe = bHerbe && V.Y > 7000.f;
+							Haut = FMath::Max(Haut, V.Z);
+						}
+						if (bHerbe)
+						{
+							++NHerbe;
+							HautHerbe = FMath::Max(HautHerbe, Haut);
+						}
+					}
+				}
+				TestEqual(TEXT("3 polygones appartiennent a la bordurette"), NHerbe, 3);
+				TestTrue(FString::Printf(TEXT("Profil REDUIT : la bordurette culmine a 7 cm (%.2f)"),
+					HautHerbe), FMath::IsNearlyEqual(HautHerbe, 7.f, 0.05f));
 			}
 		});
 

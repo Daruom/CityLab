@@ -706,6 +706,23 @@ namespace
 	// surfaces divergent de quelques centimetres. Enterrer le pied coute zero
 	// triangle et supprime tout risque de jour sous la bordure.
 	constexpr float GMaskCurbSinkCm = 10.f;
+	// LOT FINITION_SOL V3 — LA BORDURETTE D'HERBE.
+	// DOCTRINE : n'importe quelle forme BORDEE lit « amenagement voulu ». Une pelouse
+	// qui meurt sur la dalle sans rien lit « releve d'occupation du sol » ; la meme
+	// pelouse ceinturee d'une pierre lit « pelouse ». C'est ce qui remplace la course
+	// a la peinture parfaite — on arrete de chercher le contour juste, on POSE la
+	// pierre sur le contour qu'on a.
+	// Le decoupage est fait au bake (Tools/j3c_sols_masks.py, liste `grassEdges` :
+	// memes conventions que `curbs`, MINERAL A GAUCHE, hors facades, hors bordures de
+	// chaussee deja posees, hors eau, hors segments < 1,5 m). Ici on ne fait que
+	// poser des quads, avec la MEME mecanique que BuildMaskCurb et le MEME materiau
+	// de bordure (GSurfCurb) — aucun materiau nouveau.
+	// PROFIL REDUIT : une bordurette de pelouse n'est pas une bordure de chaussee.
+	// 7 cm de relief au lieu de 12 (elle ne doit pas se lire comme une marche de
+	// trottoir depuis le ciel) et 14 cm de chant, qui deborde sur la pelouse — c'est
+	// exactement une bordurette de jardin posee au ras de la terre.
+	constexpr float GGrassCurbHeightCm = 7.f;
+	constexpr float GGrassCurbTopWidthCm = 14.f;
 	constexpr float GMaskCrossLiftCm = 4.f;    // passage pieton au-dessus de la peinture
 	constexpr float GMaskDashLiftCm = 6.f;     // tiret au-dessus du passage, sous le chant (12)
 
@@ -722,6 +739,10 @@ namespace
 	struct FGroundMaskCell
 	{
 		TArray<TArray<FVector2D>> Curbs;  // polylignes cm, chaussee A GAUCHE
+		// V3 : contour d'herbe a border. Memes conventions que Curbs, MINERAL a
+		// gauche — donc la face verticale de la pierre regarde le mineral et son
+		// chant deborde sur la pelouse.
+		TArray<TArray<FVector2D>> GrassEdges;
 		TArray<FMaskCrossing> Crossings;
 		TArray<FVector4> Axial;           // (ax, ay, bx, by) en cm
 	};
@@ -770,9 +791,16 @@ namespace
 			return false;
 		}
 		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
-		if (Root->TryGetArrayField(TEXT("curbs"), Arr))
+		// Les polylignes (bordures de chaussee et bordurettes d'herbe) ont exactement
+		// le meme encodage : une seule lecture, deux champs.
+		auto LoadPolylines = [&](const TCHAR* Field, TArray<TArray<FVector2D>>& Dest)
 		{
-			for (const TSharedPtr<FJsonValue>& V : *Arr)
+			const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
+			if (!Root->TryGetArrayField(Field, A))
+			{
+				return;
+			}
+			for (const TSharedPtr<FJsonValue>& V : *A)
 			{
 				TArray<FVector2D> Line;
 				for (const TSharedPtr<FJsonValue>& PV : V->AsArray())
@@ -785,10 +813,14 @@ namespace
 				}
 				if (Line.Num() >= 2)
 				{
-					Out.Curbs.Add(MoveTemp(Line));
+					Dest.Add(MoveTemp(Line));
 				}
 			}
-		}
+		};
+		LoadPolylines(TEXT("curbs"), Out.Curbs);
+		// Champ ABSENT sur un masque cuit avant la v3 : aucune bordurette, et rien
+		// d'autre ne change. Une regeneration sur d'anciens masques reste valide.
+		LoadPolylines(TEXT("grassEdges"), Out.GrassEdges);
 		if (Root->TryGetArrayField(TEXT("crossings"), Arr))
 		{
 			for (const TSharedPtr<FJsonValue>& V : *Arr)
@@ -1604,9 +1636,16 @@ namespace
 	// rives depuis le ciel (deux aretes eclairees differemment) au prix d'un
 	// trottoir qui, au ras du sol, est de plain-pied avec la chaussee. Surhausser
 	// le trottoir demanderait de deformer la dalle : hors perimetre de la maquette.
+	//
+	// V3 : le PROFIL est parametre (hauteur de face, largeur de chant). Les valeurs
+	// par defaut sont la bordure de chaussee historique (12 / 15 cm) ; la bordurette
+	// d'herbe passe le profil reduit GGrassCurb* (7 / 14 cm). Le reste — sens de
+	// parcours (mineral A GAUCHE), pied enterre, UV monde du chant, dos visible — est
+	// rigoureusement le meme code : c'est ce qui garantit que les deux pierres se
+	// lisent comme la meme matiere posee de la meme facon.
 	void BuildMaskCurb(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm,
 		const FDrapeContext& Drape, const FResolvedSurface* Surf, const FVector3f& Tint,
-		int32* OutQuads)
+		int32* OutQuads, float HeightCm = GCurbHeightCm, float TopWidthCm = GCurbTopWidthCm)
 	{
 		if (!Surf || PtsCm.Num() < 2)
 		{
@@ -1645,12 +1684,12 @@ namespace
 			const FVector3f F[4] = {
 				At(A, ZA, ToRoad, 0.f, -GMaskCurbSinkCm),
 				At(B, ZB, ToRoad, 0.f, -GMaskCurbSinkCm),
-				At(B, ZB, ToRoad, 0.f, GCurbHeightCm),
-				At(A, ZA, ToRoad, 0.f, GCurbHeightCm) };
+				At(B, ZB, ToRoad, 0.f, HeightCm),
+				At(A, ZA, ToRoad, 0.f, HeightCm) };
 			const FVector2f FUV[4] = {
 				FVector2f(U0, 0.f), FVector2f(U1, 0.f),
-				FVector2f(U1, (GCurbHeightCm + GMaskCurbSinkCm) * 0.01f),
-				FVector2f(U0, (GCurbHeightCm + GMaskCurbSinkCm) * 0.01f) };
+				FVector2f(U1, (HeightCm + GMaskCurbSinkCm) * 0.01f),
+				FVector2f(U0, (HeightCm + GMaskCurbSinkCm) * 0.01f) };
 			QM.AddPoly(Group, F, 4,
 				FVector3f((float)ToRoad.X, (float)ToRoad.Y, 0.f).GetSafeNormal(), FUV, Tint);
 
@@ -1658,24 +1697,24 @@ namespace
 			//    en phase avec la dalle qui le porte (la bordure est de la meme
 			//    matiere, juste assombrie).
 			const FVector3f C[4] = {
-				At(A, ZA, ToRoad, 0.f, GCurbHeightCm),
-				At(B, ZB, ToRoad, 0.f, GCurbHeightCm),
-				At(B, ZB, ToWalk, GCurbTopWidthCm, GCurbHeightCm),
-				At(A, ZA, ToWalk, GCurbTopWidthCm, GCurbHeightCm) };
+				At(A, ZA, ToRoad, 0.f, HeightCm),
+				At(B, ZB, ToRoad, 0.f, HeightCm),
+				At(B, ZB, ToWalk, TopWidthCm, HeightCm),
+				At(A, ZA, ToWalk, TopWidthCm, HeightCm) };
 			const FVector2f CUV[4] = { WorldUV(C[0]), WorldUV(C[1]), WorldUV(C[2]), WorldUV(C[3]) };
 			QM.AddPoly(Group, C, 4, Up, CUV, Tint);
 
 			// 3. FACE cote trottoir : sans elle la bordure serait un plan sans dos,
 			//    invisible depuis le trottoir.
 			const FVector3f W[4] = {
-				At(B, ZB, ToWalk, GCurbTopWidthCm, GCurbHeightCm),
-				At(A, ZA, ToWalk, GCurbTopWidthCm, GCurbHeightCm),
-				At(A, ZA, ToWalk, GCurbTopWidthCm, -GMaskCurbSinkCm),
-				At(B, ZB, ToWalk, GCurbTopWidthCm, -GMaskCurbSinkCm) };
+				At(B, ZB, ToWalk, TopWidthCm, HeightCm),
+				At(A, ZA, ToWalk, TopWidthCm, HeightCm),
+				At(A, ZA, ToWalk, TopWidthCm, -GMaskCurbSinkCm),
+				At(B, ZB, ToWalk, TopWidthCm, -GMaskCurbSinkCm) };
 			const FVector2f WUV[4] = {
 				FVector2f(U1, 0.f), FVector2f(U0, 0.f),
-				FVector2f(U0, (GCurbHeightCm + GMaskCurbSinkCm) * 0.01f),
-				FVector2f(U1, (GCurbHeightCm + GMaskCurbSinkCm) * 0.01f) };
+				FVector2f(U0, (HeightCm + GMaskCurbSinkCm) * 0.01f),
+				FVector2f(U1, (HeightCm + GMaskCurbSinkCm) * 0.01f) };
 			QM.AddPoly(Group, W, 4,
 				FVector3f((float)ToWalk.X, (float)ToWalk.Y, 0.f).GetSafeNormal(), WUV, Tint);
 
@@ -7322,6 +7361,17 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				BuildMaskCurb(GetIn(GroundCells, Line[0], Cell, bLinearColors, bWorldUVs),
 					Line, Drape, CurbSurf, Tint, &Summary.CurbQuads);
 			}
+			// V3 : LA BORDURETTE D'HERBE. Meme mecanique, MEME materiau de bordure,
+			// profil reduit (7 / 14 cm au lieu de 12 / 15). Elle vit dans les memes
+			// cellules de rubans que la bordure de chaussee — une pierre n'a rien a
+			// faire dans la dalle porteuse. Compteur SEPARE : c'est ce qui permet de
+			// juger le volume pose sans le confondre avec celui de la voirie.
+			for (const TArray<FVector2D>& Line : Data.GrassEdges)
+			{
+				BuildMaskCurb(GetIn(GroundCells, Line[0], Cell, bLinearColors, bWorldUVs),
+					Line, Drape, CurbSurf, Tint, &Summary.GrassCurbQuads,
+					GGrassCurbHeightCm, GGrassCurbTopWidthCm);
+			}
 			for (const FMaskCrossing& Site : Data.Crossings)
 			{
 				const float Zcm = Drape.GroundZ(Site.PosCm.X, Site.PosCm.Y) + GMaskCrossLiftCm;
@@ -7338,9 +7388,9 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			}
 		}
 		UE_LOG(LogCityImport, Display,
-			TEXT("Maquette du sol : %d cellules masquees, %d rubans de chaussee supprimes, %d ponts conserves, %d quads de bordure, %d passages, %d tirets axiaux."),
+			TEXT("Maquette du sol : %d cellules masquees, %d rubans de chaussee supprimes, %d ponts conserves, %d quads de bordure, %d quads de bordurette d'herbe, %d passages, %d tirets axiaux."),
 			MaskCells.Num(), Summary.GroundRibbonsSkipped, Summary.BridgeRibbons,
-			Summary.CurbQuads, Summary.Crossings, Summary.AxialDashes);
+			Summary.CurbQuads, Summary.GrassCurbQuads, Summary.Crossings, Summary.AxialDashes);
 	}
 
 	// --- Dalles de sol PEINTES : grilles 12x12 par cellule, sommets teintes par

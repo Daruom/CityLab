@@ -140,43 +140,74 @@ HERBE_SIMPLIFY_M = 0.55
 #    trou de batiment mettrait de la pelouse sur un toit). Le seuil est pose au-dessus
 #    de ces deux cas mesures pour rester utile ailleurs qu'au centre de Toulouse.
 HERBE_TROU_M2 = 50.0
+
+# --- HERBE V3 (lot FINITION_SOL V3, 2026-08-01). Verdict utilisateur sur la v2 :
+# « pas tres beau ». Trois griefs, trois reponses, et UN RETRAIT.
 #
-# 3. REGLE DE COMPARTIMENT — la reponse a « epouser la forme parfaite ».
-#    On partitionne l'espace en ILOTS delimites par des frontieres REELLES et par
-#    elles seules : chaussee, voirie privee, gravier, emprise batie, la frontiere du
-#    CORRIDOR (ce qui separe le trottoir public de l'interieur d'une parcelle) et la
-#    LIMITE DE PARCELLE cadastrale — un parc EST une parcelle, et c'est jusqu'a SA
-#    limite que l'herbe doit aller. Un ilot dont l'herbe couvre deja au moins
-#    HERBE_COMPART_TAUX est peint jusqu'a ses limites ; les autres ne bougent pas.
+# RETRAIT : LA REGLE DE COMPARTIMENT ET SON HALO DE 80 m SONT SUPPRIMES.
+#   Ils remplissaient un ilot majoritairement vert jusqu'a ses limites, y compris
+#   jusqu'a des LIMITES CADASTRALES INVISIBLES au rendu (aucun mur, aucune bordure a
+#   cet endroit) : le remplissage s'arretait sur une frontiere que l'oeil ne peut pas
+#   justifier. Ils coutaient en plus 35 s de cuisson sur 49 s (le halo doublait le
+#   calcul des classes) — ~80 min a 400 cellules au lieu de ~24. Le code est retire,
+#   pas neutralise : `compartiments()` et `remplir_compartiments()` n'existent plus.
+#   MESURE DU RETRAIT (km2 proto) : herbe 53 749 -> 51 186 m2, et surtout
+#   58 -> 41 fragments, dont 22 -> 4 en dessous de 15 m2 (les fils de 1 cm ouverts
+#   aux limites de parcelle etaient une fabrique a miettes).
 #
-#    CALIBRATION MESUREE (km2 proto, 4 cellules) — la parcelle change tout :
-#      variante            0,60      0,65      0,70      0,75      0,80      0,90
-#      sans parcelle    4 539 m2  2 009 m2    521 m2    521 m2    340 m2    208 m2
-#      AVEC parcelle    3 863 m2  3 750 m2  2 321 m2  2 099 m2  1 449 m2    384 m2
-#    Sans la parcelle la regle ne fait presque rien (521 m2) ; avec, elle complete
-#    chaque parcelle deja majoritairement verte (2 321 m2) — c'est ce que montre le
-#    rendu de diagnostic (work/FINITION_SOL/diag/variante_*.png) : des liseres et des
-#    encoches qui ferment la forme, pas des blocs.
-#    Le seuil est pose a 0,70 par TROIS mesures concordantes :
-#      a. sous 0,65, le remplissage attrape des COURS BATIES entieres (verifie a
-#         l'oeil sur le rendu : la tache prend la forme decoupee des cours) ;
-#      b. les allees : sous 0,65 la regle mangerait 53 m de sentiers BD TOPO, a 0,70
-#         elle n'en mange AUCUN ;
-#      c. la distribution des taux par ilot (famille hors-corridor, >= 200 m2) est
-#         quasi vide entre 0,62 et 0,69 : le seuil n'est pas sensible a +/- 5 %.
-HERBE_COMPART_TAUX = 0.70
-#    Un ilot plus petit que ca n'est pas un compartiment, c'est une miette de decoupe.
-HERBE_COMPART_AIRE_MIN_M2 = 20.0
-#    HALO : l'ilot est evalue sur une fenetre ELARGIE, pas sur le fragment que la
-#    cellule en voit. Sans ce halo, un parc a cheval sur deux cellules recoit deux
-#    taux differents et donc deux decisions differentes -> une COUTURE rectiligne
-#    d'herbe sur la grille de 500 m. Mesure du piege : l'ilot [-317,-452] passe de
-#    0,710 (tronque par la cellule) a moins de 0,70 (evalue en entier) — la decision
-#    basculait. 80 m couvre un ilot urbain francais typique.
-HERBE_COMPART_HALO_M = 80.0
-#    Epaisseur du fil retire aux limites de parcelle pour separer les ilots, puis
-#    rendu au remplissage : 1 cm, soit 1/49e de texel — invisible a la cuisson.
-HERBE_COMPART_FIL_M = 0.01
+# 1. MIETTES. Un fragment d'herbe isole plus petit que ce seuil n'est pas une
+#    pelouse : c'est un confetti de releve. Regle SYMETRIQUE du bouchage de trous
+#    (HERBE_TROU_M2) : sous le plancher de motif de la charte du sol, une tache ne
+#    porte aucune information de forme. CALIBRE PAR LA DISTRIBUTION MESUREE : sur le
+#    proto, les fragments font 0,2 / 0,2 / 0,3 / 1,4 m2 puis SAUTENT a 92,5 m2. Le
+#    seuil ne tombe donc pas dans une queue de distribution mais dans un VIDE de
+#    90 m2 : tout choix entre 2 et 90 m2 donne exactement le meme resultat. 15 m2 est
+#    pose au milieu de la fourchette du brief, loin des deux bords du vide.
+HERBE_MIETTE_M2 = 15.0
+#
+# 2. REGULARISATION DU CONTOUR. Une frontiere OCS GE est un RELEVE : elle gigote a
+#    l'echelle du metre sans qu'aucun objet de la ville ne le justifie, et ca se lit
+#    comme une amibe. On decime le contour FRANCHEMENT (Douglas-Peucker, donc angles
+#    nets et segments longs) AVANT l'accostage — l'accostage vient ensuite recoller
+#    le contour regularise sur les frontieres reelles, et la re-soustraction finale
+#    garantit zero debord.
+#    CALIBRATION MESUREE (4 cellules, sommets / longueur moyenne de segment / ecart
+#    max au contour d'origine) :
+#      0,55 m (v2) :  969 sommets,  7,5 m,  0,54 m      1,25 m :  592,  12,3 m, 1,53 m
+#      0,80 m      :  856 sommets,  8,5 m,  1,03 m      1,50 m :  523,  14,0 m, 2,16 m
+#      1,00 m      :  714 sommets, 10,2 m,  1,53 m      2,00 m :  443,  16,6 m, 2,70 m
+#    1,25 m est retenu : c'est la valeur qui donne les segments les PLUS LONGS
+#    (+21 % sur 1,00 m) SANS augmenter l'ecart maximal (1,53 m dans les deux cas,
+#    soit 3 texels de masque). Au-dela, l'ecart part a 2,2 m et le contour commence a
+#    quitter la pelouse. L'aire ne bouge que de +1,1 %.
+HERBE_REGUL_M = 1.25
+#
+# 3. BORDURETTE 3D — le coeur de la v3. DOCTRINE : n'importe quelle forme BORDEE lit
+#    « amenagement voulu ». Une pelouse qui meurt sur la dalle sans rien lit
+#    « releve » ; la meme pelouse ceinturee d'une pierre lit « pelouse ». C'est ca qui
+#    remplace la course a la peinture parfaite — on arrete de chercher le contour
+#    juste, on POSE la pierre sur le contour qu'on a.
+#    Le bake emet la liste `grassEdges` (memes conventions que `curbs` : polylignes en
+#    metres, MINERAL A GAUCHE du sens de parcours) ; le C++ y pose le meme profil que
+#    BuildMaskCurb, en plus bas (relief 7 cm au lieu de 12, chant 14 cm), avec le
+#    MATERIAU DE BORDURE EXISTANT — aucun materiau nouveau.
+#    QUATRE EXCLUSIONS, toutes mesurees :
+#      a. le long des FACADES : l'herbe meurt sur le mur, une pierre au pied d'un mur
+#         est un artefact de decoupe (43,0 % du contour du proto est du mur) ;
+#      b. la ou une BORDURE DE CHAUSSEE est deja posee : pas de double pierre. Le test
+#         porte sur les polylignes `curbs` REELLEMENT emises pour la cellule, pas sur
+#         la frontiere de chaussee — la frontiere est coupee (bati, bout pendant,
+#         autoroutier) a des endroits ou aucune pierre n'existe et ou la bordurette a
+#         donc sa place ;
+#      c. l'EAU : une berge n'est pas un trottoir ;
+#      d. les segments plus courts que GRASS_EDGE_MIN_LEN_M : meme plancher que les
+#         bordures de chaussee (CURB_MIN_LEN_M) — un bout de pierre de 80 cm est un
+#         artefact de decoupe, pas un amenagement.
+#    MESURE (4 cellules) : contour 6 846 m -> 2 628 m retenus en 111 segments
+#    (23,7 m de moyenne), 9 m seulement ecartes par le plancher de longueur.
+GRASS_EDGE_CLEAR_M = 0.40   # rayon de silence autour du bati, des bordures et de l'eau
+GRASS_EDGE_MIN_LEN_M = 1.5  # = CURB_MIN_LEN_M : meme plancher physique
+GRASS_EDGE_SIMPLIFY_M = 0.15  # = CURB_SIMPLIFY_M : la polyligne maillee, pas le masque
 
 # Natures BD TOPO qui ne portent PAS de bordure : sur autoroute et bretelle, la
 # chaussee finit en accotement, pas en trottoir.
@@ -203,6 +234,25 @@ DASH_MIN_WIDTH_M = 5.5
 # Mesure sur le km2 proto : 53 troncons « Restreint aux ayants droit » sur 509, dont
 # 16 portaient des tirets (859 m d'axe). Les 456 troncons « Libre » ne bougent pas.
 ACCES_SANS_AXIALE = {"restreint aux ayants droit"}
+# --- V3 : LA REGLE SE DECIDE PAR RUE, PAS PAR TRONCON.
+# Verdict utilisateur sur la v2 : « Alsace-Lorraine melange des troncons ayants-droit
+# et Libre dans la MEME rue -> des tirets en pointilles par segments ». Mesure : la
+# rue d'Alsace-Lorraine du proto compte 18 troncons, 661,6 m « ayants droit » et
+# 215,1 m « Libre » — dont 136,5 m de « Libre » EN PLEIN MILIEU de la rue, qui
+# portaient donc des tirets isoles entre deux tronces nus. Une rue est un objet
+# UNIQUE : son regime se decide sur l'ensemble.
+# GROUPE = troncons de MEME NOM de voie, connexes par leurs noeuds. Le nom vient de
+# BD TOPO (`nom_voie_ban_gauche`, repli `nom_collaboratif_gauche`) : sur le km2 proto
+# il couvre 96,5 % de la longueur et 69 / 69 des troncons eligibles aux tirets. La
+# connexite evite de fusionner deux morceaux homonymes separes par la ville.
+# REPLI SANS NOM (petites communes, donnee incomplete) : chainage geometrique au
+# noeud, meme nature et largeur a AXIAL_RUE_LARGEUR_TOL_M pres, COUPE aux carrefours
+# (un noeud partage par 3 troncons ou plus n'enchaine pas) — c'est-a-dire exactement
+# la definition d'une rue quand on n'a pas son nom.
+# DECISION : si la MAJORITE DE LA LONGUEUR du groupe est « restreinte aux ayants
+# droit », le groupe entier perd ses tirets. Sinon il les garde tous.
+AXIAL_RUE_MAJORITE = 0.50
+AXIAL_RUE_LARGEUR_TOL_M = 1.0
 # Deux sentiers OSM traversent souvent la meme rue a quelques metres : un seul
 # passage pieton par rayon. Un vrai carrefour garde ses passages (un par branche,
 # separes de plus que ca).
@@ -438,6 +488,11 @@ def charger_routes_bdtopo(fen):
             # Qui a le droit de rouler la : sert a la regle nationale de ligne axiale
             # (ACCES_SANS_AXIALE). Normalise en ASCII minuscule comme la nature.
             "acces": acces,
+            # V3 : le NOM de la voie regroupe les troncons en RUES. `nom_voie_ban_gauche`
+            # d'abord (adresse BAN, la plus complete), repli sur le nom collaboratif.
+            # Vide = repli sur le chainage geometrique (cf. rues_de_troncons).
+            "nom": (C.norm(tr.get("nom_voie_ban_gauche"))
+                    or C.norm(tr.get("nom_collaboratif_gauche")) or ""),
         }
         if rec["pont"]:
             stats["pont"] += 1
@@ -627,88 +682,161 @@ def classes_de_cellule(zone, parcelles, eaux, routes, batis=None):
     return corridor, chaussee, privee, gravier, u_bati
 
 
-def compartiments(zone_eval, corridor, chaussee, privee, gravier, u_bati, parcelles):
-    """ILOTS de la regle de compartiment (herbe v2) : les composantes connexes de
-    l'espace libre, decoupe par des frontieres REELLES et par elles seules.
+def polygones(g):
+    """Les composantes POLYGONALES d'une geometrie shapely, et rien d'autre.
 
-    Bornes, dans l'ordre ou elles sont posees :
-      - chaussee, voirie privee, gravier, emprise batie : ce qui est deja peint ou
-        bati ne fait partie d'aucun compartiment ;
-      - la frontiere du CORRIDOR : elle separe le trottoir PUBLIC de l'interieur des
-        parcelles. Sans elle, un parc et le trottoir qui en fait le tour forment un
-        seul ilot, et remplir l'ilot mettrait de la pelouse sur le trottoir ;
-      - la LIMITE DE PARCELLE cadastrale : un parc EST une parcelle. C'est la borne
-        qui fait toute la difference a la mesure (521 m2 sans, 2 321 m2 avec).
-
-    Rend (ilots, libre) : `libre` sert a re-fermer les fils de 1 cm ouverts aux
-    limites de parcelle une fois les ilots retenus."""
-    bornes = [g for g in (chaussee, privee, gravier, u_bati)
-              if g is not None and not g.is_empty]
-    libre = C.valide(zone_eval.difference(unary_union(bornes))) if bornes else zone_eval
-    if libre.is_empty:
-        return [], libre
-    fams = []
-    if corridor is not None and not corridor.is_empty:
-        fams.append(C.valide(libre.intersection(corridor)))
-        hors = C.valide(libre.difference(corridor))
-    else:
-        hors = libre
-    if parcelles:
-        try:
-            fil = unary_union([p.boundary for p in parcelles]).buffer(HERBE_COMPART_FIL_M)
-            hors = C.valide(hors.difference(fil))
-        except Exception:
-            pass
-    fams.append(hors)
-    ilots = []
-    for fam in fams:
-        if fam is None or fam.is_empty:
-            continue
-        for isl in getattr(fam, "geoms", [fam]):
-            if (isl.is_empty or isl.geom_type != "Polygon"
-                    or isl.area < HERBE_COMPART_AIRE_MIN_M2):
-                continue
-            ilots.append(isl)
-    return ilots, libre
+    `C.valide` peut rendre une GeometryCollection (un polygone qui touche un autre
+    par un point produit un fil de dimension 1) : le contour d'une telle collection
+    est VIDE, et tout ce qui lit le contour de l'herbe en sort silencieusement a
+    zero. Piege paye en v3 sur la cellule -1,+0 (10 417 m2 d'herbe, contour mesure a
+    0 m). Passer par ici est obligatoire pour tout ce qui parcourt l'herbe."""
+    if g is None or g.is_empty:
+        return []
+    return [p for p in getattr(g, "geoms", [g])
+            if p.geom_type == "Polygon" and not p.is_empty]
 
 
-def remplir_compartiments(herbe, herbe_ref, ilots, libre):
-    """REGLE DE COMPARTIMENT : un ilot dont l'herbe couvre deja au moins
-    HERBE_COMPART_TAUX de sa surface est peint herbe JUSQU'A SES LIMITES ; un ilot
-    minoritaire (une place, une cour, un parvis avec deux carres de pelouse) n'est
-    pas touche du tout.
+def contour_de(g):
+    """Contour (exterieur + trous) des composantes polygonales, en MultiLineString."""
+    ls = []
+    for p in polygones(g):
+        ls.append(LineString(p.exterior.coords))
+        for r in p.interiors:
+            ls.append(LineString(r.coords))
+    return unary_union(ls) if ls else LineString()
 
-    Le taux se mesure sur `herbe_ref` — l'herbe BRUTE issue du releve, avant
-    accostage et avant remplissage : sinon la regle se nourrirait de son propre
-    resultat d'une passe a l'autre. `herbe_ref` est calculee sur la fenetre ELARGIE
-    (halo), donc l'ilot est juge sur son extension reelle et deux cellules voisines
-    prennent la MEME decision (pas de couture sur la grille de 500 m)."""
-    remplir_compartiments.dernier = {"ilots": 0, "remplis": 0, "gain_m2": 0.0}
-    if herbe is None or not ilots:
+
+def retirer_miettes(herbe, aire_min=None):
+    """MIETTES (herbe v3) : un fragment d'herbe isole plus petit que `aire_min`
+    n'est pas une pelouse, c'est un confetti de releve — on le retire.
+
+    Regle SYMETRIQUE de `boucher_trous` : sous le plancher de motif, ni un trou ni
+    une tache ne portent d'information de forme. Le seuil est calibre sur la
+    distribution mesuree des fragments (cf. HERBE_MIETTE_M2 : un vide de 90 m2
+    separe les confettis des vraies pelouses)."""
+    retirer_miettes.dernier = {"fragments": 0, "retires": 0, "aire_m2": 0.0}
+    amin = HERBE_MIETTE_M2 if aire_min is None else aire_min
+    if herbe is None or herbe.is_empty or amin <= 0.0:
         return herbe
     gardes = []
-    for isl in ilots:
-        a = isl.area
-        if a <= 0.0:
+    perdu = 0.0
+    for p in polygones(herbe):
+        retirer_miettes.dernier["fragments"] += 1
+        if p.area < amin:
+            retirer_miettes.dernier["retires"] += 1
+            perdu += p.area
             continue
-        try:
-            h = isl.intersection(herbe_ref).area if not herbe_ref.is_empty else 0.0
-        except Exception:
-            continue
-        if h >= HERBE_COMPART_TAUX * a:
-            gardes.append(isl)
-    remplir_compartiments.dernier["ilots"] = len(ilots)
-    remplir_compartiments.dernier["remplis"] = len(gardes)
-    if not gardes:
+        gardes.append(p)
+    retirer_miettes.dernier["aire_m2"] = round(perdu, 2)
+    if retirer_miettes.dernier["retires"] == 0:
         return herbe
-    u = C.valide(unary_union(gardes))
-    # Les fils de 1 cm ouverts aux limites de parcelle sont rendus : deux parcelles
-    # voisines toutes deux retenues doivent redevenir jointives. Le buffer est borne
-    # par `libre`, donc il ne peut pas mordre une frontiere reelle.
-    u = C.valide(u.buffer(HERBE_COMPART_FIL_M * 1.5).intersection(libre))
-    gain = u.difference(herbe).area if not herbe.is_empty else u.area
-    remplir_compartiments.dernier["gain_m2"] = round(gain, 1)
-    return C.valide(herbe.union(u)) if not herbe.is_empty else u
+    return C.valide(unary_union(gardes)) if gardes else herbe.difference(herbe)
+
+
+def regulariser_herbe(herbe, tol=None):
+    """REGULARISATION FRANCHE du contour d'herbe (herbe v3), AVANT l'accostage.
+
+    Douglas-Peucker : il ne lisse pas, il DECIME — les sommets qui restent sont des
+    sommets d'origine et les angles restent nets. C'est ce qu'on veut : un contour
+    dessine a la regle, pas un contour arrondi. L'accostage qui suit recolle ce
+    contour sur les frontieres reelles, et la re-soustraction finale d'`accoster_herbe`
+    garantit qu'aucun debord ne survit a l'operation."""
+    regulariser_herbe.dernier = {"avant": 0, "apres": 0}
+    t = HERBE_REGUL_M if tol is None else tol
+    if herbe is None or herbe.is_empty or t <= 0.0:
+        return herbe
+    regulariser_herbe.dernier["avant"] = sum(
+        len(p.exterior.coords) + sum(len(r.coords) for r in p.interiors)
+        for p in polygones(herbe))
+    out = C.valide(herbe.simplify(t, preserve_topology=True))
+    regulariser_herbe.dernier["apres"] = sum(
+        len(p.exterior.coords) + sum(len(r.coords) for r in p.interiors)
+        for p in polygones(out))
+    return out
+
+
+def grass_edges(herbe, cell_box, curbs, u_bati=None, u_eau=None):
+    """BORDURETTE (herbe v3) : les polylignes du contour d'herbe FINAL sur lesquelles
+    le C++ posera une pierre basse. Memes conventions que `curb_lines` : metres,
+    MINERAL A GAUCHE du sens de parcours (le C++ pose la face verticale a gauche et
+    le chant vers la droite, donc la face regarde le mineral et le chant deborde de
+    14 cm sur la pelouse — exactement une bordurette de jardin).
+
+    Exclusions (cf. GRASS_EDGE_*) : les facades, les bordures de chaussee DEJA
+    posees (les polylignes `curbs` de la cellule, pas la frontiere de chaussee), les
+    berges, et les segments plus courts que le plancher physique. Le contour est
+    d'abord ramene a la CELLULE : la partie qui vit dans la marge de calcul
+    appartient a la cellule voisine."""
+    grass_edges.dernier = {"contour_m": 0.0, "retenu_m": 0.0, "segments": 0,
+                           "courts_m": 0.0}
+    if herbe is None or herbe.is_empty:
+        return []
+    bnd = contour_de(herbe)
+    if bnd.is_empty:
+        return []
+    grass_edges.dernier["contour_m"] = round(bnd.length, 1)
+    coupes = []
+    if u_bati is not None and not u_bati.is_empty:
+        coupes.append(u_bati.buffer(GRASS_EDGE_CLEAR_M))
+    if u_eau is not None and not u_eau.is_empty:
+        coupes.append(u_eau.buffer(GRASS_EDGE_CLEAR_M))
+    lignes_curb = [LineString(l) for l in (curbs or []) if len(l) > 1]
+    if lignes_curb:
+        coupes.append(unary_union(lignes_curb).buffer(GRASS_EDGE_CLEAR_M))
+    if coupes:
+        bnd = bnd.difference(unary_union(coupes))
+    bnd = bnd.intersection(cell_box)
+    if bnd.is_empty:
+        return []
+    try:
+        merged = linemerge(bnd)
+    except Exception:
+        merged = bnd
+    brut = [g for g in (merged.geoms if merged.geom_type.startswith("Multi") or
+                        merged.geom_type == "GeometryCollection" else [merged])
+            if g.geom_type == "LineString"]
+    pre = prep(herbe)
+    out = []
+    for g in brut:
+        if g.length < GRASS_EDGE_MIN_LEN_M:
+            grass_edges.dernier["courts_m"] += g.length
+            continue
+        s = g.simplify(GRASS_EDGE_SIMPLIFY_M, preserve_topology=False)
+        cs = retirer_pointes(list(s.coords))
+        if len(cs) < 2:
+            continue
+        s = LineString(cs)
+        if s.length < GRASS_EDGE_MIN_LEN_M:
+            grass_edges.dernier["courts_m"] += s.length
+            continue
+        # ORIENTATION : on SONDE comme curb_lines (le sens des anneaux shapely ne
+        # survit pas a la decoupe). Ici c'est l'HERBE qui doit tomber a DROITE.
+        cs = list(s.coords)
+        votes = 0
+        for i in range(len(cs) - 1):
+            ax, ay = cs[i]
+            bx, by = cs[i + 1]
+            dx, dy = bx - ax, by - ay
+            d = math.hypot(dx, dy)
+            if d < 1e-6:
+                continue
+            dx, dy = dx / d, dy / d
+            mx, my = (ax + bx) * 0.5, (ay + by) * 0.5
+            gauche = pre.contains(Point(mx - dy * 0.10, my + dx * 0.10))
+            droite = pre.contains(Point(mx + dy * 0.10, my - dx * 0.10))
+            if droite and not gauche:
+                votes += 1
+            elif gauche and not droite:
+                votes -= 1
+        if votes < 0:
+            cs.reverse()
+        out.append(cs)
+        grass_edges.dernier["retenu_m"] += s.length
+    grass_edges.dernier["segments"] = len(out)
+    grass_edges.dernier["retenu_m"] = round(grass_edges.dernier["retenu_m"], 1)
+    grass_edges.dernier["courts_m"] = round(grass_edges.dernier["courts_m"], 1)
+    return out
+
 
 
 def boucher_trous(herbe, obstacles, aire_max=None):
@@ -783,7 +911,29 @@ def accoster_herbe(herbe, chaussee, privee, gravier, u_bati=None, u_eau=None):
     mineral = C.valide(unary_union(peints)) if peints else None
     if quai is not None and not quai.is_empty and HERBE_ACCOSTAGE_M > 0.0:
         r = HERBE_ACCOSTAGE_M * 0.5
-        u = C.valide(unary_union([herbe, quai]))
+        # V3 : LE QUAI EST BORNE AU VOISINAGE DE L'HERBE (4r = 4 m).
+        # Raison premiere, mesuree : le quai contient l'union des 2 611 emprises
+        # baties (l'accostage des facades, valide en v2) ; fermer sur cette union
+        # entiere coutait 6,5 s pour la seule cellule -1,-1, soit l'essentiel des
+        # 30,5 s du bake v3. Borne a 4 m, le bake retombe a 14,7 s pour 4 cellules —
+        # le niveau v1, ce que le lot exigeait.
+        # Effet mesure sur le resultat (ce n'est PAS une operation neutre, et c'est
+        # tant mieux) : herbe 50 107 -> 50 017 m2 (-0,18 %) et 60 -> 39 fragments.
+        # Ce qui disparait, ce sont les comblements qui TOUCHAIENT l'herbe par un
+        # seul point et couraient ensuite le long d'un mur a 10 ou 50 m de la
+        # pelouse — c'est-a-dire des miettes fabriquees par l'accostage lui-meme
+        # (miettes retirees : 23 avant la borne, 2 apres). Un accostage borne a 2 m
+        # ne doit pas produire de langue a 50 m : la borne remet la regle en accord
+        # avec son propre enonce.
+        try:
+            proche = C.valide(quai.intersection(herbe.buffer(4.0 * r)))
+            if not proche.is_empty:
+                quai_acc = proche
+            else:
+                quai_acc = quai
+        except Exception:
+            quai_acc = quai
+        u = C.valide(unary_union([herbe, quai_acc]))
         ferme = C.valide(u.buffer(r).buffer(-r))
         comble = C.valide(ferme.difference(u))
         if not comble.is_empty:
@@ -1068,26 +1218,101 @@ def junction_points(routes):
     return [(k[0] / 10.0, k[1] / 10.0) for k, n in compte.items() if n >= 3]
 
 
+def rues_de_troncons(routes):
+    """Regroupe les troncons en RUES et rend, pour chaque troncon, l'index de sa rue.
+
+    Deux troncons sont dans la meme rue s'ils portent le MEME NOM de voie et
+    partagent un noeud (transitivement). Sans nom, on chaine geometriquement : meme
+    noeud, meme nature, largeur a AXIAL_RUE_LARGEUR_TOL_M pres, et JAMAIS a travers
+    un carrefour (noeud partage par 3 troncons ou plus) — sinon deux rues qui se
+    croisent deviendraient une seule.
+
+    Union-find sur les indices ; la cle de noeud est arrondie au decimetre, la meme
+    que junction_points et dangling_ends."""
+    n = len(routes)
+    parent = list(range(n))
+
+    def trouve(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def unir(i, j):
+        a, b = trouve(i), trouve(j)
+        if a != b:
+            parent[b] = a
+
+    noeuds = {}
+    for i, r in enumerate(routes):
+        cs = list(r["line"].coords)
+        for p in (cs[0], cs[-1]):
+            noeuds.setdefault((round(p[0] * 10), round(p[1] * 10)), []).append(i)
+    for k, idx in noeuds.items():
+        degre = len(idx)
+        for a in range(len(idx)):
+            for b in range(a + 1, len(idx)):
+                ra, rb = routes[idx[a]], routes[idx[b]]
+                na, nb = ra.get("nom") or "", rb.get("nom") or ""
+                if na and nb:
+                    if na == nb:
+                        unir(idx[a], idx[b])
+                    continue
+                # Repli sans nom : chainage geometrique, coupe aux carrefours.
+                if degre >= 3:
+                    continue
+                if (ra.get("nature") == rb.get("nature")
+                        and abs(float(ra.get("largeur") or 0.0)
+                                - float(rb.get("largeur") or 0.0)) <= AXIAL_RUE_LARGEUR_TOL_M):
+                    unir(idx[a], idx[b])
+    return [trouve(i) for i in range(n)]
+
+
+def rues_sans_axiale(routes):
+    """Ensemble des indices de RUE dont la MAJORITE DE LA LONGUEUR est « restreinte
+    aux ayants droit » : ces rues perdent leur ligne axiale EN ENTIER.
+
+    Une rue est un objet unique — le regime d'acces se lit sur la rue, pas sur le
+    decoupage BD TOPO. Rend aussi la table des groupes pour le journal et les
+    verrous."""
+    groupes = rues_de_troncons(routes)
+    tot = {}
+    ayd = {}
+    for i, r in enumerate(routes):
+        g = groupes[i]
+        L = float(r["line"].length)
+        tot[g] = tot.get(g, 0.0) + L
+        if r.get("acces") in ACCES_SANS_AXIALE:
+            ayd[g] = ayd.get(g, 0.0) + L
+    muettes = {g for g, L in tot.items()
+               if L > 0.0 and ayd.get(g, 0.0) > AXIAL_RUE_MAJORITE * L}
+    rues_sans_axiale.dernier = {"groupes": len(tot), "muettes": len(muettes),
+                                "longueur_muette_m": round(sum(tot[g] for g in muettes), 1)}
+    return groupes, muettes
+
+
 def axial_dashes(routes, chaussee, cell_box, jonctions):
     """Tirets de ligne axiale : voies >= 2, dans la chaussee, a plus de 8 m d'un
-    carrefour, et sur une voie OUVERTE a la circulation. Le decoupage est fait ICI
+    carrefour, et sur une RUE ouverte a la circulation. Le decoupage est fait ICI
     (le C++ ne fait que poser des quads)."""
     if chaussee.is_empty:
         return []
+    groupes, muettes = rues_sans_axiale(routes)
     pre = prep(chaussee)
     jx = np.array([p[0] for p in jonctions], dtype=np.float64) if jonctions else None
     jy = np.array([p[1] for p in jonctions], dtype=np.float64) if jonctions else None
     out = []
     period = DASH_ON_M + DASH_OFF_M
-    for r in routes:
+    for i, r in enumerate(routes):
         if (r["pont"] or r["etroit"] or r["voies"] < 2
                 or r["largeur"] < DASH_MIN_WIDTH_M):
             continue
-        # REGLE NATIONALE : pas d'axe peint sur une voie « restreinte aux ayants
-        # droit » (rue pietonne a acces riverains). `.get` et non `[]` : les scenes
-        # synthetiques des self-tests n'ont pas cet attribut, et une route sans
-        # attribut reste traitee comme ouverte.
-        if r.get("acces") in ACCES_SANS_AXIALE:
+        # REGLE NATIONALE, PAR RUE (v3) : pas d'axe peint sur une rue dont la majorite
+        # de la longueur est « restreinte aux ayants droit » — la decision porte sur
+        # la RUE entiere, jamais sur un troncon isole (sinon : tirets en pointilles).
+        # Une route sans l'attribut reste ouverte : la regle n'efface jamais un
+        # marquage par silence de la donnee.
+        if groupes[i] in muettes:
             continue
         ln = r["line"]
         L = ln.length
@@ -1153,35 +1378,31 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
         return g
 
     herbe = herbe_brute(zone, loc_verts, chaussee, privee, gravier, u_bati, u_eau)
-    compart = {"ilots": 0, "remplis": 0, "gain_m2": 0.0}
     boucher_trous.dernier = {"trous": 0, "combles": 0, "aire_m2": 0.0}
-    aire_releve = herbe.intersection(cell_box).area     # avant toute regle v2
-    aire_compart = aire_releve
+    regulariser_herbe.dernier = {"avant": 0, "apres": 0}
+    retirer_miettes.dernier = {"fragments": 0, "retires": 0, "aire_m2": 0.0}
+    aire_releve = herbe.intersection(cell_box).area     # le releve nu, avant tout
+    aire_regul = aire_releve
     if loc_verts:
-        # --- REGLE DE COMPARTIMENT, evaluee sur une fenetre ELARGIE (halo) pour que
-        # deux cellules voisines prennent la MEME decision sur un ilot a cheval.
-        if HERBE_COMPART_TAUX > 0.0 and HERBE_COMPART_HALO_M > 0.0:
-            hm = HERBE_COMPART_HALO_M
-            zh = box(x0 - hm, y0 - hm, x0 + CELL_M + hm, y0 + CELL_M + hm)
-            h_parc = [p for p in parcelles if p.intersects(zh)]
-            h_eau = [e for e in eaux if e.intersects(zh)]
-            h_rou = [r for r in routes if r["line"].intersects(zh)]
-            h_bat = [b for b in (batis or []) if b.intersects(zh)]
-            h_ver = [v for v in (verts or []) if v.intersects(zh)]
-            (h_corr, h_ch, h_pr, h_gr, h_ub) = classes_de_cellule(
-                zh, h_parc, h_eau, h_rou, h_bat)
-            h_ref = herbe_brute(zh, h_ver, h_ch, h_pr, h_gr, h_ub,
-                                C.valide(unary_union(h_eau)) if h_eau else None)
-            ilots, libre = compartiments(zh, h_corr, h_ch, h_pr, h_gr, h_ub, h_parc)
-            rempli = remplir_compartiments(herbe, h_ref, ilots, libre)
-            compart = dict(remplir_compartiments.dernier)
-            if rempli is not None and not rempli.is_empty:
-                herbe = C.valide(rempli.intersection(zone))
-            aire_compart = herbe.intersection(cell_box).area
-            compart["gain_m2"] = round(aire_compart - aire_releve, 1)
+        # HERBE V3, dans cet ordre et pas un autre :
+        #   1. REGULARISER le contour du releve (decimation franche : c'est LA que
+        #      l'amibe devient un dessin) ;
+        #   2. ACCOSTER (chaussee / privee / gravier / FACADES) : le contour
+        #      regularise vient se recoller sur les frontieres reelles, et
+        #      `accoster_herbe` finit par re-soustraire le mineral et le bati — donc
+        #      la regularisation ne peut pas produire de debord ;
+        #   3. RETIRER LES MIETTES : ce qui reste isole sous le plancher de motif.
+        # La regularisation vient AVANT l'accostage : l'inverse decollerait l'herbe
+        # des murs qu'elle vient d'accoster (Douglas-Peucker deplace le contour des
+        # deux cotes), c'est-a-dire qu'elle detruirait le volet valide de la v2.
+        herbe = regulariser_herbe(herbe)
+        aire_regul = herbe.intersection(cell_box).area
         herbe = accoster_herbe(herbe, chaussee, privee, gravier, u_bati, u_eau)
+        herbe = retirer_miettes(herbe)
     trous = dict(getattr(boucher_trous, "dernier",
                          {"trous": 0, "combles": 0, "aire_m2": 0.0}))
+    regul = dict(regulariser_herbe.dernier)
+    miettes = dict(retirer_miettes.dernier)
 
     # --- rasterisation (grille de calcul : cellule + marge, a 24,41 cm/px)
     size = OUT_PX * SS + 2 * MARGIN_PX
@@ -1237,6 +1458,9 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
     curbs = curb_lines(chaussee, cell_box, loc_routes, crossings, u_bati)
     jonctions = junction_points(loc_routes)
     dashes = axial_dashes(loc_routes, chaussee, cell_box, jonctions)
+    # BORDURETTE (v3) : APRES les bordures de chaussee, parce qu'elle les evite.
+    gedges = grass_edges(herbe, cell_box, curbs, u_bati, u_eau)
+    ged = dict(grass_edges.dernier)
 
     aires = {}
     for nom, g in (("corridor", corridor), ("chaussee", chaussee),
@@ -1255,6 +1479,8 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
         "maskChannels": {"R": "sdf_herbe", "G": "sdf_chaussee",
                          "B": "sdf_privee", "A": "sdf_gravier"},
         "curbs": [[[round(c[0], 2), round(c[1], 2)] for c in ln] for ln in curbs],
+        # BORDURETTE d'herbe (v3) : memes conventions que `curbs`, mineral A GAUCHE.
+        "grassEdges": [[[round(c[0], 2), round(c[1], 2)] for c in ln] for ln in gedges],
         "crossings": crossings,
         "axial": dashes,
         "areasM2": aires,
@@ -1264,23 +1490,26 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
         json.dump(data, f, separators=(",", ":"))
 
     if preview:
-        apercu(cx, cy, r_chan, rgba[:, :, 1], curbs, crossings, dashes, x0, y0)
+        apercu(cx, cy, r_chan, rgba[:, :, 1], curbs, crossings, dashes, x0, y0, gedges)
 
     pc = 100.0 * aires["chaussee"] / aires["cellule"]
     ecart_pc = (100.0 * abs(aire_herbe_png - aire_herbe_vec) / aire_herbe_vec
                 if aire_herbe_vec > 1.0 else 0.0)
     log("cellule %+d,%+d : chaussee %.1f %% | herbe %.0f m2 (raster %.0f m2, ecart "
-        "%.2f %%) | %d bordures (%.0f m) | %d passages | %d tirets | masque %.2f Mo | "
-        "json %.2f Mo | %.1f s"
+        "%.2f %%) | %d bordures (%.0f m) | %d bordurettes (%.0f m) | %d passages | "
+        "%d tirets | masque %.2f Mo | json %.2f Mo | %.1f s"
         % (cx, cy, pc, aire_herbe_vec, aire_herbe_png, ecart_pc,
            len(curbs), sum(LineString(l).length for l in curbs if len(l) > 1),
+           len(gedges), ged["retenu_m"],
            len(crossings), len(dashes), os.path.getsize(png) / 1048576.0,
            os.path.getsize(js) / 1048576.0, time.time() - t0))
-    log("   herbe v2 : releve %.0f m2 -> compartiment %+.0f m2 (%d ilots remplis sur "
-        "%d) -> accostage+trous %+.0f m2 | trous vus %d, combles %d (%.0f m2)"
-        % (aire_releve, aire_compart - aire_releve, compart["remplis"], compart["ilots"],
-           aire_herbe_vec - aire_compart, trous["trous"], trous["combles"],
-           trous["aire_m2"]))
+    log("   herbe v3 : releve %.0f m2 -> regularisation %+.0f m2 (%d -> %d sommets) "
+        "-> accostage+trous %+.0f m2 | trous vus %d, combles %d (%.0f m2) | miettes "
+        "%d/%d retirees (%.1f m2) | contour %.0f m -> bordurette %.0f m"
+        % (aire_releve, aire_regul - aire_releve, regul["avant"], regul["apres"],
+           aire_herbe_vec - aire_regul, trous["trous"], trous["combles"],
+           trous["aire_m2"], miettes["retires"], miettes["fragments"],
+           miettes["aire_m2"], ged["contour_m"], ged["retenu_m"]))
     return {"cell": [cx, cy], "origin": [x0, y0], "png": png, "json": js, "curbs": len(curbs),
             "crossings": len(crossings), "axial": len(dashes),
             "curbLenM": round(sum(LineString(l).length for l in curbs if len(l) > 1), 1),
@@ -1288,14 +1517,18 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
             "areasM2": aires, "herbeRasterM2": round(aire_herbe_png, 1),
             "herbeEcartPc": round(ecart_pc, 3),
             "herbeReleveM2": round(aire_releve, 1),
-            "herbeCompartM2": round(aire_compart - aire_releve, 1),
-            "herbeAccostM2": round(aire_herbe_vec - aire_compart, 1),
-            "compartIlots": compart["ilots"], "compartRemplis": compart["remplis"],
+            "herbeRegulM2": round(aire_regul - aire_releve, 1),
+            "herbeAccostM2": round(aire_herbe_vec - aire_regul, 1),
+            "sommetsAvant": regul["avant"], "sommetsApres": regul["apres"],
+            "fragments": miettes["fragments"], "miettes": miettes["retires"],
+            "miettesAireM2": miettes["aire_m2"],
+            "grassEdges": len(gedges), "grassEdgeLenM": ged["retenu_m"],
+            "grassContourM": ged["contour_m"], "grassCourtsM": ged["courts_m"],
             "trousVus": trous["trous"], "trousCombles": trous["combles"],
             "trousAireM2": trous["aire_m2"]}
 
 
-def apercu(cx, cy, r_chan, g_chan, curbs, crossings, dashes, x0, y0):
+def apercu(cx, cy, r_chan, g_chan, curbs, crossings, dashes, x0, y0, gedges=None):
     """PNG de controle LISIBLE (le masque, lui, n'est pas fait pour l'oeil)."""
     couleurs = {CLS_HORS: (238, 236, 232), CLS_TROTTOIR: (214, 200, 172),
                 CLS_CHAUSSEE: (96, 100, 104), CLS_PRIVEE: (176, 126, 100),
@@ -1317,6 +1550,9 @@ def apercu(cx, cy, r_chan, g_chan, curbs, crossings, dashes, x0, y0):
     for ln in curbs:
         if len(ln) >= 2:
             d.line([tx(c) for c in ln], fill=(30, 200, 90), width=2)
+    for ln in (gedges or []):
+        if len(ln) >= 2:
+            d.line([tx(c) for c in ln], fill=(230, 40, 200), width=2)
     for s in dashes:
         d.line([tx((s[0], s[1])), tx((s[2], s[3]))], fill=(255, 255, 255), width=2)
     for c in crossings:
@@ -1758,32 +1994,86 @@ def selftest():
     check_bool("lissage : l'aire est preservee a 1 %%",
                abs(liss.area - brut.area) / brut.area < 0.01, True)
 
-    # ------------------------------------------------ FINITION_SOL V2 : verrou 15
-    # 15. LIGNE AXIALE ET « AYANTS DROIT ». Deux troncons RIGOUREUSEMENT identiques
-    #     (meme geometrie, meme largeur, meme nombre de voies) : seul l'attribut
-    #     d'acces change. Celui qui est restreint ne recoit plus AUCUN tiret, celui
-    #     qui est libre garde exactement les siens.
-    z_ad = box(0, 0, 200, 200)
-    def _tr(y, acces):
-        return {"line": LineString([(0.0, y), (200.0, y)]), "largeur": 9.0,
-                "nature": "route a 1 chaussee", "pont": False, "voies": 2,
-                "etroit": False, "sans_bordure": False, "acces": acces}
-    r_lib = [_tr(60.0, "libre")]
-    r_ayd = [_tr(60.0, "restreint aux ayants droit")]
+    # ------------------------------------------------ FINITION_SOL V3 : verrou 15
+    # 15. LIGNE AXIALE : LA REGLE SE DECIDE PAR RUE, PAS PAR TRONCON.
+    #     C'est le grief utilisateur de la v2 : Alsace-Lorraine melangeait des
+    #     troncons « ayants droit » et « Libre » et sortait en pointilles.
+    z_ad = box(0, 0, 400, 200)
+
+    def _tr(x0_, x1_, acces, nom="", y=60.0, larg=9.0, nature="route a 1 chaussee"):
+        return {"line": LineString([(x0_, y), (x1_, y)]), "largeur": larg,
+                "nature": nature, "pont": False, "voies": 2,
+                "etroit": False, "sans_bordure": False, "acces": acces, "nom": nom}
+
+    #  (a) une rue entierement LIBRE garde tous ses tirets ; la meme rue entierement
+    #      « ayants droit » n'en garde aucun.
+    r_lib = [_tr(0.0, 200.0, "libre", "rue de metz")]
+    r_ayd = [_tr(0.0, 200.0, "restreint aux ayants droit", "rue de metz")]
     ch_ad = classes_de_cellule(z_ad, [], [], r_lib)[1]
     n_lib = len(axial_dashes(r_lib, ch_ad, z_ad, []))
     n_ayd = len(axial_dashes(r_ayd, ch_ad, z_ad, []))
     check_bool("axiale : une rue LIBRE garde ses tirets (%d)" % n_lib, n_lib > 20, True)
-    check("axiale : zero tiret sur « ayants droit »", float(n_ayd), 0.0, 0.0)
-    # Une route sans l'attribut (scene synthetique, donnee incomplete) reste ouverte :
-    # la regle ne doit jamais effacer un marquage par silence de la donnee.
-    r_sans = [dict(_tr(60.0, None))]
+    check("axiale : zero tiret sur une rue « ayants droit »", float(n_ayd), 0.0, 0.0)
+    #  (b) LE CAS ALSACE-LORRAINE : une rue de 4 troncons contigus, 3 « ayants droit »
+    #      (150 m) et 1 « Libre » (50 m) AU MILIEU. Par troncon, le troncon libre
+    #      sortirait des tirets isoles ; par RUE, la rue entiere est muette.
+    r_mix = [_tr(0.0, 60.0, "restreint aux ayants droit", "rue d'alsace lorraine"),
+             _tr(60.0, 110.0, "libre", "rue d'alsace lorraine"),
+             _tr(110.0, 160.0, "restreint aux ayants droit", "rue d'alsace lorraine"),
+             _tr(160.0, 200.0, "restreint aux ayants droit", "rue d'alsace lorraine")]
+    ch_mix = classes_de_cellule(z_ad, [], [], r_mix)[1]
+    grp, muettes = rues_sans_axiale(r_mix)
+    check("axiale par rue : les 4 troncons forment UNE rue",
+          float(len(set(grp))), 1.0, 0.0)
+    check("axiale par rue : la rue mixte est muette (150 m / 200 m)",
+          float(len(muettes)), 1.0, 0.0)
+    check("axiale par rue : zero tiret sur la rue mixte",
+          float(len(axial_dashes(r_mix, ch_mix, z_ad, []))), 0.0, 0.0)
+    #  (c) MINORITE : la meme rue avec 50 m « ayants droit » sur 200 m garde TOUT.
+    r_min = [_tr(0.0, 50.0, "restreint aux ayants droit", "rue de bayard"),
+             _tr(50.0, 200.0, "libre", "rue de bayard")]
+    ch_min = classes_de_cellule(z_ad, [], [], r_min)[1]
+    _g, mu_min = rues_sans_axiale(r_min)
+    check("axiale par rue : une rue minoritairement restreinte garde son axe",
+          float(len(mu_min)), 0.0, 0.0)
+    check_bool("axiale par rue : et elle garde bien ses tirets",
+               len(axial_dashes(r_min, ch_min, z_ad, [])) > 20, True)
+    #  (d) La rue VOISINE, de nom different et pourtant connectee par un noeud, n'est
+    #      PAS contaminee : c'est le verrou de non-regression du volet B.
+    r_deux = r_mix + [_tr(200.0, 380.0, "libre", "rue de metz")]
+    ch_deux = classes_de_cellule(z_ad, [], [], r_deux)[1]
+    g2, mu2 = rues_sans_axiale(r_deux)
+    check("axiale par rue : deux rues distinctes malgre le noeud partage",
+          float(len(set(g2))), 2.0, 0.0)
+    n_deux = len(axial_dashes(r_deux, ch_deux, z_ad, []))
+    check_bool("axiale par rue : la rue Libre voisine garde ses tirets (%d)" % n_deux,
+               n_deux > 15, True)
+    #  (e) REPLI SANS NOM : chainage geometrique, mais COUPE au carrefour. Deux
+    #      troncons alignes forment une rue ; un troisieme qui arrive en T sur leur
+    #      noeud commun casse le chainage (un carrefour n'enchaine pas).
+    r_sn = [_tr(0.0, 100.0, "restreint aux ayants droit"),
+            _tr(100.0, 200.0, "restreint aux ayants droit")]
+    g_sn, mu_sn = rues_sans_axiale(r_sn)
+    check("axiale sans nom : deux troncons alignes = une rue",
+          float(len(set(g_sn))), 1.0, 0.0)
+    r_sn3 = r_sn + [{"line": LineString([(100.0, 60.0), (100.0, 180.0)]),
+                     "largeur": 9.0, "nature": "route a 1 chaussee", "pont": False,
+                     "voies": 2, "etroit": False, "sans_bordure": False,
+                     "acces": "libre", "nom": ""}]
+    g_sn3, _m = rues_sans_axiale(r_sn3)
+    check("axiale sans nom : le carrefour (3 troncons) COUPE le chainage",
+          float(len(set(g_sn3))), 3.0, 0.0)
+    #  (f) Une route sans attribut d'acces reste OUVERTE (la regle n'efface jamais un
+    #      marquage par silence de la donnee).
+    r_sans = [dict(_tr(0.0, 200.0, None, "rue de metz"))]
     del r_sans[0]["acces"]
     check("axiale : attribut absent = voie ouverte",
           float(len(axial_dashes(r_sans, ch_ad, z_ad, []))), float(n_lib), 0.0)
 
-    # ------------------------------------------------ FINITION_SOL V2 : verrou 16
-    # 16. HERBE V2 : facades, trous internes, compartiment.
+    # ------------------------------------------------ FINITION_SOL V3 : verrou 16
+    # 16. HERBE V3 : facades (conserve de la v2), trous internes (conserve),
+    #     REGULARISATION, MIETTES et BORDURETTE. La regle de compartiment de la v2 a
+    #     ete RETIREE : ce bloc est reecrit, pas troue.
     #  (a) FACADE : une pelouse separee d'un MUR par un lisere de 60 cm vient
     #      accoster le mur, exactement comme elle accoste une chaussee.
     mur = box(0.0, 0.0, 10.0, 100.0)
@@ -1808,31 +2098,87 @@ def selftest():
                bou.intersection(obst).area < 1e-6, True)
     check_bool("trous : le trou de 100 m2 reste ouvert",
                bou.intersection(t_grand.buffer(-0.5)).area < 1e-6, True)
-    #  (c) COMPARTIMENT : deux ilots separes par une chaussee. Celui qui est deja
-    #      majoritairement herbe est peint jusqu'a ses limites ; l'autre ne bouge pas.
-    z_c = box(0.0, 0.0, 200.0, 100.0)
-    route_c = box(95.0, 0.0, 105.0, 100.0)
-    ilot_g = box(0.0, 0.0, 95.0, 100.0)                    # 9 500 m2
-    ilot_d = box(105.0, 0.0, 200.0, 100.0)                 # 9 500 m2
-    h_maj = box(0.0, 0.0, 95.0, 80.0)                      # 7 600 m2 -> 80 % de l'ilot
-    h_min = box(105.0, 0.0, 200.0, 20.0)                   # 1 900 m2 -> 20 % de l'ilot
-    h_ref = C.valide(unary_union([h_maj, h_min]))
-    ils, libre_c = compartiments(z_c, None, route_c, vide, vide, None, [])
-    check("compartiment : 2 ilots trouves", float(len(ils)), 2.0, 0.0)
-    remp = remplir_compartiments(h_ref, h_ref, ils, libre_c)
-    check("compartiment : 1 seul ilot rempli",
-          float(remplir_compartiments.dernier["remplis"]), 1.0, 0.0)
-    check("compartiment : l'ilot majoritaire est peint jusqu'a ses limites",
-          remp.intersection(ilot_g).area, ilot_g.area, 1.0)
-    check("compartiment : l'ilot minoritaire est INTACT",
-          remp.intersection(ilot_d).area, h_min.area, 1.0)
-    check("compartiment : zero debordement sur la chaussee",
-          remp.intersection(route_c).area, 0.0, 1e-6)
-    #  (d) Le taux se mesure sur la reference du RELEVE : une herbe deja accostee ne
-    #      doit pas faire basculer un ilot minoritaire (pas de boucle de retroaction).
-    remp2 = remplir_compartiments(h_ref, C.valide(h_ref.difference(ilot_g)), ils, libre_c)
-    check("compartiment : sans herbe de reference, l'ilot n'est pas rempli",
-          float(remplir_compartiments.dernier["remplis"]), 0.0, 0.0)
+    #  (c) MIETTES : regle SYMETRIQUE du bouchage de trous. Un confetti part, une
+    #      vraie pelouse reste, et l'aire retiree est exactement celle des confettis.
+    gros = box(0.0, 0.0, 40.0, 40.0)                       # 1 600 m2
+    moyen = box(60.0, 0.0, 65.0, 5.0)                      # 25 m2 : au-dessus du seuil
+    miette1 = box(80.0, 0.0, 82.0, 2.0)                    # 4 m2
+    miette2 = box(90.0, 0.0, 91.0, 1.0)                    # 1 m2
+    sem = C.valide(unary_union([gros, moyen, miette1, miette2]))
+    net = retirer_miettes(sem)
+    check("miettes : 4 fragments vus", float(retirer_miettes.dernier["fragments"]), 4.0, 0.0)
+    check("miettes : 2 retires", float(retirer_miettes.dernier["retires"]), 2.0, 0.0)
+    check("miettes : 5 m2 retires", sem.area - net.area, 5.0, 0.01)
+    check_bool("miettes : la pelouse de 25 m2 (au-dessus du seuil) est INTACTE",
+               net.intersection(moyen).area > 24.9, True)
+    check_bool("miettes : le gros fragment est INTACT",
+               abs(net.intersection(gros).area - gros.area) < 1e-6, True)
+    #  (d) REGULARISATION : un contour de releve qui gigote a l'echelle du metre est
+    #      DECIME (les sommets qui restent sont des sommets d'origine : angles nets),
+    #      et elle ne peut pas deborder, l'accostage re-soustrayant le mineral.
+    dents = [(0.0, 0.0)]
+    for i in range(1, 100):
+        dents.append((i * 1.0, 0.9 if i % 2 else 0.0))
+    dents += [(100.0, 0.0), (100.0, 60.0), (0.0, 60.0)]
+    releve = C.valide(Polygon(dents))
+    reg = regulariser_herbe(releve)
+    check_bool("regularisation : le contour est decime (%d -> %d sommets)"
+               % (regulariser_herbe.dernier["avant"], regulariser_herbe.dernier["apres"]),
+               regulariser_herbe.dernier["apres"]
+               < regulariser_herbe.dernier["avant"] / 3.0, True)
+    check_bool("regularisation : l'aire est preservee a 2 %",
+               abs(reg.area - releve.area) / releve.area < 0.02, True)
+    route_r = box(-20.0, -20.0, 120.0, -1.0)               # du mineral sous la dent
+    apres = accoster_herbe(C.valide(reg.union(box(0.0, -1.0, 100.0, 0.0))),
+                           route_r, vide, vide)
+    check("regularisation : zero debord sur le mineral apres re-soustraction",
+          apres.intersection(route_r).area, 0.0, 1e-6)
+    #  (e) BORDURETTE : une pelouse carree posee sur la dalle, un mur colle a un cote
+    #      et une bordure de chaussee le long d'un autre. Il doit rester DEUX cotes
+    #      bordes, mineral A GAUCHE, et rien le long du mur ni de la bordure.
+    cb = box(0.0, 0.0, 200.0, 200.0)
+    pel = box(50.0, 50.0, 150.0, 150.0)                    # 100 x 100
+    mur_b = box(150.0, 40.0, 160.0, 160.0)                 # colle au cote EST (x=150)
+    curb_b = [[(50.0, 48.0), (50.0, 152.0)]]               # bordure le long du cote OUEST
+    ge = grass_edges(pel, cb, curb_b, mur_b, None)
+    ltot = sum(LineString(l).length for l in ge)
+    check_bool("bordurette : au moins un segment pose (%d segments, %.0f m)"
+               % (len(ge), ltot), len(ge) >= 1 and ltot > 150.0, True)
+    check_bool("bordurette : rien le long du MUR",
+               all(LineString(l).distance(mur_b) > 0.30 for l in ge), True)
+    check_bool("bordurette : rien le long de la BORDURE de chaussee existante",
+               all(LineString(l).distance(LineString(curb_b[0])) > 0.30 for l in ge), True)
+    check_bool("bordurette : le total vaut les deux cotes libres (200 m, obtenu %.0f)"
+               % ltot, 180.0 < ltot < 205.0, True)
+    # ORIENTATION : mineral a gauche <=> herbe a droite, sur chaque segment.
+    ok_or = True
+    for l in ge:
+        for i in range(len(l) - 1):
+            ax, ay = l[i]
+            bx, by = l[i + 1]
+            dx, dy = bx - ax, by - ay
+            n_ = math.hypot(dx, dy)
+            if n_ < 0.5:
+                continue
+            dx, dy = dx / n_, dy / n_
+            mx, my = (ax + bx) * 0.5, (ay + by) * 0.5
+            if not pel.contains(Point(mx + dy * 0.10, my - dx * 0.10)):
+                ok_or = False
+            if pel.contains(Point(mx - dy * 0.10, my + dx * 0.10)):
+                ok_or = False
+    check_bool("bordurette : l'herbe est A DROITE, le mineral A GAUCHE", ok_or, True)
+    #  (f) BORDURETTE : un BOUT de contour plus court que le plancher n'est pas pose.
+    #      Pelouse ceinturee de bordures de chaussee sauf un trou de 1 m : apres les
+    #      rayons de silence il ne reste que 20 cm de contour libre — trop court pour
+    #      une pierre. On ne pose rien plutot qu'un caillou de 20 cm.
+    pel_f = box(0.0, 0.0, 10.0, 10.0)
+    curb_f = [[(5.5, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0), (0.0, 0.0), (4.5, 0.0)]]
+    ge_court = grass_edges(pel_f, box(-10.0, -10.0, 20.0, 20.0), curb_f, None, None)
+    check("bordurette : le trou de 1 m entre deux bordures ne produit rien",
+          float(len(ge_court)), 0.0, 0.0)
+    check_bool("bordurette : ce bout est bien compte comme ecarte (trop court)",
+               grass_edges.dernier["courts_m"] > 0.0, True)
+
 
     log("SELFTEST : " + ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
@@ -1857,11 +2203,10 @@ def main():
     t0 = time.time()
     log("=== MAQUETTE DU SOL : cuisson de %d cellules %s ==="
         % (len(cells), " ".join("%+d,%+d" % c for c in cells)))
-    # La fenetre de CHARGEMENT porte la marge de calcul du SDF ET le halo de la regle
-    # de compartiment : sans le halo, les ilots de bord seraient juges sur une donnee
-    # tronquee (routes et parcelles manquantes) et la decision de remplissage
-    # basculerait au bord de la zone cuite.
-    marge = MARGIN_PX * CELL_M / (OUT_PX * SS) + 5.0 + HERBE_COMPART_HALO_M
+    # La fenetre de CHARGEMENT porte la marge de calcul du SDF plus une reserve. Le
+    # halo de 80 m de la regle de compartiment (v2) a disparu avec la regle : c'est
+    # lui qui faisait passer la cuisson de 14 s a 49 s pour 4 cellules.
+    marge = MARGIN_PX * CELL_M / (OUT_PX * SS) + 5.0
     xs = [c[0] for c in cells]
     ys = [c[1] for c in cells]
     fen = (min(xs) * CELL_M - marge, min(ys) * CELL_M - marge,
@@ -1905,17 +2250,23 @@ def main():
            sum(r["areasM2"]["gravier"] for r in resume),
            sum(r["areasM2"]["herbe"] for r in resume),
            max((r["herbeEcartPc"] for r in resume), default=0.0)))
-    log("HERBE V2: releve %d m2 -> compartiment %+d m2 (%d ilots remplis sur %d) -> "
-        "accostage+trous %+d m2 | trous vus %d, combles %d (%.0f m2)"
+    log("HERBE V3: releve %d m2 -> regularisation %+d m2 (%d -> %d sommets) -> "
+        "accostage+trous %+d m2 | trous vus %d, combles %d (%.0f m2) | miettes %d/%d "
+        "retirees (%.1f m2)"
         % (sum(r["herbeReleveM2"] for r in resume),
-           sum(r["herbeCompartM2"] for r in resume),
-           sum(r["compartRemplis"] for r in resume),
-           sum(r["compartIlots"] for r in resume),
+           sum(r["herbeRegulM2"] for r in resume),
+           sum(r["sommetsAvant"] for r in resume),
+           sum(r["sommetsApres"] for r in resume),
            sum(r["herbeAccostM2"] for r in resume),
            sum(r["trousVus"] for r in resume), sum(r["trousCombles"] for r in resume),
-           sum(r["trousAireM2"] for r in resume)))
-    log("MAILLE  : %d polylignes de bordure (%.0f m), %d passages, %d tirets"
+           sum(r["trousAireM2"] for r in resume),
+           sum(r["miettes"] for r in resume), sum(r["fragments"] for r in resume),
+           sum(r["miettesAireM2"] for r in resume)))
+    log("MAILLE  : %d polylignes de bordure (%.0f m), %d bordurettes d'herbe (%.0f m "
+        "sur %.0f m de contour, %.0f m ecartes trop courts), %d passages, %d tirets"
         % (sum(r["curbs"] for r in resume), sum(r["curbLenM"] for r in resume),
+           sum(r["grassEdges"] for r in resume), sum(r["grassEdgeLenM"] for r in resume),
+           sum(r["grassContourM"] for r in resume), sum(r["grassCourtsM"] for r in resume),
            sum(r["crossings"] for r in resume), sum(r["axial"] for r in resume)))
     return 0
 
