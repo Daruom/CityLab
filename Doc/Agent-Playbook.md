@@ -71,6 +71,17 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
   `Sampler type`). Cohérence VT↔samplers obligatoire. En cas d'échec sans texte d'erreur : ouvrir le
   matériau EN GUI et lire l'erreur (ne pas bisecter en aveugle >15 min).
 - **AUTO-VALIDATION : regarde tes captures et REJETTE ta propre version si elle ne convainc pas.**
+- ⚠️ **MESURER LE COÛT GPU : une seule méthode marche** (établie le 01/08, lot V6).
+  Le temps de frame relevé dans un callback de tick est **inutilisable** : il vaut
+  **8,333 ms exactement** (120 Hz) à *toutes* les poses, du ras du sol au zénith, et
+  `r.VSync 0` / `t.MaxFPS 0` n'y changent rien — c'est un **plafond**, pas un coût.
+  Ce qui marche : `ProfileGPU` **avec l'éditeur au premier plan** (`work/FINITION_SOL/v6_focus.ps1`,
+  `AttachThreadInput` + `SetForegroundWindow`), puis lire la ligne **« Frame Time »
+  du pipeline GRAPHIQUE** dans `Saved/Logs/CityLab.log` (parseur prêt :
+  `work/FINITION_SOL/v6_parse_gpu.py`). Toujours ajouter une **pose témoin** qui ne
+  dessine presque rien (caméra au zénith à 3 km) : elle donne le plancher de bruit
+  (mesuré ±0,3 ms) et prouve que la mesure discrimine. Sans focus, `ProfileGPU`
+  profile une frame d'interface — c'est le piège v4 ci-dessous.
 - ⚠️ **UN ÉDITEUR NON FOCALISÉ NE REND PAS** (payé trois fois le 01/08). Symptômes :
   delta-time clampé à **125,000 ms** exactement ; `ProfileGPU` profile une frame
   d'**INTERFACE** (mêmes draws/primitives au ras du sol et à 150 m d'altitude) ; la spec
@@ -99,8 +110,20 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
   `SM_Slab_` / `SM_Proxy_` / `SM_Bldg_` du monde ouvert** avant de poser les siens. Lancée
   avec une map de production ouverte, elle la remplace **en mémoire** par la maquette de test.
   Ce n'est sans conséquence que si l'on **ne sauvegarde pas** ensuite. Règle : ouvrir une map
-  jetable (`/Game/Dev/Test/L_V5Scratch`) **avant** `Automation RunTests CityLab`, puis
-  recharger la map de travail. Idem pour toute sonde qui rejoue un import.
+  jetable **avant** `Automation RunTests CityLab`, puis recharger la map de travail sans
+  sauvegarder. Idem pour toute sonde qui rejoue un import.
+  **V6** : la spec écrit ses assets dans `/Game/Dev/Test/` — dont les noms sont
+  **homonymes** des assets réels (`SM_Bldg_0_0`, `SM_Ground_0_0`, `SM_Slab_0_0`, et même
+  les sous-niveaux `L_T10_B_0_0`), ce qui a déjà brouillé des diagnostics. Ce dossier a
+  été **supprimé** ; la spec le recrée. Donc : **session dédiée, OU purge de
+  `/Game/Dev/Test` obligatoire après la spec**, et jamais de sauvegarde de la map de
+  travail entre les deux. Purge en deux temps (payé le 01/08) : les assets de la spec
+  restent **référencés par son monde** tant qu'il est ouvert — recharger d'abord la map
+  de travail, **puis** supprimer, puis vérifier **sur le disque** (le registre peut
+  annoncer 0 asset alors que des `.umap` orphelins subsistent).
+  ⚠️ **Ouvrir la map jetable DEPUIS une map lourde coûte le teardown de la map lourde**
+  (10 min mesurées sur le proto 3×3 à 1,2 M d'instances) : lancer la spec dans une
+  session **démarrée** sur une map légère, pas par bascule depuis la production.
 - **Un processus UE par passe de génération lourde** (commandlet), reprenable par lot de cellules.
 - Crash : `Saved/Crashes/*/CrashContext.runtime-xml` → `IsEnsure=true` = NON-fatal (l'éditeur vit).
 - **REDÉMARRER L'ÉDITEUR : trois pièges payés le 2026-08-01, dans cet ordre.**
@@ -183,11 +206,18 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
   PAR OBJET : posées après coup elles ne survivent pas à la régé suivante — d'où le C++.
   **Ne plus lancer `fix_pie_sol2.py` ni le script SDM du lot 3** ; les VÉRIFIER suffit
   (`work/SOLROUTES/ater_regen.py` fait la régé et les deux vérifications, `flags_ok`/`sdm_ok`).
-  **V5 (01/08)** : la **visibilité des `SM_Proxy`** rejoint la même liste — elle est posée
-  par le C++ à la création (`FCityGenProfile::bProxyVisible`, défaut false = cachés).
-  **Ne plus les cacher en Python** : les VÉRIFIER suffit (`regen_v5.py` :
-  `proxys_caches_par_le_cpp`). Les cacher après la passe ne servait à rien — la passe
-  sauvegarde la map AVANT, donc le disque gardait des proxys visibles.
+  **V6 (01/08, décision utilisateur) : LA COUCHE PROXY EST SUPPRIMÉE.** Elle est
+  obsolète sur desktop — Nanite rend le détail à la densité de l'écran et le streame à
+  la demande, et nos maillages sont fusionnés par cellule (surcoût en composants
+  trivial). `FCityGenProfile::bProxyLayer` (défaut **false**) : la géométrie proxy n'est
+  plus **construite** du tout ; `true` restitue l'ancienne couche, visible. Si des
+  silhouettes lointaines redeviennent nécessaires à l'échelle de l'agglo, la réponse est
+  le **HLOD d'UE**, qui les génère correctes (toits compris) au lieu de blocs à cours
+  pleines. Le verrou n'est donc plus « les proxys sont cachés » mais **« aucun proxy
+  n'existe »** (spec `V6 VERROU PROXY` + `Tools/verrou_batiments_sol2.py`). *(V5 avait
+  posé `bProxyVisible=false` à la création, après que douze scripts les aient cachés en
+  Python APRÈS la sauvegarde faite par la passe : le disque gardait des proxys visibles.)*
+  Le streaming de **collision** par distance reste un sujet ouvert du lot perf, sans rapport.
   Restent obligatoires après chaque régé : `ImportCitySurfaces` avec le **NOGREEN**
   (`SOLVERT/proto_capitole_surfaces_nogreen.json`, JAMAIS `grass_v3` — 1 407 films verts
   revenus le 31/07), re-run `ImportVegetation`, re-masquer l'ancienne végé `Sol2Veg_*`/
@@ -204,6 +234,19 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
   tout objet fin exige la compensation +w/4 avant la réduction 2×2.
 - Données : tout est SUR DISQUE (`SourceData\`, `SourceData\Agglo\`, LiDAR `C:\LidarPoC\`) — zéro
   fetch réseau en lot. `data.geopf.fr` : 1 req/s, 429 = page HTML silencieuse de 134 octets.
+- ⚠️ **Cuire des cellules à indice NÉGATIF ne passe pas par la ligne de commande**
+  (payé le 01/08) : `j3c_sols_masks.py --cells -3,-2` fait échouer argparse (son
+  détecteur de nombre négatif est `^-\d+$`, et « -3,-2 » n'y répond pas), et le chemin
+  du projet contient des espaces (`Start-Process -ArgumentList @(…)` ne les requote pas
+  — même piège que la relance de l'éditeur). Passer par un **wrapper** qui fournit la
+  liste de cellules directement à `main()` : `work/FINITION_SOL/v6_bake.py`.
+- ⚠️ **Un verrou à valeurs de référence EN DUR meurt au changement d'échelle.**
+  `Tools/verrou_batiments_sol2.py` compare désormais, cellule par cellule, l'emprise
+  **mesurée** à l'aire nette **du JSON qui a servi à générer** (contours moins trous) :
+  ce critère est vrai à toutes les emprises. Les valeurs en dur du témoin gelé Sol1 ne
+  sont vérifiées que si c'est bien son extrait de 550 m qui a servi — sinon les mêmes
+  cellules reçoivent en plus les bâtiments qui tombaient hors du rayon d'extraction, et
+  le verrou crierait sur une différence LÉGITIME.
 
 ## 7. Supervision (OBLIGATOIRE)
 - **Heartbeat** horodaté dans le dossier de travail du lot, à CHAQUE étape **y compris la prep**

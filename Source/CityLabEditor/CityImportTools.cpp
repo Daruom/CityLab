@@ -2216,10 +2216,30 @@ namespace
 	constexpr float GPitJitterDeg = 3.f;      // jeu de pose autour de l'axe de la rue
 	constexpr float GPitFreeJitterDeg = 10.f; // sans rue identifiee
 
-	// Touffes d'herbe : fondu 45-60 m et pas d'ombre portee (reglage valide par
-	// l'utilisateur sur la passe de semis dediee, repris ici tel quel).
-	constexpr float GClumpCullStartCm = 4500.f;
-	constexpr float GClumpCullEndCm = 6000.f;
+	// Touffes d'herbe : PLUS AUCUN FONDU (V6, decision utilisateur), et toujours pas
+	// d'ombre portee.
+	//
+	// Le fondu 45-60 m datait du contexte MOBILE, ou les touffes etaient des maillages
+	// a UN SEUL LOD de 6 271 a 30 767 triangles : les tenir a distance etait le seul
+	// levier existant. Son prix, mesure en v4 : ZERO touffe dessinee des 100 m
+	// d'altitude, et une pelouse qui « repousse » en descendant sous 60 m (c'etait le
+	// SEUL cull du niveau — l'effet « sous-marin » signale par l'utilisateur).
+	//
+	// V6 : les 12 SM_KikuyuGrass_* sont passes en NANITE (repli 476 a 3 031 triangles
+	// contre 771 a 30 767 en source). La distance n'est plus une charge — Nanite choisit
+	// lui-meme la finesse selon la taille a l'ecran. Mesure ProfileGPU (editeur AU
+	// PREMIER PLAN, sinon la frame profilee est une frame d'interface), sur la pelouse
+	// la plus dense du proto, 5 460 touffes dans 60 m = 69,8 M triangles source :
+	//     pose        avant (1 LOD, cull 45/60)   Nanite meme cull   Nanite SANS cull
+	//     ras du sol           5,30 ms                 3,42 ms            3,42 ms
+	//     50 m                 2,74 ms                 2,75 ms            3,01 ms
+	//     150 m                2,32 ms                 2,57 ms            2,50 ms
+	//     temoin ciel          1,59 ms                 1,80 ms            1,49 ms
+	// (le temoin ciel donne le plancher de bruit : +-0,3 ms). Rendre l'herbe A TOUTE
+	// ALTITUDE coute donc MOINS que ce que coutait l'ancienne herbe au ras du sol.
+	// Zero = aucun fondu : un plafond serait une depense sans contrepartie mesuree.
+	constexpr float GClumpCullStartCm = 0.f;
+	constexpr float GClumpCullEndCm = 0.f;
 
 	// -----------------------------------------------------------------------------
 	// LOT6 point A/D — RETRACTION DES PLANTATIONS QUI MORDENT LA CHAUSSEE.
@@ -4177,11 +4197,21 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 			continue;
 		}
 		// Piege F.39 : sans l'usage ISM sur ses materiaux, les instances rendent en defaut.
+		// V6 : meme regle pour l'usage NANITE, depuis que les touffes SM_KikuyuGrass_*
+		// sont Nanite — sans ce flag, « missing usage flag Nanite » et le moteur
+		// substitue le Materiau par Defaut (piege deja paye le 25/07 sur les toits).
+		// Il est pose ICI, par le generateur, et non par un script joue apres coup :
+		// c'est la doctrine V5 (une propriete rejouee a la main ne survit pas).
+		const bool bMeshNanite = Mesh->IsNaniteEnabled();
 		for (const FStaticMaterial& SM : Mesh->GetStaticMaterials())
 		{
 			if (SM.MaterialInterface)
 			{
 				SM.MaterialInterface->CheckMaterialUsage(MATUSAGE_InstancedStaticMeshes);
+				if (bMeshNanite)
+				{
+					SM.MaterialInterface->CheckMaterialUsage(MATUSAGE_Nanite);
+				}
 			}
 		}
 		// VENT DES ARBRES : rien a faire ici, et c'est VOULU. Les meshes gardent leurs
@@ -4857,9 +4887,10 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 			Hism->AddInstance(Xf, /*bWorldSpace*/ true);
 			++Summary.Instances;
 		}
-		// Touffes d'herbe : reglages de RENDU valides par l'utilisateur sur la passe
-		// dediee (fondu 45-60 m, pas d'ombre portee). Ils vivent ici, dans l'unique
-		// autorite de pose, et non plus dans un script de semis parallele.
+		// Touffes d'herbe : reglages de RENDU poses A LA CREATION, dans l'unique
+		// autorite de pose (V6 : plus aucun fondu — cf. GClumpCullStartCm ; toujours
+		// pas d'ombre portee, reglage utilisateur d'origine). L'ecriture est
+		// INCONDITIONNELLE : elle efface aussi le cull d'une generation anterieure.
 		if (bClump)
 		{
 			Hism->InstanceStartCullDistance = GClumpCullStartCm;
@@ -7166,9 +7197,15 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				BuildPolygonBuildingTextured(GetIn(BldgCells, Centroid, Cell), Pts, Hcm, Tint,
 					ZBase, SocleDepth);
 			}
-			BuildProxyBuilding(GetIn(ProxyCells, Centroid, ProxyCell, bLinearColors), Pts, Hcm,
-				Gen.bMarbleWhite ? MarbleTint() : Tint,
-				ZBase, SocleDepth, bBakedShade, Gen.bMarbleWhite);
+			// V6 : la couche proxy est supprimee (cf. FCityGenProfile::bProxyLayer).
+			// On ne la CONSTRUIT plus du tout : a l'echelle 3x3 km c'est autant de
+			// geometrie, d'assets et d'acteurs en moins, pas seulement une visibilite.
+			if (Gen.bProxyLayer)
+			{
+				BuildProxyBuilding(GetIn(ProxyCells, Centroid, ProxyCell, bLinearColors), Pts, Hcm,
+					Gen.bMarbleWhite ? MarbleTint() : Tint,
+					ZBase, SocleDepth, bBakedShade, Gen.bMarbleWhite);
+			}
 			SlabKeys.Add(FIntPoint(FMath::FloorToInt(Centroid.X / Cell), FMath::FloorToInt(Centroid.Y / Cell)));
 			++Summary.Buildings;
 			++Index;
@@ -7817,16 +7854,6 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
 		Actor->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		ApplyGroundTextureStreaming(Actor->GetStaticMeshComponent());
-		// V5 — LA VISIBILITE DU PROXY SE POSE ICI, A LA CREATION (autopsie du 01/08).
-		// Ce bloc grossier (rectangle oriente, cours pleines, 2 m de retrait) n'a de
-		// sens que si le detail n'est PAS affiche ; or le meme generateur force les
-		// sous-niveaux de detail charges+visibles quelques lignes plus bas. Laisse
-		// visible, le proxy se superpose au detail : cours bouchees, emprises gonflees.
-		// C'est une propriete PAR OBJET : posee apres coup par un script, elle ne
-		// survit pas a la sauvegarde que fait cette passe (FEditorFileUtils plus bas),
-		// donc pas non plus a la fermeture de l'editeur. Doctrine du lot A-ter.
-		Actor->GetStaticMeshComponent()->SetVisibility(Gen.bProxyVisible);
-		Actor->GetStaticMeshComponent()->SetHiddenInGame(!Gen.bProxyVisible);
 		Actor->SetActorLabel(Name);
 	}
 

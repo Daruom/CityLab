@@ -2605,3 +2605,377 @@
 2026-08-01 17:07:02  PEINT   : 92508 m2 de chaussee, 3186 m2 de voirie privee, 0 m2 de gravier, 50017 m2 d'HERBE (ecart raster max 2.07 %)
 2026-08-01 17:07:02  HERBE V3: releve 48983 m2 -> regularisation -1144 m2 (7073 -> 443 sommets) -> accostage+trous +2178 m2 | trous vus 2, combles 0 (0 m2) | miettes 2/39 retirees (9.6 m2)
 2026-08-01 17:07:02  MAILLE  : 332 polylignes de bordure (40207 m), 104 bordurettes d'herbe (2651 m sur 6614 m de contour, 7 m ecartes trop courts), 0 passages, 287 tirets
+2026-08-01 20:49:23  selftest SDF centre du disque (sature)      attendu    10.5000  obtenu    10.5000  OK
+2026-08-01 20:49:23  selftest SDF a 5 px du bord (dedans)        attendu     5.0000  obtenu     4.5990  OK
+2026-08-01 20:49:23  selftest SDF a 5 px du bord (dehors)        attendu    -5.0000  obtenu    -4.5000  OK
+2026-08-01 20:49:23  selftest SDF signe dedans                   attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest SDF signe dehors                   attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest encodage frontiere -> 128          attendu   128.0000  obtenu   127.0000  OK
+2026-08-01 20:49:23  selftest encodage -2 m -> plancher 1        attendu     1.0000  obtenu     1.0000  OK
+2026-08-01 20:49:23  selftest encodage +2 m -> 255               attendu   255.0000  obtenu   255.0000  OK
+2026-08-01 20:49:23  selftest encodage sature en bas             attendu     1.0000  obtenu     1.0000  OK
+2026-08-01 20:49:23  selftest encodage sature en haut            attendu   255.0000  obtenu   255.0000  OK
+2026-08-01 20:49:23  selftest sans bati : pas d'union batie      attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest corridor synthetique (m2)          attendu  1000.0000  obtenu  1000.0000  OK
+2026-08-01 20:49:23  selftest chaussee = corridor - pont         attendu   920.0000  obtenu   920.0000  OK
+2026-08-01 20:49:23  selftest le pont ne se peint pas            attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest voirie privee (m2)                 attendu   356.0000  obtenu   356.0000  OK
+2026-08-01 20:49:23  selftest gravier present                    attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest gravier disjoint de la chaussee    attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest bordures produites                 attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest bordures mal orientees             attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest bordures echantillonnees           attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest bordures sur autoroutier           attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest sites de passage                   attendu     1.0000  obtenu     1.0000  OK
+2026-08-01 20:49:23  selftest passage : demi-largeur             attendu     5.0000  obtenu     5.0000  OK
+2026-08-01 20:49:23  selftest passage : |dy| (axe de rue)        attendu     1.0000  obtenu     1.0000  OK
+2026-08-01 20:49:23  selftest passage : x du site (snappe sur l'axe) attendu    50.0000  obtenu    50.0000  OK
+2026-08-01 20:49:23  selftest passage : noeud sans axe rejete    attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest passage : noeud hors chaussee rejete attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest passage : dedoublonnage a 7 m      attendu     1.0000  obtenu     1.0000  OK
+2026-08-01 20:49:23  selftest bordure coupee a la traversee      attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest tirets produits                    attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest longueur de tiret                  attendu     3.0000  obtenu     3.0000  OK
+2026-08-01 20:49:23  selftest tirets hors chaussee               attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest tirets dans un carrefour           attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest carrefour = moins de tirets        attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest rasterisation 50 x 50 (m2)         attendu  2500.0000  obtenu  2500.0000  OK
+2026-08-01 20:49:23  selftest largeur rendue d'une chaussee de 10 m attendu    10.0000  obtenu    10.0098  OK
+2026-08-01 20:49:23  selftest corridor sans bati (m2)            attendu  2000.0000  obtenu  2000.0000  OK
+2026-08-01 20:49:23  selftest union batie rendue                 attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest corridor - batiment (m2)           attendu    45.7255  obtenu    45.7255  OK
+2026-08-01 20:49:23  selftest corridor sous batiment (m2)        attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest chaussee sous batiment (m2)        attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest la chaussee perd bien du terrain   attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest privee sous batiment (m2)          attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest points de bordure dans le bati     attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest longueur de bordure dans le bati   attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest des bordures subsistent ailleurs   attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest le porche a de la surface          attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest chaussee conservee sous le porche  attendu   128.0000  obtenu   128.0000  OK
+2026-08-01 20:49:23  selftest le centre du porche est de la chaussee attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest corridor sous le porche hors bande attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest extremites pendantes               attendu     2.0000  obtenu     2.0000  OK
+2026-08-01 20:49:23  selftest largeur retenue au bout            attendu     8.0000  obtenu     8.0000  OK
+2026-08-01 20:49:23  selftest bordures d'impasse produites       attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest bout plat present dans la chaussee (10) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest bordure au bout pendant (10)       attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest bout plat present dans la chaussee (60) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest bordure au bout pendant (60)       attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest pendantes du T (le noeud exclu)    attendu     3.0000  obtenu     3.0000  OK
+2026-08-01 20:49:23  selftest le noeud du T n'est pas pendant    attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest CROSSINGS_ON coupe                 attendu      False  obtenu      False  OK
+2026-08-01 20:49:23  selftest crossing_sites appelee directement attendu     1.0000  obtenu     1.0000  OK
+2026-08-01 20:49:23  selftest crossing_sites SANS noeud OSM (jamais invente) attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest site propose : demi-largeur        attendu     5.0000  obtenu     5.0000  OK
+2026-08-01 20:49:23  selftest site propose : dans l'axe de la rue attendu     1.0000  obtenu     1.0000  OK
+2026-08-01 20:49:23  cellule +9999,+9999 : chaussee 2.0 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 2 bordures (1000 m) | 0 bordurettes (0 m) | 0 passages | 112 tirets | masque 0.00 Mo | json 0.01 Mo | 0.1 s
+2026-08-01 20:49:23     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-01 20:49:23     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-01 20:49:23  selftest passages ecrits par la cuisson (CROSSINGS_ON coupe) attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest la cuisson ecrit toujours ses bordures attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest la cuisson ecrit toujours ses tirets attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest bordure continue : au plus 2 rives sur une rue droite attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest marche de largeur : aucune bordure en travers attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest marche de largeur : les bordures longitudinales restent (231 m) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest depointage : pointe de 2 cm retiree attendu     4.0000  obtenu     4.0000  OK
+2026-08-01 20:49:23  selftest depointage : epingle de 3 m conservee attendu     6.0000  obtenu     6.0000  OK
+2026-08-01 20:49:23  selftest frontiere interne : rien de maille dans la chaussee attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  cellule +8888,+8888 : chaussee 2.0 % | herbe 13025 m2 (raster 13000 m2, ecart 0.16 %) | 2 bordures (1000 m) | 2 bordurettes (458 m) | 0 passages | 112 tirets | masque 0.00 Mo | json 0.01 Mo | 0.0 s
+2026-08-01 20:49:23     herbe v3 : releve 13198 m2 -> regularisation -281 m2 (138 -> 10 sommets) -> accostage+trous +108 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/2 retirees (0.0 m2) | contour 701 m -> bordurette 458 m
+2026-08-01 20:49:23     bordurette v4 : 4 extremites recalees sur une bordure de chaussee (1.60 m cumules) | peinture retractee de 0.10 m sous 2 pierres (-46.1 m2, soit 0.35 % de l'herbe)
+2026-08-01 20:49:23  selftest herbe : pelouse peinte             attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest herbe : complement de la chaussee  attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest canal R : coeur de pelouse >= 200  attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest canal R : chaussee <= 60           attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest canal R : languette EFFACEE        attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest canal R : hors tout vert <= 60     attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest herbe absente par defaut (verrou 11) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest accostage : le lisere de 60 cm est comble attendu  3000.0000  obtenu  2999.9627  OK
+2026-08-01 20:49:23  selftest accostage : l'herbe touche la chaussee attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest accostage : zero recouvrement du mineral attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest accostage : a 5 m, l'herbe n'est PAS tiree attendu  2500.0000  obtenu  2500.0000  OK
+2026-08-01 20:49:23  selftest accostage : l'ecart de 5 m est conserve attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest lissage : le contour dentele est simplifie (204 -> 5 sommets) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest lissage : l'aire est preservee a 1 %% attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest axiale : une rue LIBRE garde ses tirets (44) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest axiale : zero tiret sur une rue « ayants droit » attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest axiale par rue : les 4 troncons forment UNE rue attendu     1.0000  obtenu     1.0000  OK
+2026-08-01 20:49:23  selftest axiale par rue : la rue mixte est muette (150 m / 200 m) attendu     1.0000  obtenu     1.0000  OK
+2026-08-01 20:49:23  selftest axiale par rue : zero tiret sur la rue mixte attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest axiale par rue : une rue minoritairement restreinte garde son axe attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest axiale par rue : et elle garde bien ses tirets attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest axiale par rue : deux rues distinctes malgre le noeud partage attendu     2.0000  obtenu     2.0000  OK
+2026-08-01 20:49:23  selftest axiale par rue : la rue Libre voisine garde ses tirets (40) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest axiale sans nom : deux troncons alignes = une rue attendu     1.0000  obtenu     1.0000  OK
+2026-08-01 20:49:23  selftest axiale sans nom : le carrefour (3 troncons) COUPE le chainage attendu     3.0000  obtenu     3.0000  OK
+2026-08-01 20:49:23  selftest axiale : attribut absent = voie ouverte attendu    44.0000  obtenu    44.0000  OK
+2026-08-01 20:49:23  selftest facade : le lisere de 60 cm est comble attendu  3000.0000  obtenu  2999.9627  OK
+2026-08-01 20:49:23  selftest facade : l'herbe touche le mur     attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest facade : zero recouvrement du bati attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest trous : les 3 trous sont vus       attendu     3.0000  obtenu     3.0000  OK
+2026-08-01 20:49:23  selftest trous : un seul comble             attendu     1.0000  obtenu     1.0000  OK
+2026-08-01 20:49:23  selftest trous : c'est bien le trou VIDE (25 m2) attendu    25.0000  obtenu    25.0000  OK
+2026-08-01 20:49:23  selftest trous : le trou a batiment reste ouvert attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest trous : le trou de 100 m2 reste ouvert attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest miettes : 4 fragments vus          attendu     4.0000  obtenu     4.0000  OK
+2026-08-01 20:49:23  selftest miettes : 2 retires                attendu     2.0000  obtenu     2.0000  OK
+2026-08-01 20:49:23  selftest miettes : 5 m2 retires             attendu     5.0000  obtenu     5.0000  OK
+2026-08-01 20:49:23  selftest miettes : la pelouse de 25 m2 (au-dessus du seuil) est INTACTE attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest miettes : le gros fragment est INTACT attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest regularisation : le contour est decime (104 -> 5 sommets) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest regularisation : l'aire est preservee a 2 % attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest regularisation : zero debord sur le mineral apres re-soustraction attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest bordurette : au moins un segment pose (2 segments, 199 m) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest bordurette : rien le long du MUR   attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest bordurette : rien LE LONG de la bordure de chaussee existante (bouts exclus : le raccord v4 y est colle expres) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest bordurette : le total vaut les deux cotes libres (200 m, obtenu 199) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest bordurette : l'herbe est A DROITE, le mineral A GAUCHE attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest bordurette : le trou de 1 m entre deux bordures ne produit rien attendu     0.0000  obtenu     0.0000  OK
+2026-08-01 20:49:23  selftest bordurette : ce bout est bien compte comme ecarte (trop court) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest v4 retraction : la peinture perd recul x longueur (0,10 x 20 = 2 m2) attendu     2.0000  obtenu     2.0000  OK
+2026-08-01 20:49:23  selftest v4 retraction : le polygone d'ORIGINE est intact (la pierre ne bouge pas) attendu   400.0000  obtenu   400.0000  OK
+2026-08-01 20:49:23  selftest v4 retraction : le recul se fait bien DANS l'herbe (y=0,05 sorti) attendu      False  obtenu      False  OK
+2026-08-01 20:49:23  selftest v4 retraction : au-dela du recul l'herbe est intacte (y=0,20 garde) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest v4 retraction : le cote NON borde ne recule pas (x=0,05 garde) attendu       True  obtenu       True  OK
+2026-08-01 20:49:23  selftest v4 retraction : sans bordurette, aucun recul attendu   400.0000  obtenu   400.0000  OK
+2026-08-01 20:49:23  selftest v4 retraction : recul nul = polygone inchange attendu   400.0000  obtenu   400.0000  OK
+2026-08-01 20:49:23  selftest v4 retraction : bouts DROITS (pas de morsure au-dela de la pierre) attendu       True  obtenu       True  OK
+2026-08-01 20:49:24  selftest v4 snap : au moins une extremite est POSEE sur la bordure (d = 0) attendu       True  obtenu       True  OK
+2026-08-01 20:49:24  selftest v4 snap : le recalage est compte   attendu       True  obtenu       True  OK
+2026-08-01 20:49:24  selftest v4 snap : au-dela de 1 m, aucune extremite n'est deplacee attendu       True  obtenu       True  OK
+2026-08-01 20:49:24  SELFTEST : PASS
+2026-08-01 20:50:35  === MAQUETTE DU SOL : cuisson de 36 cellules -3,-3 -3,-2 -3,-1 -3,+0 -3,+1 -3,+2 -2,-3 -2,-2 -2,-1 -2,+0 -2,+1 -2,+2 -1,-3 -1,-2 -1,-1 -1,+0 -1,+1 -1,+2 +0,-3 +0,-2 +0,-1 +0,+0 +0,+1 +0,+2 +1,-3 +1,-2 +1,-1 +1,+0 +1,+1 +1,+2 +2,-3 +2,-2 +2,-1 +2,+0 +2,+1 +2,+2 ===
+2026-08-01 20:50:36  routes BD TOPO : 3576 troncons dans la fenetre (3531 au sol, 45 ponts exclus du masque, 3 souterrains, 692 natures pietonnes, 109 hors service) ; largeurs mesurees 3517 / replis 14
+2026-08-01 20:50:36  passages OSM : 10236 noeuds lus, 8388 peints (1848 refuses par le filtre de marquage), 1614 dans la fenetre
+2026-08-01 20:50:38  verts OCS GE : 245 polygones CS2.* lus, 245 dans la fenetre
+2026-08-01 20:50:38  chargements : 3.4 s
+2026-08-01 20:50:41  cellule -3,-3 : chaussee 5.9 % | herbe 11633 m2 (raster 11677 m2, ecart 1.09 %) | 35 bordures (6479 m) | 23 bordurettes (818 m) | 0 passages | 70 tirets | masque 0.13 Mo | json 0.01 Mo | 3.0 s
+2026-08-01 20:50:41     herbe v3 : releve 11292 m2 -> regularisation -224 m2 (1994 -> 113 sommets) -> accostage+trous +565 m2 | trous vus 2, combles 0 (0 m2) | miettes 0/9 retirees (0.0 m2) | contour 1815 m -> bordurette 818 m
+2026-08-01 20:50:41     bordurette v4 : 10 extremites recalees sur une bordure de chaussee (4.00 m cumules) | peinture retractee de 0.10 m sous 23 pierres (-82.2 m2, soit 0.71 % de l'herbe)
+2026-08-01 20:50:45  cellule -3,-2 : chaussee 7.4 % | herbe 25433 m2 (raster 25533 m2, ecart 1.21 %) | 51 bordures (6322 m) | 39 bordurettes (2060 m) | 0 passages | 264 tirets | masque 0.18 Mo | json 0.02 Mo | 3.4 s
+2026-08-01 20:50:45     herbe v3 : releve 24419 m2 -> regularisation -371 m2 (3132 -> 216 sommets) -> accostage+trous +1385 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/19 retirees (0.0 m2) | contour 3911 m -> bordurette 2060 m
+2026-08-01 20:50:45     bordurette v4 : 14 extremites recalees sur une bordure de chaussee (5.60 m cumules) | peinture retractee de 0.10 m sous 39 pierres (-204.2 m2, soit 0.80 % de l'herbe)
+2026-08-01 20:50:49  cellule -3,-1 : chaussee 11.5 % | herbe 23113 m2 (raster 23329 m2, ecart 1.38 %) | 70 bordures (10442 m) | 62 bordurettes (996 m) | 0 passages | 253 tirets | masque 0.16 Mo | json 0.02 Mo | 3.8 s
+2026-08-01 20:50:49     herbe v3 : releve 22052 m2 -> regularisation -382 m2 (2545 -> 153 sommets) -> accostage+trous +1443 m2 | trous vus 1, combles 0 (0 m2) | miettes 9/26 retirees (10.7 m2) | contour 3853 m -> bordurette 996 m
+2026-08-01 20:50:49     bordurette v4 : 48 extremites recalees sur une bordure de chaussee (19.20 m cumules) | peinture retractee de 0.10 m sous 62 pierres (-101.2 m2, soit 0.44 % de l'herbe)
+2026-08-01 20:50:52  cellule -3,+0 : chaussee 4.1 % | herbe 20145 m2 (raster 20210 m2, ecart 0.82 %) | 46 bordures (3364 m) | 24 bordurettes (993 m) | 0 passages | 165 tirets | masque 0.11 Mo | json 0.01 Mo | 2.8 s
+2026-08-01 20:50:52     herbe v3 : releve 19963 m2 -> regularisation -311 m2 (2240 -> 144 sommets) -> accostage+trous +494 m2 | trous vus 2, combles 1 (17 m2) | miettes 3/13 retirees (3.0 m2) | contour 2030 m -> bordurette 993 m
+2026-08-01 20:50:52     bordurette v4 : 7 extremites recalees sur une bordure de chaussee (2.80 m cumules) | peinture retractee de 0.10 m sous 24 pierres (-98.8 m2, soit 0.49 % de l'herbe)
+2026-08-01 20:50:55  cellule -3,+1 : chaussee 10.4 % | herbe 12029 m2 (raster 12102 m2, ecart 1.16 %) | 60 bordures (10050 m) | 31 bordurettes (642 m) | 0 passages | 173 tirets | masque 0.14 Mo | json 0.02 Mo | 3.3 s
+2026-08-01 20:50:55     herbe v3 : releve 11560 m2 -> regularisation -225 m2 (1676 -> 99 sommets) -> accostage+trous +694 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/9 retirees (0.0 m2) | contour 1669 m -> bordurette 642 m
+2026-08-01 20:50:55     bordurette v4 : 6 extremites recalees sur une bordure de chaussee (2.40 m cumules) | peinture retractee de 0.10 m sous 31 pierres (-65.1 m2, soit 0.54 % de l'herbe)
+2026-08-01 20:50:57  cellule -3,+2 : chaussee 5.4 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 41 bordures (6338 m) | 0 bordurettes (0 m) | 0 passages | 63 tirets | masque 0.10 Mo | json 0.01 Mo | 2.3 s
+2026-08-01 20:50:57     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-01 20:50:57     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-01 20:51:01  cellule -2,-3 : chaussee 10.3 % | herbe 20003 m2 (raster 20108 m2, ecart 1.22 %) | 65 bordures (9926 m) | 48 bordurettes (1357 m) | 0 passages | 219 tirets | masque 0.15 Mo | json 0.02 Mo | 3.4 s
+2026-08-01 20:51:01     herbe v3 : releve 19580 m2 -> regularisation -381 m2 (2761 -> 196 sommets) -> accostage+trous +805 m2 | trous vus 2, combles 0 (0 m2) | miettes 0/15 retirees (0.0 m2) | contour 3253 m -> bordurette 1357 m
+2026-08-01 20:51:01     bordurette v4 : 13 extremites recalees sur une bordure de chaussee (5.20 m cumules) | peinture retractee de 0.10 m sous 48 pierres (-136.7 m2, soit 0.68 % de l'herbe)
+2026-08-01 20:51:04  cellule -2,-2 : chaussee 7.0 % | herbe 60548 m2 (raster 60699 m2, ecart 0.55 %) | 40 bordures (6395 m) | 53 bordurettes (1790 m) | 0 passages | 190 tirets | masque 0.13 Mo | json 0.02 Mo | 3.0 s
+2026-08-01 20:51:04     herbe v3 : releve 60130 m2 -> regularisation -404 m2 (3998 -> 314 sommets) -> accostage+trous +822 m2 | trous vus 3, combles 0 (0 m2) | miettes 0/11 retirees (0.0 m2) | contour 4043 m -> bordurette 1790 m
+2026-08-01 20:51:04     bordurette v4 : 18 extremites recalees sur une bordure de chaussee (7.57 m cumules) | peinture retractee de 0.10 m sous 53 pierres (-179.9 m2, soit 0.30 % de l'herbe)
+2026-08-01 20:51:07  cellule -2,-1 : chaussee 4.4 % | herbe 44458 m2 (raster 44684 m2, ecart 1.04 %) | 33 bordures (5667 m) | 62 bordurettes (2341 m) | 0 passages | 9 tirets | masque 0.16 Mo | json 0.01 Mo | 3.7 s
+2026-08-01 20:51:07     herbe v3 : releve 43458 m2 -> regularisation -566 m2 (4729 -> 326 sommets) -> accostage+trous +1566 m2 | trous vus 2, combles 0 (0 m2) | miettes 0/21 retirees (0.0 m2) | contour 5687 m -> bordurette 2341 m
+2026-08-01 20:51:07     bordurette v4 : 24 extremites recalees sur une bordure de chaussee (9.60 m cumules) | peinture retractee de 0.10 m sous 62 pierres (-234.1 m2, soit 0.53 % de l'herbe)
+2026-08-01 20:51:10  cellule -2,+0 : chaussee 3.3 % | herbe 14153 m2 (raster 14198 m2, ecart 1.19 %) | 30 bordures (3792 m) | 24 bordurettes (1213 m) | 0 passages | 39 tirets | masque 0.10 Mo | json 0.01 Mo | 2.8 s
+2026-08-01 20:51:10     herbe v3 : releve 13855 m2 -> regularisation -372 m2 (1848 -> 130 sommets) -> accostage+trous +670 m2 | trous vus 0, combles 0 (0 m2) | miettes 2/15 retirees (0.2 m2) | contour 2391 m -> bordurette 1213 m
+2026-08-01 20:51:10     bordurette v4 : 7 extremites recalees sur une bordure de chaussee (2.80 m cumules) | peinture retractee de 0.10 m sous 24 pierres (-121.5 m2, soit 0.86 % de l'herbe)
+2026-08-01 20:51:13  cellule -2,+1 : chaussee 7.7 % | herbe 43449 m2 (raster 43606 m2, ecart 0.77 %) | 63 bordures (8843 m) | 35 bordurettes (1757 m) | 0 passages | 71 tirets | masque 0.15 Mo | json 0.01 Mo | 3.1 s
+2026-08-01 20:51:13     herbe v3 : releve 43105 m2 -> regularisation -377 m2 (2976 -> 204 sommets) -> accostage+trous +721 m2 | trous vus 3, combles 0 (0 m2) | miettes 1/13 retirees (12.8 m2) | contour 3288 m -> bordurette 1757 m
+2026-08-01 20:51:13     bordurette v4 : 23 extremites recalees sur une bordure de chaussee (9.20 m cumules) | peinture retractee de 0.10 m sous 35 pierres (-176.2 m2, soit 0.41 % de l'herbe)
+2026-08-01 20:51:15  cellule -2,+2 : chaussee 5.3 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 47 bordures (6094 m) | 0 bordurettes (0 m) | 0 passages | 41 tirets | masque 0.08 Mo | json 0.01 Mo | 2.2 s
+2026-08-01 20:51:15     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-01 20:51:15     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-01 20:51:19  cellule -1,-3 : chaussee 9.8 % | herbe 9016 m2 (raster 9129 m2, ecart 1.86 %) | 53 bordures (10269 m) | 34 bordurettes (533 m) | 0 passages | 193 tirets | masque 0.14 Mo | json 0.02 Mo | 4.0 s
+2026-08-01 20:51:19     herbe v3 : releve 8326 m2 -> regularisation -54 m2 (1682 -> 106 sommets) -> accostage+trous +744 m2 | trous vus 1, combles 0 (0 m2) | miettes 0/8 retirees (0.0 m2) | contour 2026 m -> bordurette 533 m
+2026-08-01 20:51:19     bordurette v4 : 9 extremites recalees sur une bordure de chaussee (3.60 m cumules) | peinture retractee de 0.10 m sous 34 pierres (-54.2 m2, soit 0.60 % de l'herbe)
+2026-08-01 20:51:23  cellule -1,-2 : chaussee 12.6 % | herbe 3832 m2 (raster 3861 m2, ecart 1.28 %) | 85 bordures (11022 m) | 17 bordurettes (191 m) | 0 passages | 196 tirets | masque 0.14 Mo | json 0.02 Mo | 4.1 s
+2026-08-01 20:51:23     herbe v3 : releve 3677 m2 -> regularisation -62 m2 (1239 -> 61 sommets) -> accostage+trous +217 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/7 retirees (0.0 m2) | contour 859 m -> bordurette 191 m
+2026-08-01 20:51:23     bordurette v4 : 8 extremites recalees sur une bordure de chaussee (3.20 m cumules) | peinture retractee de 0.10 m sous 17 pierres (-19.7 m2, soit 0.51 % de l'herbe)
+2026-08-01 20:51:27  cellule -1,-1 : chaussee 6.6 % | herbe 27695 m2 (raster 27822 m2, ecart 0.89 %) | 69 bordures (7974 m) | 67 bordurettes (1194 m) | 0 passages | 4 tirets | masque 0.15 Mo | json 0.02 Mo | 3.5 s
+2026-08-01 20:51:27     herbe v3 : releve 27211 m2 -> regularisation -521 m2 (3779 -> 209 sommets) -> accostage+trous +1006 m2 | trous vus 1, combles 0 (0 m2) | miettes 1/15 retirees (7.4 m2) | contour 3187 m -> bordurette 1194 m
+2026-08-01 20:51:27     bordurette v4 : 17 extremites recalees sur une bordure de chaussee (6.80 m cumules) | peinture retractee de 0.10 m sous 67 pierres (-120.1 m2, soit 0.43 % de l'herbe)
+2026-08-01 20:51:30  cellule -1,+0 : chaussee 7.5 % | herbe 10398 m2 (raster 10469 m2, ecart 1.22 %) | 114 bordures (8389 m) | 11 bordurettes (556 m) | 0 passages | 27 tirets | masque 0.12 Mo | json 0.01 Mo | 3.1 s
+2026-08-01 20:51:30     herbe v3 : releve 10344 m2 -> regularisation -244 m2 (965 -> 67 sommets) -> accostage+trous +299 m2 | trous vus 0, combles 0 (0 m2) | miettes 1/8 retirees (2.2 m2) | contour 1257 m -> bordurette 556 m
+2026-08-01 20:51:30     bordurette v4 : 2 extremites recalees sur une bordure de chaussee (0.80 m cumules) | peinture retractee de 0.10 m sous 11 pierres (-55.8 m2, soit 0.54 % de l'herbe)
+2026-08-01 20:51:33  cellule -1,+1 : chaussee 5.7 % | herbe 5475 m2 (raster 5528 m2, ecart 1.46 %) | 60 bordures (5967 m) | 17 bordurettes (249 m) | 0 passages | 63 tirets | masque 0.09 Mo | json 0.01 Mo | 2.8 s
+2026-08-01 20:51:33     herbe v3 : releve 5357 m2 -> regularisation -53 m2 (892 -> 55 sommets) -> accostage+trous +171 m2 | trous vus 2, combles 0 (0 m2) | miettes 0/3 retirees (0.0 m2) | contour 831 m -> bordurette 249 m
+2026-08-01 20:51:33     bordurette v4 : 10 extremites recalees sur une bordure de chaussee (4.00 m cumules) | peinture retractee de 0.10 m sous 17 pierres (-26.0 m2, soit 0.48 % de l'herbe)
+2026-08-01 20:51:35  cellule -1,+2 : chaussee 5.9 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 60 bordures (5879 m) | 0 bordurettes (0 m) | 0 passages | 154 tirets | masque 0.10 Mo | json 0.01 Mo | 2.6 s
+2026-08-01 20:51:35     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-01 20:51:35     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-01 20:51:39  cellule +0,-3 : chaussee 7.2 % | herbe 14136 m2 (raster 14241 m2, ecart 1.45 %) | 44 bordures (6981 m) | 21 bordurettes (1000 m) | 0 passages | 223 tirets | masque 0.15 Mo | json 0.01 Mo | 3.1 s
+2026-08-01 20:51:39     herbe v3 : releve 13292 m2 -> regularisation -383 m2 (1834 -> 118 sommets) -> accostage+trous +1227 m2 | trous vus 0, combles 0 (0 m2) | miettes 2/11 retirees (11.6 m2) | contour 2802 m -> bordurette 1000 m
+2026-08-01 20:51:39     bordurette v4 : 6 extremites recalees sur une bordure de chaussee (2.40 m cumules) | peinture retractee de 0.10 m sous 21 pierres (-98.9 m2, soit 0.70 % de l'herbe)
+2026-08-01 20:51:42  cellule +0,-2 : chaussee 10.3 % | herbe 1283 m2 (raster 1284 m2, ecart 0.64 %) | 51 bordures (10660 m) | 4 bordurettes (72 m) | 0 passages | 100 tirets | masque 0.12 Mo | json 0.01 Mo | 3.4 s
+2026-08-01 20:51:42     herbe v3 : releve 1256 m2 -> regularisation -47 m2 (315 -> 15 sommets) -> accostage+trous +74 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/2 retirees (0.0 m2) | contour 233 m -> bordurette 72 m
+2026-08-01 20:51:42     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 4 pierres (-7.2 m2, soit 0.56 % de l'herbe)
+2026-08-01 20:51:45  cellule +0,-1 : chaussee 12.8 % | herbe 5607 m2 (raster 5629 m2, ecart 1.09 %) | 74 bordures (13232 m) | 11 bordurettes (384 m) | 0 passages | 143 tirets | masque 0.15 Mo | json 0.02 Mo | 3.0 s
+2026-08-01 20:51:45     herbe v3 : releve 5357 m2 -> regularisation -161 m2 (813 -> 71 sommets) -> accostage+trous +411 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/6 retirees (0.0 m2) | contour 868 m -> bordurette 384 m
+2026-08-01 20:51:45     bordurette v4 : 13 extremites recalees sur une bordure de chaussee (5.20 m cumules) | peinture retractee de 0.10 m sous 11 pierres (-39.5 m2, soit 0.70 % de l'herbe)
+2026-08-01 20:51:48  cellule +0,+0 : chaussee 10.1 % | herbe 6317 m2 (raster 6394 m2, ecart 2.07 %) | 75 bordures (10611 m) | 15 bordurettes (518 m) | 0 passages | 113 tirets | masque 0.11 Mo | json 0.01 Mo | 3.0 s
+2026-08-01 20:51:48     herbe v3 : releve 6072 m2 -> regularisation -217 m2 (1516 -> 96 sommets) -> accostage+trous +463 m2 | trous vus 1, combles 0 (0 m2) | miettes 0/10 retirees (0.0 m2) | contour 1302 m -> bordurette 518 m
+2026-08-01 20:51:48     bordurette v4 : 15 extremites recalees sur une bordure de chaussee (6.00 m cumules) | peinture retractee de 0.10 m sous 15 pierres (-52.5 m2, soit 0.83 % de l'herbe)
+2026-08-01 20:51:51  cellule +0,+1 : chaussee 9.8 % | herbe 10555 m2 (raster 10613 m2, ecart 0.97 %) | 150 bordures (9357 m) | 27 bordurettes (440 m) | 0 passages | 70 tirets | masque 0.15 Mo | json 0.02 Mo | 3.3 s
+2026-08-01 20:51:51     herbe v3 : releve 10462 m2 -> regularisation -252 m2 (1698 -> 92 sommets) -> accostage+trous +345 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/8 retirees (0.0 m2) | contour 1262 m -> bordurette 440 m
+2026-08-01 20:51:51     bordurette v4 : 8 extremites recalees sur une bordure de chaussee (3.20 m cumules) | peinture retractee de 0.10 m sous 27 pierres (-44.1 m2, soit 0.42 % de l'herbe)
+2026-08-01 20:51:54  cellule +0,+2 : chaussee 8.5 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 63 bordures (8446 m) | 0 bordurettes (0 m) | 0 passages | 51 tirets | masque 0.11 Mo | json 0.01 Mo | 2.3 s
+2026-08-01 20:51:54     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-01 20:51:54     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-01 20:51:57  cellule +1,-3 : chaussee 6.4 % | herbe 13309 m2 (raster 13313 m2, ecart 0.51 %) | 45 bordures (6247 m) | 29 bordurettes (630 m) | 0 passages | 82 tirets | masque 0.14 Mo | json 0.01 Mo | 3.4 s
+2026-08-01 20:51:57     herbe v3 : releve 12962 m2 -> regularisation -86 m2 (1204 -> 79 sommets) -> accostage+trous +433 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/7 retirees (0.0 m2) | contour 1350 m -> bordurette 630 m
+2026-08-01 20:51:57     bordurette v4 : 13 extremites recalees sur une bordure de chaussee (5.20 m cumules) | peinture retractee de 0.10 m sous 29 pierres (-63.8 m2, soit 0.48 % de l'herbe)
+2026-08-01 20:52:00  cellule +1,-2 : chaussee 7.8 % | herbe 6420 m2 (raster 6466 m2, ecart 1.15 %) | 55 bordures (6932 m) | 7 bordurettes (271 m) | 0 passages | 185 tirets | masque 0.13 Mo | json 0.01 Mo | 2.8 s
+2026-08-01 20:52:00     herbe v3 : releve 6031 m2 -> regularisation +21 m2 (408 -> 35 sommets) -> accostage+trous +368 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/3 retirees (0.0 m2) | contour 1067 m -> bordurette 271 m
+2026-08-01 20:52:00     bordurette v4 : 4 extremites recalees sur une bordure de chaussee (1.60 m cumules) | peinture retractee de 0.10 m sous 7 pierres (-27.6 m2, soit 0.43 % de l'herbe)
+2026-08-01 20:52:03  cellule +1,-1 : chaussee 9.8 % | herbe 4844 m2 (raster 4857 m2, ecart 0.76 %) | 47 bordures (11062 m) | 12 bordurettes (225 m) | 0 passages | 165 tirets | masque 0.12 Mo | json 0.01 Mo | 3.0 s
+2026-08-01 20:52:03     herbe v3 : releve 4510 m2 -> regularisation -107 m2 (644 -> 40 sommets) -> accostage+trous +441 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/5 retirees (0.0 m2) | contour 898 m -> bordurette 225 m
+2026-08-01 20:52:03     bordurette v4 : 11 extremites recalees sur une bordure de chaussee (4.40 m cumules) | peinture retractee de 0.10 m sous 12 pierres (-23.6 m2, soit 0.49 % de l'herbe)
+2026-08-01 20:52:06  cellule +1,+0 : chaussee 11.9 % | herbe 11231 m2 (raster 11373 m2, ecart 1.73 %) | 83 bordures (12458 m) | 31 bordurettes (500 m) | 0 passages | 226 tirets | masque 0.13 Mo | json 0.02 Mo | 3.1 s
+2026-08-01 20:52:06     herbe v3 : releve 10440 m2 -> regularisation -206 m2 (1647 -> 114 sommets) -> accostage+trous +997 m2 | trous vus 0, combles 0 (0 m2) | miettes 7/19 retirees (2.0 m2) | contour 1913 m -> bordurette 500 m
+2026-08-01 20:52:06     bordurette v4 : 26 extremites recalees sur une bordure de chaussee (10.40 m cumules) | peinture retractee de 0.10 m sous 31 pierres (-51.0 m2, soit 0.45 % de l'herbe)
+2026-08-01 20:52:09  cellule +1,+1 : chaussee 9.9 % | herbe 38256 m2 (raster 38521 m2, ecart 1.07 %) | 57 bordures (10724 m) | 56 bordurettes (1402 m) | 0 passages | 103 tirets | masque 0.14 Mo | json 0.02 Mo | 3.2 s
+2026-08-01 20:52:09     herbe v3 : releve 37301 m2 -> regularisation -524 m2 (3561 -> 246 sommets) -> accostage+trous +1480 m2 | trous vus 6, combles 0 (0 m2) | miettes 0/13 retirees (0.0 m2) | contour 3740 m -> bordurette 1402 m
+2026-08-01 20:52:09     bordurette v4 : 33 extremites recalees sur une bordure de chaussee (13.20 m cumules) | peinture retractee de 0.10 m sous 56 pierres (-143.9 m2, soit 0.38 % de l'herbe)
+2026-08-01 20:52:12  cellule +1,+2 : chaussee 6.5 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 27 bordures (6688 m) | 0 bordurettes (0 m) | 0 passages | 147 tirets | masque 0.08 Mo | json 0.01 Mo | 2.6 s
+2026-08-01 20:52:12     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-01 20:52:12     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-01 20:52:14  cellule +2,-3 : chaussee 8.8 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 68 bordures (10112 m) | 0 bordurettes (0 m) | 0 passages | 73 tirets | masque 0.14 Mo | json 0.01 Mo | 2.7 s
+2026-08-01 20:52:14     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-01 20:52:14     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-01 20:52:17  cellule +2,-2 : chaussee 9.4 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 70 bordures (10362 m) | 0 bordurettes (0 m) | 0 passages | 138 tirets | masque 0.14 Mo | json 0.01 Mo | 2.5 s
+2026-08-01 20:52:17     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-01 20:52:17     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-01 20:52:19  cellule +2,-1 : chaussee 7.8 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 75 bordures (8163 m) | 0 bordurettes (0 m) | 0 passages | 51 tirets | masque 0.09 Mo | json 0.01 Mo | 2.4 s
+2026-08-01 20:52:19     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-01 20:52:19     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-01 20:52:22  cellule +2,+0 : chaussee 10.1 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 56 bordures (10190 m) | 0 bordurettes (0 m) | 0 passages | 160 tirets | masque 0.10 Mo | json 0.01 Mo | 2.9 s
+2026-08-01 20:52:22     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-01 20:52:22     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-01 20:52:24  cellule +2,+1 : chaussee 6.2 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 28 bordures (5934 m) | 0 bordurettes (0 m) | 0 passages | 183 tirets | masque 0.06 Mo | json 0.01 Mo | 2.2 s
+2026-08-01 20:52:24     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-01 20:52:24     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-01 20:52:27  cellule +2,+2 : chaussee 8.4 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 45 bordures (9115 m) | 0 bordurettes (0 m) | 0 passages | 119 tirets | masque 0.11 Mo | json 0.01 Mo | 2.4 s
+2026-08-01 20:52:27     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-01 20:52:27     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-01 20:52:27  TOTAL 111.8 s | 36 cellules | masques 4.5 Mo (0.13 Mo/cellule) | json 0.51 Mo
+2026-08-01 20:52:27  PEINT   : 731355 m2 de chaussee, 88094 m2 de voirie privee, 1852 m2 de gravier, 443337 m2 d'HERBE (ecart raster max 2.07 %)
+2026-08-01 20:52:27  HERBE V3: releve 432010 m2 -> regularisation -6512 m2 (50096 -> 3299 sommets) -> accostage+trous +17838 m2 | trous vus 26, combles 1 (17 m2) | miettes 26/276 retirees (50.0 m2)
+2026-08-01 20:52:27  MAILLE  : 2135 polylignes de bordure (300485 m), 760 bordurettes d'herbe (22131 m sur 55534 m de contour, 34 m ecartes trop courts), 0 passages, 4526 tirets
+2026-08-01 21:45:14  === MAQUETTE DU SOL : cuisson de 36 cellules -3,-3 -3,-2 -3,-1 -3,+0 -3,+1 -3,+2 -2,-3 -2,-2 -2,-1 -2,+0 -2,+1 -2,+2 -1,-3 -1,-2 -1,-1 -1,+0 -1,+1 -1,+2 +0,-3 +0,-2 +0,-1 +0,+0 +0,+1 +0,+2 +1,-3 +1,-2 +1,-1 +1,+0 +1,+1 +1,+2 +2,-3 +2,-2 +2,-1 +2,+0 +2,+1 +2,+2 ===
+2026-08-01 21:45:15  routes BD TOPO : 3576 troncons dans la fenetre (3531 au sol, 45 ponts exclus du masque, 3 souterrains, 692 natures pietonnes, 109 hors service) ; largeurs mesurees 3517 / replis 14
+2026-08-01 21:45:15  passages OSM : 10236 noeuds lus, 8388 peints (1848 refuses par le filtre de marquage), 1614 dans la fenetre
+2026-08-01 21:45:18  verts OCS GE : 716 polygones CS2.* lus, 608 dans la fenetre
+2026-08-01 21:45:18  chargements : 4.3 s
+2026-08-01 21:45:24  cellule -3,-3 : chaussee 5.9 % | herbe 33975 m2 (raster 34102 m2, ecart 0.86 %) | 35 bordures (6479 m) | 73 bordurettes (1605 m) | 0 passages | 70 tirets | masque 0.16 Mo | json 0.02 Mo | 5.8 s
+2026-08-01 21:45:24     herbe v3 : releve 33056 m2 -> regularisation -390 m2 (5721 -> 305 sommets) -> accostage+trous +1309 m2 | trous vus 3, combles 0 (0 m2) | miettes 1/19 retirees (11.4 m2) | contour 4315 m -> bordurette 1605 m
+2026-08-01 21:45:24     bordurette v4 : 28 extremites recalees sur une bordure de chaussee (11.20 m cumules) | peinture retractee de 0.10 m sous 73 pierres (-162.9 m2, soit 0.48 % de l'herbe)
+2026-08-01 21:45:30  cellule -3,-2 : chaussee 7.4 % | herbe 43105 m2 (raster 43223 m2, ecart 1.15 %) | 51 bordures (6322 m) | 64 bordurettes (3753 m) | 0 passages | 264 tirets | masque 0.21 Mo | json 0.03 Mo | 6.5 s
+2026-08-01 21:45:30     herbe v3 : releve 41345 m2 -> regularisation -638 m2 (5955 -> 396 sommets) -> accostage+trous +2398 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/29 retirees (0.0 m2) | contour 6332 m -> bordurette 3753 m
+2026-08-01 21:45:30     bordurette v4 : 22 extremites recalees sur une bordure de chaussee (8.80 m cumules) | peinture retractee de 0.10 m sous 64 pierres (-372.5 m2, soit 0.86 % de l'herbe)
+2026-08-01 21:45:38  cellule -3,-1 : chaussee 11.5 % | herbe 49005 m2 (raster 49337 m2, ecart 1.08 %) | 70 bordures (10442 m) | 102 bordurettes (1957 m) | 0 passages | 253 tirets | masque 0.19 Mo | json 0.03 Mo | 7.5 s
+2026-08-01 21:45:38     herbe v3 : releve 47201 m2 -> regularisation -720 m2 (5282 -> 306 sommets) -> accostage+trous +2524 m2 | trous vus 3, combles 0 (0 m2) | miettes 14/43 retirees (2.7 m2) | contour 7034 m -> bordurette 1957 m
+2026-08-01 21:45:38     bordurette v4 : 62 extremites recalees sur une bordure de chaussee (24.80 m cumules) | peinture retractee de 0.10 m sous 102 pierres (-195.6 m2, soit 0.40 % de l'herbe)
+2026-08-01 21:45:43  cellule -3,+0 : chaussee 4.1 % | herbe 28366 m2 (raster 28481 m2, ecart 1.02 %) | 46 bordures (3364 m) | 56 bordurettes (1750 m) | 0 passages | 165 tirets | masque 0.13 Mo | json 0.02 Mo | 5.7 s
+2026-08-01 21:45:43     herbe v3 : releve 27970 m2 -> regularisation -378 m2 (4349 -> 267 sommets) -> accostage+trous +773 m2 | trous vus 1, combles 0 (0 m2) | miettes 13/30 retirees (11.4 m2) | contour 3462 m -> bordurette 1750 m
+2026-08-01 21:45:43     bordurette v4 : 20 extremites recalees sur une bordure de chaussee (8.00 m cumules) | peinture retractee de 0.10 m sous 56 pierres (-172.6 m2, soit 0.61 % de l'herbe)
+2026-08-01 21:45:50  cellule -3,+1 : chaussee 10.4 % | herbe 29324 m2 (raster 29541 m2, ecart 1.26 %) | 60 bordures (10050 m) | 82 bordurettes (1504 m) | 0 passages | 173 tirets | masque 0.16 Mo | json 0.02 Mo | 6.5 s
+2026-08-01 21:45:50     herbe v3 : releve 28793 m2 -> regularisation -561 m2 (5092 -> 279 sommets) -> accostage+trous +1091 m2 | trous vus 5, combles 0 (0 m2) | miettes 0/22 retirees (0.0 m2) | contour 4181 m -> bordurette 1504 m
+2026-08-01 21:45:50     bordurette v4 : 8 extremites recalees sur une bordure de chaussee (3.20 m cumules) | peinture retractee de 0.10 m sous 82 pierres (-151.8 m2, soit 0.52 % de l'herbe)
+2026-08-01 21:45:58  cellule -3,+2 : chaussee 5.4 % | herbe 44774 m2 (raster 44951 m2, ecart 1.09 %) | 41 bordures (6338 m) | 134 bordurettes (3073 m) | 0 passages | 63 tirets | masque 0.19 Mo | json 0.02 Mo | 8.0 s
+2026-08-01 21:45:58     herbe v3 : releve 43794 m2 -> regularisation -795 m2 (9861 -> 552 sommets) -> accostage+trous +1775 m2 | trous vus 13, combles 0 (0 m2) | miettes 18/51 retirees (4.8 m2) | contour 6894 m -> bordurette 3073 m
+2026-08-01 21:45:58     bordurette v4 : 28 extremites recalees sur une bordure de chaussee (11.20 m cumules) | peinture retractee de 0.10 m sous 134 pierres (-308.7 m2, soit 0.69 % de l'herbe)
+2026-08-01 21:46:04  cellule -2,-3 : chaussee 10.3 % | herbe 28341 m2 (raster 28490 m2, ecart 1.11 %) | 65 bordures (9926 m) | 81 bordurettes (1616 m) | 0 passages | 219 tirets | masque 0.17 Mo | json 0.02 Mo | 6.2 s
+2026-08-01 21:46:04     herbe v3 : releve 27613 m2 -> regularisation -543 m2 (4413 -> 267 sommets) -> accostage+trous +1271 m2 | trous vus 4, combles 0 (0 m2) | miettes 0/19 retirees (0.0 m2) | contour 4366 m -> bordurette 1616 m
+2026-08-01 21:46:04     bordurette v4 : 24 extremites recalees sur une bordure de chaussee (9.60 m cumules) | peinture retractee de 0.10 m sous 81 pierres (-163.8 m2, soit 0.58 % de l'herbe)
+2026-08-01 21:46:10  cellule -2,-2 : chaussee 7.0 % | herbe 60548 m2 (raster 60699 m2, ecart 0.55 %) | 40 bordures (6395 m) | 53 bordurettes (1790 m) | 0 passages | 190 tirets | masque 0.13 Mo | json 0.02 Mo | 5.5 s
+2026-08-01 21:46:10     herbe v3 : releve 60130 m2 -> regularisation -404 m2 (3998 -> 314 sommets) -> accostage+trous +822 m2 | trous vus 3, combles 0 (0 m2) | miettes 0/11 retirees (0.0 m2) | contour 4043 m -> bordurette 1790 m
+2026-08-01 21:46:10     bordurette v4 : 18 extremites recalees sur une bordure de chaussee (7.57 m cumules) | peinture retractee de 0.10 m sous 53 pierres (-179.9 m2, soit 0.30 % de l'herbe)
+2026-08-01 21:46:15  cellule -2,-1 : chaussee 4.4 % | herbe 44458 m2 (raster 44684 m2, ecart 1.04 %) | 33 bordures (5667 m) | 62 bordurettes (2341 m) | 0 passages | 9 tirets | masque 0.16 Mo | json 0.01 Mo | 5.5 s
+2026-08-01 21:46:15     herbe v3 : releve 43458 m2 -> regularisation -566 m2 (4729 -> 326 sommets) -> accostage+trous +1566 m2 | trous vus 2, combles 0 (0 m2) | miettes 0/21 retirees (0.0 m2) | contour 5687 m -> bordurette 2341 m
+2026-08-01 21:46:15     bordurette v4 : 24 extremites recalees sur une bordure de chaussee (9.60 m cumules) | peinture retractee de 0.10 m sous 62 pierres (-234.1 m2, soit 0.53 % de l'herbe)
+2026-08-01 21:46:18  cellule -2,+0 : chaussee 3.3 % | herbe 14153 m2 (raster 14198 m2, ecart 1.19 %) | 30 bordures (3792 m) | 24 bordurettes (1213 m) | 0 passages | 39 tirets | masque 0.10 Mo | json 0.01 Mo | 2.8 s
+2026-08-01 21:46:18     herbe v3 : releve 13855 m2 -> regularisation -372 m2 (1848 -> 130 sommets) -> accostage+trous +670 m2 | trous vus 0, combles 0 (0 m2) | miettes 2/15 retirees (0.2 m2) | contour 2391 m -> bordurette 1213 m
+2026-08-01 21:46:18     bordurette v4 : 7 extremites recalees sur une bordure de chaussee (2.80 m cumules) | peinture retractee de 0.10 m sous 24 pierres (-121.5 m2, soit 0.86 % de l'herbe)
+2026-08-01 21:46:21  cellule -2,+1 : chaussee 7.7 % | herbe 53158 m2 (raster 53353 m2, ecart 0.82 %) | 63 bordures (8843 m) | 45 bordurettes (2358 m) | 0 passages | 71 tirets | masque 0.16 Mo | json 0.02 Mo | 3.3 s
+2026-08-01 21:46:21     herbe v3 : releve 52733 m2 -> regularisation -533 m2 (3898 -> 267 sommets) -> accostage+trous +957 m2 | trous vus 3, combles 0 (0 m2) | miettes 0/16 retirees (0.0 m2) | contour 4331 m -> bordurette 2358 m
+2026-08-01 21:46:21     bordurette v4 : 24 extremites recalees sur une bordure de chaussee (9.60 m cumules) | peinture retractee de 0.10 m sous 45 pierres (-236.4 m2, soit 0.44 % de l'herbe)
+2026-08-01 21:46:24  cellule -2,+2 : chaussee 5.3 % | herbe 53655 m2 (raster 53806 m2, ecart 0.74 %) | 47 bordures (6094 m) | 76 bordurettes (2385 m) | 0 passages | 41 tirets | masque 0.14 Mo | json 0.01 Mo | 3.1 s
+2026-08-01 21:46:24     herbe v3 : releve 53216 m2 -> regularisation -765 m2 (4399 -> 289 sommets) -> accostage+trous +1204 m2 | trous vus 5, combles 0 (0 m2) | miettes 1/17 retirees (7.6 m2) | contour 4794 m -> bordurette 2385 m
+2026-08-01 21:46:24     bordurette v4 : 25 extremites recalees sur une bordure de chaussee (10.00 m cumules) | peinture retractee de 0.10 m sous 76 pierres (-245.3 m2, soit 0.46 % de l'herbe)
+2026-08-01 21:46:29  cellule -1,-3 : chaussee 9.8 % | herbe 21713 m2 (raster 21919 m2, ecart 1.54 %) | 53 bordures (10269 m) | 100 bordurettes (1242 m) | 0 passages | 193 tirets | masque 0.17 Mo | json 0.02 Mo | 4.6 s
+2026-08-01 21:46:29     herbe v3 : releve 20822 m2 -> regularisation -322 m2 (5105 -> 253 sommets) -> accostage+trous +1213 m2 | trous vus 8, combles 0 (0 m2) | miettes 13/33 retirees (4.0 m2) | contour 4085 m -> bordurette 1242 m
+2026-08-01 21:46:29     bordurette v4 : 10 extremites recalees sur une bordure de chaussee (4.00 m cumules) | peinture retractee de 0.10 m sous 100 pierres (-125.6 m2, soit 0.58 % de l'herbe)
+2026-08-01 21:46:33  cellule -1,-2 : chaussee 12.6 % | herbe 3832 m2 (raster 3861 m2, ecart 1.28 %) | 85 bordures (11022 m) | 17 bordurettes (191 m) | 0 passages | 196 tirets | masque 0.14 Mo | json 0.02 Mo | 4.2 s
+2026-08-01 21:46:33     herbe v3 : releve 3677 m2 -> regularisation -62 m2 (1239 -> 61 sommets) -> accostage+trous +217 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/7 retirees (0.0 m2) | contour 859 m -> bordurette 191 m
+2026-08-01 21:46:33     bordurette v4 : 8 extremites recalees sur une bordure de chaussee (3.20 m cumules) | peinture retractee de 0.10 m sous 17 pierres (-19.7 m2, soit 0.51 % de l'herbe)
+2026-08-01 21:46:36  cellule -1,-1 : chaussee 6.6 % | herbe 27695 m2 (raster 27822 m2, ecart 0.89 %) | 69 bordures (7974 m) | 67 bordurettes (1194 m) | 0 passages | 4 tirets | masque 0.15 Mo | json 0.02 Mo | 3.5 s
+2026-08-01 21:46:36     herbe v3 : releve 27211 m2 -> regularisation -521 m2 (3779 -> 209 sommets) -> accostage+trous +1006 m2 | trous vus 1, combles 0 (0 m2) | miettes 1/15 retirees (7.4 m2) | contour 3187 m -> bordurette 1194 m
+2026-08-01 21:46:36     bordurette v4 : 17 extremites recalees sur une bordure de chaussee (6.80 m cumules) | peinture retractee de 0.10 m sous 67 pierres (-120.1 m2, soit 0.43 % de l'herbe)
+2026-08-01 21:46:40  cellule -1,+0 : chaussee 7.5 % | herbe 10398 m2 (raster 10469 m2, ecart 1.22 %) | 114 bordures (8389 m) | 11 bordurettes (556 m) | 0 passages | 27 tirets | masque 0.12 Mo | json 0.01 Mo | 3.1 s
+2026-08-01 21:46:40     herbe v3 : releve 10344 m2 -> regularisation -244 m2 (965 -> 67 sommets) -> accostage+trous +299 m2 | trous vus 0, combles 0 (0 m2) | miettes 1/8 retirees (2.2 m2) | contour 1257 m -> bordurette 556 m
+2026-08-01 21:46:40     bordurette v4 : 2 extremites recalees sur une bordure de chaussee (0.80 m cumules) | peinture retractee de 0.10 m sous 11 pierres (-55.8 m2, soit 0.54 % de l'herbe)
+2026-08-01 21:46:43  cellule -1,+1 : chaussee 5.7 % | herbe 8452 m2 (raster 8539 m2, ecart 1.50 %) | 60 bordures (5967 m) | 21 bordurettes (378 m) | 0 passages | 63 tirets | masque 0.09 Mo | json 0.01 Mo | 2.9 s
+2026-08-01 21:46:43     herbe v3 : releve 8331 m2 -> regularisation -138 m2 (1632 -> 98 sommets) -> accostage+trous +259 m2 | trous vus 5, combles 0 (0 m2) | miettes 0/6 retirees (0.0 m2) | contour 1261 m -> bordurette 378 m
+2026-08-01 21:46:43     bordurette v4 : 10 extremites recalees sur une bordure de chaussee (4.00 m cumules) | peinture retractee de 0.10 m sous 21 pierres (-38.8 m2, soit 0.46 % de l'herbe)
+2026-08-01 21:46:46  cellule -1,+2 : chaussee 5.9 % | herbe 10397 m2 (raster 10442 m2, ecart 1.17 %) | 60 bordures (5879 m) | 21 bordurettes (743 m) | 0 passages | 154 tirets | masque 0.12 Mo | json 0.02 Mo | 3.3 s
+2026-08-01 21:46:46     herbe v3 : releve 10132 m2 -> regularisation -256 m2 (1551 -> 94 sommets) -> accostage+trous +521 m2 | trous vus 2, combles 0 (0 m2) | miettes 0/9 retirees (0.0 m2) | contour 1541 m -> bordurette 743 m
+2026-08-01 21:46:46     bordurette v4 : 23 extremites recalees sur une bordure de chaussee (9.20 m cumules) | peinture retractee de 0.10 m sous 21 pierres (-76.2 m2, soit 0.73 % de l'herbe)
+2026-08-01 21:46:49  cellule +0,-3 : chaussee 7.2 % | herbe 20199 m2 (raster 20311 m2, ecart 1.20 %) | 44 bordures (6981 m) | 28 bordurettes (1300 m) | 0 passages | 223 tirets | masque 0.16 Mo | json 0.02 Mo | 3.2 s
+2026-08-01 21:46:49     herbe v3 : releve 19206 m2 -> regularisation -417 m2 (2522 -> 152 sommets) -> accostage+trous +1409 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/12 retirees (0.0 m2) | contour 3294 m -> bordurette 1300 m
+2026-08-01 21:46:49     bordurette v4 : 6 extremites recalees sur une bordure de chaussee (2.40 m cumules) | peinture retractee de 0.10 m sous 28 pierres (-128.9 m2, soit 0.64 % de l'herbe)
+2026-08-01 21:46:53  cellule +0,-2 : chaussee 10.3 % | herbe 1283 m2 (raster 1284 m2, ecart 0.64 %) | 51 bordures (10660 m) | 4 bordurettes (72 m) | 0 passages | 100 tirets | masque 0.12 Mo | json 0.01 Mo | 3.5 s
+2026-08-01 21:46:53     herbe v3 : releve 1256 m2 -> regularisation -47 m2 (315 -> 15 sommets) -> accostage+trous +74 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/2 retirees (0.0 m2) | contour 233 m -> bordurette 72 m
+2026-08-01 21:46:53     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 4 pierres (-7.2 m2, soit 0.56 % de l'herbe)
+2026-08-01 21:46:56  cellule +0,-1 : chaussee 12.8 % | herbe 5607 m2 (raster 5629 m2, ecart 1.09 %) | 74 bordures (13232 m) | 11 bordurettes (384 m) | 0 passages | 143 tirets | masque 0.15 Mo | json 0.02 Mo | 3.1 s
+2026-08-01 21:46:56     herbe v3 : releve 5357 m2 -> regularisation -161 m2 (813 -> 71 sommets) -> accostage+trous +411 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/6 retirees (0.0 m2) | contour 868 m -> bordurette 384 m
+2026-08-01 21:46:56     bordurette v4 : 13 extremites recalees sur une bordure de chaussee (5.20 m cumules) | peinture retractee de 0.10 m sous 11 pierres (-39.5 m2, soit 0.70 % de l'herbe)
+2026-08-01 21:46:59  cellule +0,+0 : chaussee 10.1 % | herbe 6317 m2 (raster 6394 m2, ecart 2.07 %) | 75 bordures (10611 m) | 15 bordurettes (518 m) | 0 passages | 113 tirets | masque 0.11 Mo | json 0.01 Mo | 3.1 s
+2026-08-01 21:46:59     herbe v3 : releve 6072 m2 -> regularisation -217 m2 (1516 -> 96 sommets) -> accostage+trous +463 m2 | trous vus 1, combles 0 (0 m2) | miettes 0/10 retirees (0.0 m2) | contour 1302 m -> bordurette 518 m
+2026-08-01 21:46:59     bordurette v4 : 15 extremites recalees sur une bordure de chaussee (6.00 m cumules) | peinture retractee de 0.10 m sous 15 pierres (-52.5 m2, soit 0.83 % de l'herbe)
+2026-08-01 21:47:02  cellule +0,+1 : chaussee 9.8 % | herbe 16309 m2 (raster 16380 m2, ecart 0.79 %) | 150 bordures (9357 m) | 31 bordurettes (572 m) | 0 passages | 70 tirets | masque 0.15 Mo | json 0.02 Mo | 3.4 s
+2026-08-01 21:47:02     herbe v3 : releve 16178 m2 -> regularisation -284 m2 (2061 -> 113 sommets) -> accostage+trous +415 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/9 retirees (0.0 m2) | contour 1854 m -> bordurette 572 m
+2026-08-01 21:47:02     bordurette v4 : 8 extremites recalees sur une bordure de chaussee (3.20 m cumules) | peinture retractee de 0.10 m sous 31 pierres (-57.3 m2, soit 0.35 % de l'herbe)
+2026-08-01 21:47:05  cellule +0,+2 : chaussee 8.5 % | herbe 42870 m2 (raster 42965 m2, ecart 0.57 %) | 63 bordures (8446 m) | 41 bordurettes (1521 m) | 0 passages | 51 tirets | masque 0.15 Mo | json 0.01 Mo | 3.2 s
+2026-08-01 21:47:05     herbe v3 : releve 42000 m2 -> regularisation -638 m2 (2496 -> 156 sommets) -> accostage+trous +1508 m2 | trous vus 0, combles 0 (0 m2) | miettes 1/14 retirees (12.9 m2) | contour 3638 m -> bordurette 1521 m
+2026-08-01 21:47:05     bordurette v4 : 30 extremites recalees sur une bordure de chaussee (12.00 m cumules) | peinture retractee de 0.10 m sous 41 pierres (-147.8 m2, soit 0.34 % de l'herbe)
+2026-08-01 21:47:09  cellule +1,-3 : chaussee 6.4 % | herbe 15260 m2 (raster 15271 m2, ecart 0.63 %) | 45 bordures (6247 m) | 35 bordurettes (828 m) | 0 passages | 82 tirets | masque 0.15 Mo | json 0.01 Mo | 3.5 s
+2026-08-01 21:47:09     herbe v3 : releve 14922 m2 -> regularisation -146 m2 (1699 -> 113 sommets) -> accostage+trous +484 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/10 retirees (0.0 m2) | contour 1724 m -> bordurette 828 m
+2026-08-01 21:47:09     bordurette v4 : 13 extremites recalees sur une bordure de chaussee (5.20 m cumules) | peinture retractee de 0.10 m sous 35 pierres (-83.6 m2, soit 0.55 % de l'herbe)
+2026-08-01 21:47:12  cellule +1,-2 : chaussee 7.8 % | herbe 6767 m2 (raster 6814 m2, ecart 1.16 %) | 55 bordures (6932 m) | 8 bordurettes (313 m) | 0 passages | 185 tirets | masque 0.13 Mo | json 0.01 Mo | 2.8 s
+2026-08-01 21:47:12     herbe v3 : releve 6385 m2 -> regularisation +16 m2 (510 -> 44 sommets) -> accostage+trous +366 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/4 retirees (0.0 m2) | contour 1153 m -> bordurette 313 m
+2026-08-01 21:47:12     bordurette v4 : 4 extremites recalees sur une bordure de chaussee (1.60 m cumules) | peinture retractee de 0.10 m sous 8 pierres (-31.8 m2, soit 0.47 % de l'herbe)
+2026-08-01 21:47:15  cellule +1,-1 : chaussee 9.8 % | herbe 6013 m2 (raster 6035 m2, ecart 1.02 %) | 47 bordures (11062 m) | 18 bordurettes (377 m) | 0 passages | 165 tirets | masque 0.12 Mo | json 0.01 Mo | 3.8 s
+2026-08-01 21:47:15     herbe v3 : releve 5681 m2 -> regularisation -158 m2 (1180 -> 67 sommets) -> accostage+trous +491 m2 | trous vus 1, combles 0 (0 m2) | miettes 0/7 retirees (0.0 m2) | contour 1156 m -> bordurette 377 m
+2026-08-01 21:47:15     bordurette v4 : 11 extremites recalees sur une bordure de chaussee (4.40 m cumules) | peinture retractee de 0.10 m sous 18 pierres (-38.8 m2, soit 0.65 % de l'herbe)
+2026-08-01 21:47:21  cellule +1,+0 : chaussee 11.9 % | herbe 14173 m2 (raster 14354 m2, ecart 1.78 %) | 83 bordures (12458 m) | 43 bordurettes (671 m) | 0 passages | 226 tirets | masque 0.14 Mo | json 0.02 Mo | 5.6 s
+2026-08-01 21:47:21     herbe v3 : releve 13158 m2 -> regularisation -224 m2 (2242 -> 149 sommets) -> accostage+trous +1238 m2 | trous vus 0, combles 0 (0 m2) | miettes 11/27 retirees (1.2 m2) | contour 2679 m -> bordurette 671 m
+2026-08-01 21:47:21     bordurette v4 : 37 extremites recalees sur une bordure de chaussee (14.80 m cumules) | peinture retractee de 0.10 m sous 43 pierres (-69.1 m2, soit 0.49 % de l'herbe)
+2026-08-01 21:47:27  cellule +1,+1 : chaussee 9.9 % | herbe 55496 m2 (raster 55740 m2, ecart 0.77 %) | 57 bordures (10724 m) | 64 bordurettes (1775 m) | 0 passages | 103 tirets | masque 0.15 Mo | json 0.02 Mo | 5.7 s
+2026-08-01 21:47:27     herbe v3 : releve 54468 m2 -> regularisation -602 m2 (4528 -> 322 sommets) -> accostage+trous +1629 m2 | trous vus 6, combles 0 (0 m2) | miettes 0/14 retirees (0.0 m2) | contour 4618 m -> bordurette 1775 m
+2026-08-01 21:47:27     bordurette v4 : 41 extremites recalees sur une bordure de chaussee (16.40 m cumules) | peinture retractee de 0.10 m sous 64 pierres (-181.9 m2, soit 0.33 % de l'herbe)
+2026-08-01 21:47:33  cellule +1,+2 : chaussee 6.5 % | herbe 69477 m2 (raster 69615 m2, ecart 0.43 %) | 27 bordures (6688 m) | 58 bordurettes (1594 m) | 0 passages | 147 tirets | masque 0.12 Mo | json 0.01 Mo | 6.3 s
+2026-08-01 21:47:33     herbe v3 : releve 68654 m2 -> regularisation -359 m2 (4768 -> 293 sommets) -> accostage+trous +1181 m2 | trous vus 9, combles 0 (0 m2) | miettes 2/17 retirees (17.4 m2) | contour 4255 m -> bordurette 1594 m
+2026-08-01 21:47:33     bordurette v4 : 14 extremites recalees sur une bordure de chaussee (5.60 m cumules) | peinture retractee de 0.10 m sous 58 pierres (-160.5 m2, soit 0.23 % de l'herbe)
+2026-08-01 21:47:40  cellule +2,-3 : chaussee 8.8 % | herbe 33606 m2 (raster 33822 m2, ecart 1.32 %) | 68 bordures (10112 m) | 109 bordurettes (2225 m) | 0 passages | 73 tirets | masque 0.21 Mo | json 0.03 Mo | 7.3 s
+2026-08-01 21:47:40     herbe v3 : releve 32396 m2 -> regularisation -463 m2 (9017 -> 457 sommets) -> accostage+trous +1673 m2 | trous vus 19, combles 0 (0 m2) | miettes 0/23 retirees (0.0 m2) | contour 5498 m -> bordurette 2225 m
+2026-08-01 21:47:40     bordurette v4 : 47 extremites recalees sur une bordure de chaussee (18.80 m cumules) | peinture retractee de 0.10 m sous 109 pierres (-223.9 m2, soit 0.67 % de l'herbe)
+2026-08-01 21:47:48  cellule +2,-2 : chaussee 9.4 % | herbe 56636 m2 (raster 56896 m2, ecart 0.91 %) | 70 bordures (10362 m) | 121 bordurettes (2473 m) | 0 passages | 138 tirets | masque 0.22 Mo | json 0.03 Mo | 8.0 s
+2026-08-01 21:47:48     herbe v3 : releve 54548 m2 -> regularisation -551 m2 (8953 -> 509 sommets) -> accostage+trous +2640 m2 | trous vus 12, combles 0 (0 m2) | miettes 1/21 retirees (11.9 m2) | contour 6584 m -> bordurette 2473 m
+2026-08-01 21:47:48     bordurette v4 : 61 extremites recalees sur une bordure de chaussee (24.40 m cumules) | peinture retractee de 0.10 m sous 121 pierres (-251.8 m2, soit 0.44 % de l'herbe)
+2026-08-01 21:47:55  cellule +2,-1 : chaussee 7.8 % | herbe 12653 m2 (raster 12722 m2, ecart 1.17 %) | 75 bordures (8163 m) | 41 bordurettes (773 m) | 0 passages | 51 tirets | masque 0.12 Mo | json 0.01 Mo | 6.5 s
+2026-08-01 21:47:55     herbe v3 : releve 12322 m2 -> regularisation -243 m2 (2846 -> 152 sommets) -> accostage+trous +574 m2 | trous vus 4, combles 0 (0 m2) | miettes 5/15 retirees (12.7 m2) | contour 1959 m -> bordurette 773 m
+2026-08-01 21:47:55     bordurette v4 : 14 extremites recalees sur une bordure de chaussee (5.60 m cumules) | peinture retractee de 0.10 m sous 41 pierres (-78.1 m2, soit 0.62 % de l'herbe)
+2026-08-01 21:48:03  cellule +2,+0 : chaussee 10.1 % | herbe 39088 m2 (raster 39439 m2, ecart 1.41 %) | 56 bordures (10190 m) | 79 bordurettes (1962 m) | 0 passages | 160 tirets | masque 0.15 Mo | json 0.02 Mo | 7.7 s
+2026-08-01 21:48:03     herbe v3 : releve 37760 m2 -> regularisation -641 m2 (5223 -> 284 sommets) -> accostage+trous +1969 m2 | trous vus 5, combles 0 (0 m2) | miettes 14/36 retirees (3.1 m2) | contour 5075 m -> bordurette 1962 m
+2026-08-01 21:48:03     bordurette v4 : 26 extremites recalees sur une bordure de chaussee (10.40 m cumules) | peinture retractee de 0.10 m sous 79 pierres (-197.5 m2, soit 0.51 % de l'herbe)
+2026-08-01 21:48:09  cellule +2,+1 : chaussee 6.2 % | herbe 58283 m2 (raster 58787 m2, ecart 1.31 %) | 28 bordures (5934 m) | 114 bordurettes (2531 m) | 0 passages | 183 tirets | masque 0.13 Mo | json 0.02 Mo | 6.1 s
+2026-08-01 21:48:09     herbe v3 : releve 57577 m2 -> regularisation -583 m2 (8887 -> 445 sommets) -> accostage+trous +1289 m2 | trous vus 6, combles 0 (0 m2) | miettes 0/21 retirees (0.0 m2) | contour 6429 m -> bordurette 2531 m
+2026-08-01 21:48:09     bordurette v4 : 11 extremites recalees sur une bordure de chaussee (4.40 m cumules) | peinture retractee de 0.10 m sous 114 pierres (-254.2 m2, soit 0.44 % de l'herbe)
+2026-08-01 21:48:16  cellule +2,+2 : chaussee 8.4 % | herbe 53041 m2 (raster 53505 m2, ecart 1.37 %) | 45 bordures (9115 m) | 168 bordurettes (2528 m) | 0 passages | 119 tirets | masque 0.20 Mo | json 0.02 Mo | 6.9 s
+2026-08-01 21:48:16     herbe v3 : releve 51578 m2 -> regularisation -719 m2 (11391 -> 537 sommets) -> accostage+trous +2182 m2 | trous vus 10, combles 0 (0 m2) | miettes 1/32 retirees (11.1 m2) | contour 7898 m -> bordurette 2528 m
+2026-08-01 21:48:16     bordurette v4 : 60 extremites recalees sur une bordure de chaussee (24.00 m cumules) | peinture retractee de 0.10 m sous 168 pierres (-259.2 m2, soit 0.49 % de l'herbe)
+2026-08-01 21:48:16  TOTAL 182.2 s | 36 cellules | masques 5.4 Mo (0.15 Mo/cellule) | json 0.63 Mo
+2026-08-01 21:48:16  PEINT   : 731355 m2 de chaussee, 88094 m2 de voirie privee, 1852 m2 de gravier, 1078425 m2 d'HERBE (ecart raster max 2.07 %)
+2026-08-01 21:48:16  HERBE V3: releve 1053200 m2 -> regularisation -14647 m2 (144783 -> 8455 sommets) -> accostage+trous +39871 m2 | trous vus 131, combles 0 (0 m2) | miettes 99/651 retirees (122.2 m2)
+2026-08-01 21:48:16  MAILLE  : 2135 polylignes de bordure (300485 m), 2077 bordurettes d'herbe (52066 m sur 130236 m de contour, 104 m ecartes trop courts), 0 passages, 4526 tirets

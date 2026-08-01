@@ -194,7 +194,7 @@ void FCityImportToolsSpec::Define()
 
 	Describe("ImportCityStreamed", [this]()
 	{
-		It("splits buildings into ground, proxy and streaming blocks", [this]()
+		It("splits buildings into ground and streaming blocks (V6 : plus de proxy)", [this]()
 		{
 			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/mini_streamed.json"));
 			const FString Json = TEXT(R"({"buildings":[{"pts":[[0,0],[12,0],[12,10],[0,10]],"h":9.5,"u":"res"},)")
@@ -210,7 +210,9 @@ void FCityImportToolsSpec::Define()
 			TestEqual(TEXT("Roads"), Summary.Roads, 1);
 			TestEqual(TEXT("Trees"), Summary.Trees, 2);
 			TestTrue(TEXT("Au moins un mesh de sol"), Summary.GroundMeshes >= 1);
-			TestTrue(TEXT("Au moins un mesh proxy"), Summary.ProxyMeshes >= 1);
+			// V6 : la couche proxy est supprimee (decision utilisateur du 01/08).
+			// Ce test exigeait un proxy ; il exige maintenant qu'il n'y en ait AUCUN.
+			TestEqual(TEXT("Aucun mesh proxy (couche supprimee)"), Summary.ProxyMeshes, 0);
 			TestEqual(TEXT("Deux meshes detail (cellules distinctes)"), Summary.BuildingMeshes, 2);
 			TestEqual(TEXT("Deux blocs de streaming"), Summary.StreamingBlocks, 2);
 		});
@@ -361,13 +363,15 @@ void FCityImportToolsSpec::Define()
 		});
 
 		// ---------------------------------------------------------------------
-		// V5 — VERROU DE NON-REGRESSION DU 01/08 : le proxy grossier ne doit JAMAIS
-		// etre cree visible. Visible, il se superpose au detail (que ce meme
-		// generateur force charge+visible) : cours bouchees a 96 %, 24 858 m2 de
-		// debordement hors emprise sur le proto. Douze scripts le cachaient APRES la
-		// passe, donc apres la sauvegarde du C++ : rien n'en survivait sur le disque.
+		// V6 — VERROU DE NON-REGRESSION : la couche proxy est SUPPRIMEE (decision
+		// utilisateur du 01/08). Le verrou V5 exigeait des proxys CACHES ; celui-ci
+		// exige qu'il n'y en ait AUCUN — ni geometrie, ni asset, ni acteur. Rappel du
+		// prix paye : sauves visibles, ces blocs a cours pleines remplissaient 96 % de
+		// la surface des cours et debordaient de 24 858 m2 hors emprise. L'option
+		// bProxyLayer survit pour pouvoir les regarder a la demande, et le test verifie
+		// qu'elle marche encore — sans quoi le verrou serait tautologique.
 		// ---------------------------------------------------------------------
-		It("V5 VERROU PROXY : les SM_Proxy sont crees CACHES, sauf bProxyVisible", [this]()
+		It("V6 VERROU PROXY : AUCUN SM_Proxy n'est cree, sauf bProxyLayer", [this]()
 		{
 			const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/v5_proxy.json"));
 			const FString Json = TEXT(R"({"buildings":[{"pts":[[0,0],[12,0],[12,10],[0,10]],"h":9.5,"u":"res"},)")
@@ -394,20 +398,19 @@ void FCityImportToolsSpec::Define()
 				TEXT("/Game/Dev/Test/Blocks"), FString(), FString(), 100.f, 200.f, 400.f,
 				FVector::ZeroVector, FCityGenProfile());
 			CompteProxys(Total, Visibles, EnJeu);
-			TestTrue(TEXT("Des proxys ont bien ete generes"), Total >= 1);
-			TestEqual(FString::Printf(TEXT("Par defaut AUCUN proxy visible (%d/%d)"), Visibles, Total),
-				Visibles, 0);
-			TestEqual(FString::Printf(TEXT("Par defaut AUCUN proxy rendu en jeu (%d/%d)"), EnJeu, Total),
-				EnJeu, 0);
+			TestEqual(FString::Printf(TEXT("Par defaut AUCUN proxy n'existe (%d trouves)"), Total),
+				Total, 0);
 
-			FCityGenProfile Visible;
-			Visible.bProxyVisible = true;
+			// Discriminant : sans cette moitie, le test passerait meme si la passe ne
+			// produisait plus RIEN du tout.
+			FCityGenProfile AvecProxys;
+			AvecProxys.bProxyLayer = true;
 			UCityImportTools::ImportCityStreamed(Path, FString(), TEXT("/Game/Dev/Test/City"),
 				TEXT("/Game/Dev/Test/Blocks"), FString(), FString(), 100.f, 200.f, 400.f,
-				FVector::ZeroVector, Visible);
+				FVector::ZeroVector, AvecProxys);
 			CompteProxys(Total, Visibles, EnJeu);
-			TestTrue(TEXT("bProxyVisible=true rend bien les proxys visibles (l'option existe)"),
-				Total >= 1 && Visibles == Total);
+			TestTrue(TEXT("bProxyLayer=true reconstruit bien la couche (l'option existe)"),
+				Total >= 1);
 		});
 
 		It("raises when the file does not exist", [this]()
@@ -856,9 +859,9 @@ void FCityImportToolsSpec::Define()
 			UStaticMesh* Glass = LoadTestMesh(TEXT("SM_Bldg_0_0_Glass"));
 			UStaticMesh* Slab = LoadTestMesh(TEXT("SM_Slab_0_0"));
 			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_0_0"));
-			UStaticMesh* Proxy = LoadTestMesh(TEXT("SM_Proxy_0_0"));
-			if (!TestTrue(TEXT("Les 5 meshes desktop existent (Wall, Glass, Slab, Ground, Proxy)"),
-				Wall && Glass && Slab && Ground && Proxy))
+			// V6 : plus de SM_Proxy_* — la couche est supprimee (bProxyLayer=false).
+			if (!TestTrue(TEXT("Les 4 meshes desktop existent (Wall, Glass, Slab, Ground)"),
+				Wall && Glass && Slab && Ground))
 			{
 				return;
 			}
@@ -870,7 +873,6 @@ void FCityImportToolsSpec::Define()
 			TestTrue(TEXT("Nanite : Glass aussi (verre opaque, J2e)"), Glass->GetNaniteSettings().bEnabled);
 			TestTrue(TEXT("Nanite : sol"), Slab->GetNaniteSettings().bEnabled);
 			TestTrue(TEXT("Nanite : routes"), Ground->GetNaniteSettings().bEnabled);
-			TestTrue(TEXT("Nanite : proxys"), Proxy->GetNaniteSettings().bEnabled);
 
 			// Materiaux PBR assignes, shading model DefaultLit (PAS unlit — Lumen).
 			auto CheckMat = [this](const TCHAR* Label, UStaticMesh* Mesh, int32 Slot, const TCHAR* Expected)
@@ -896,7 +898,6 @@ void FCityImportToolsSpec::Define()
 			CheckMat(TEXT("Vitres"), Glass, 0, TEXT("M_CityGlass_PBR"));
 			CheckMat(TEXT("Sol"), Slab, 0, TEXT("M_CityGround_PBR"));
 			CheckMat(TEXT("Routes (rubans)"), Ground, 1, TEXT("M_CityRoad_PBR"));
-			CheckMat(TEXT("Proxys"), Proxy, 0, TEXT("M_CityGround_PBR"));
 
 			// Atlas de facades 2048² (grille 4x4 de sous-tuiles).
 			UTexture2D* Atlas = LoadObject<UTexture2D>(nullptr,

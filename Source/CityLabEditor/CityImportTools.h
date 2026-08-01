@@ -157,22 +157,26 @@ struct FCityGenProfile
 	UPROPERTY() int32 WindowMode = 0;
 
 	/**
-	 * V5 (autopsie du 01/08) — VISIBILITE DES PROXYS, decidee ICI et pas dans une
-	 * checklist. Les SM_Proxy_* sont la couche RESIDENTE grossiere : un rectangle
-	 * ORIENTE par batiment (ou un contour reduit a 12 points), retracte de 2 m et
-	 * SANS les cours. Depuis le lot A-ter, le generateur force les sous-niveaux de
-	 * detail a etre charges ET visibles (editeur et runtime) : le proxy n'a donc plus
-	 * aucune occasion utile de s'afficher, et quand il s'affiche il se SUPERPOSE au
-	 * detail — il remplit 96 % de la surface des cours et deborde de 24 858 m2 hors
-	 * de toute emprise (mesure du 01/08 sur les 1 657 batiments du proto).
-	 * C'est LE symptome decrit par l'utilisateur : « cours bouchees, emprises
-	 * gonflees, ancienne construction ». Une douzaine de scripts de generation le
-	 * rattrapaient a la main APRES la passe — donc APRES la sauvegarde faite par le
-	 * C++ lui-meme : la correction ne survivait pas a la fermeture de l'editeur.
-	 * Defaut false = proxys CACHES (rendu editeur ET jeu). true = maquette grossiere
-	 * assumee (blocs seuls).
+	 * V6 (decision utilisateur du 01/08) — LA COUCHE PROXY EST SUPPRIMEE.
+	 *
+	 * Les SM_Proxy_* etaient la couche RESIDENTE grossiere : un rectangle ORIENTE par
+	 * batiment (ou un contour reduit a 12 points), retracte de 2 m et SANS les cours.
+	 * Elle est OBSOLETE sur desktop : Nanite rend le detail a la densite de l'ecran et
+	 * le streame a la demande, et nos maillages sont fusionnes PAR CELLULE (le surcout
+	 * en composants est donc trivial). Si des silhouettes lointaines redeviennent
+	 * necessaires a l'echelle de l'agglo, la reponse sera le HLOD d'UE, qui les genere
+	 * CORRECTES — toits compris — au lieu de blocs a cours pleines.
+	 *
+	 * Rappel de ce que cette couche a coute (autopsie V5) : sauvee VISIBLE, elle se
+	 * superposait au detail, remplissait 96 % de la surface des cours et debordait de
+	 * 24 858 m2 hors de toute emprise — le grief « cours bouchees, emprises gonflees,
+	 * ancienne construction ». On ne la cache plus : on ne la fabrique plus.
+	 *
+	 * Defaut false = AUCUN proxy n'est construit ni pose (ni geometrie, ni asset, ni
+	 * acteur). true = ancienne couche restituee telle quelle et VISIBLE (la demander
+	 * explicitement, c'est vouloir la voir).
 	 */
-	UPROPERTY() bool bProxyVisible = false;
+	UPROPERTY() bool bProxyLayer = false;
 
 	/** Prereglage desktop complet : 64x64 drape, collision 16x16, pas routes 15 m. */
 	static FCityGenProfile Desktop();
