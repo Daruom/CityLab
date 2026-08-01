@@ -1,0 +1,35 @@
+GPKG carre10  : 35851 troncons, 2316.0 km
+WFS (ref): 35861 troncons, 2316.8 km
+ecart     : -10 troncons (-0.03 %), -0.8 km (-0.03 %)
+largeur_de_chaussee : GPKG 30282 remplies (moy 4.46 m) / WFS 30288 (moy 4.46 m)
+
+nature                         GPKG      WFS    ecart
+Route à 1 chaussée            27086    27092       -6
+Sentier                        3633     3635       -2
+Rond-point                     2032     2032       +0
+Route à 2 chaussées            1655     1656       -1
+Route empierrée                 432      432       +0
+Bretelle                        416      416       +0
+Type autoroutier                313      313       +0
+Chemin                          186      187       -1
+Escalier                         98       98       +0
+
+remplissage par cle (%)              GPKG      WFS
+nature                              100.0    100.0
+importance                          100.0    100.0
+largeur_de_chaussee                  84.5     84.5
+nombre_de_voies                      84.4     84.4
+sens_de_circulation                 100.0    100.0
+position_par_rapport_au_sol         100.0    100.0
+fictif                              100.0    100.0
+prive                                99.5     99.5
+urbain                              100.0    100.0
+etat_de_l_objet                     100.0    100.0
+acces_vehicule_leger                100.0    100.0
+acces_pieton                          5.4      5.4
+reserve_aux_bus                       1.2      1.2
+vitesse_moyenne_vl                  100.0    100.0
+cpx_classement_administratif          7.1      7.1
+cpx_numero                            7.1      7.1
+nom_voie_ban_gauche                  61.8     61.8
+nom_collaboratif_gauche              63.5     63.5

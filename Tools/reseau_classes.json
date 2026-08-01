@@ -1,0 +1,160 @@
+{
+  "version": 2,
+  "_doc": [
+    "TABLE DE CLASSIFICATION DU RESEAU ROUTIER — LE SEUL FICHIER A EDITER.",
+    "Tools/build_reseau.py ne contient AUCUNE regle en dur : il applique celle-ci.",
+    "Regles evaluees DANS L'ORDRE, la PREMIERE qui matche gagne. Changer l'ordre",
+    "change la priorite. Un bloc 'si' matche si TOUS ses champs matchent ; un champ",
+    "matche si la valeur du troncon est dans SA liste (comparaison en minuscules",
+    "sans accents, donc 'Route a 1 chaussee' == 'Route à 1 chaussée'). Un bloc",
+    "'sauf' present disqualifie la regle si l'un de ses champs matche.",
+    "Les noms de champs sont ceux de BD TOPO troncon_de_route (88 colonnes) :",
+    "n'importe quelle colonne peut servir de critere sans toucher au code."
+  ],
+
+  "grille": {
+    "cellSizeM": 500.0,
+    "origine": { "lat": 43.6045, "lon": 1.4442 },
+    "_axes": "repere local CityLab : x = est (m), y = SUD (m). NORD = -Y. Convention GELEE.",
+    "_cellule": "la cellule (cx,cy) couvre [cx*cellSizeM, (cx+1)*cellSizeM] x [cy*cellSizeM, (cy+1)*cellSizeM]",
+    "_accord": "identique a CELL_M de Tools/j3c_sols_masks.py et a CellSizeM du generateur C++"
+  },
+
+  "emprises": {
+    "proto": {
+      "libelle": "proto 1 km2 (L_ProtoSols_E2_*) — 4 cellules",
+      "cellules": [[-1, -1], [-1, 0], [0, -1], [0, 0]]
+    },
+    "carre10": {
+      "libelle": "carre 10 km (L_Toulouse10) — 400 cellules",
+      "cx": [-10, 9],
+      "cy": [-10, 9]
+    }
+  },
+
+  "classe_defaut": "ruelle",
+  "regles": [
+    {
+      "classe": "autoroute",
+      "_doc": "voies rapides : pas de bordure (accotement), bitume distinct possible",
+      "si": { "nature": ["Type autoroutier", "Bretelle"] }
+    },
+    {
+      "classe": "pietonne_pavee",
+      "_doc": "LE critere 'centre historique' : une VRAIE rue ou la voiture ne peut pas passer. National et homogene. Ne pas confondre avec un sentier (voir la regle 'pieton').",
+      "si": { "acces_vehicule_leger": ["Physiquement impossible"] },
+      "sauf": { "nature": ["Sentier", "Escalier", "Chemin", "Route empierrée", "Bac ou liaison maritime"] }
+    },
+    {
+      "classe": "pietonne_pavee",
+      "_doc": "v2 LOT A — moitie OSM du critere HYBRIDE (strict BD TOPO ∪ OSM highway=pedestrian). 'osm_pieton' est un champ VIRTUEL calcule par build_reseau.py depuis le cache Tools/fetch_osm_pieton.py (section 'osm_pieton' ci-dessous). MESURE qui l'impose : le millesime BD TOPO 2026-06 code rue du Taur et rue Saint Rome en acces 'Libre'. Placee AVANT 'bus' : une rue pietonne traversee par un couloir bus (type Alsace-Lorraine) reste pavee.",
+      "si": { "osm_pieton": ["oui"] },
+      "sauf": { "nature": ["Sentier", "Escalier", "Chemin", "Route empierrée", "Bac ou liaison maritime"] }
+    },
+    {
+      "classe": "bus",
+      "_doc": "couloir bus : 839 troncons sur le D031, valeurs = un sens de circulation",
+      "si": { "reserve_aux_bus": ["Double sens", "Sens direct", "Sens inverse"] }
+    },
+    {
+      "classe": "pieton",
+      "_doc": "AJOUT au brief (7 classes demandees + celle-ci) : sans elle, sentiers et escaliers tombent dans les regles d'importance et faussent les kilometrages. Doctrine v4 : le pieton reste la dalle, cette classe ne peint rien.",
+      "si": { "nature": ["Sentier", "Escalier"] }
+    },
+    {
+      "classe": "chemin",
+      "si": { "nature": ["Chemin", "Route empierrée"] }
+    },
+    {
+      "classe": "artere",
+      "si": { "importance": ["1", "2"] }
+    },
+    {
+      "classe": "rue",
+      "si": { "importance": ["3", "4"] }
+    },
+    {
+      "classe": "ruelle",
+      "si": { "importance": ["5", "6"] }
+    }
+  ],
+
+  "_classes_connues": {
+    "autoroute": "nature autoroutiere ou bretelle",
+    "artere": "importance 1-2 (liaison principale)",
+    "rue": "importance 3-4",
+    "ruelle": "importance 5-6 (desserte locale) — AUSSI la classe par defaut",
+    "pietonne_pavee": "rue rendue pietonne (acces VL physiquement impossible)",
+    "bus": "couloir reserve aux bus",
+    "chemin": "chemin / route empierree",
+    "pieton": "sentier / escalier (ajout, cf. regle)"
+  },
+  "_non_classe_par_nature": [
+    "Rond-point et 'Route a 2 chaussees' n'ont PAS de regle propre : ils tombent",
+    "dans les regles d'importance (un rond-point de boulevard devient 'artere',",
+    "un rond-point de lotissement 'ruelle'). Ajouter une regle avant les regles",
+    "d'importance si l'utilisateur veut les distinguer."
+  ],
+
+  "osm_pieton": {
+    "_doc": [
+      "LOT A (A3) — overlay OSM du critere pieton hybride. Le fichier est un CACHE",
+      "disque produit par Tools/fetch_osm_pieton.py (1 requete Overpass, ODbL) :",
+      "build_reseau.py ne touche JAMAIS le reseau. Matching spatial : un troncon",
+      "BD TOPO est 'osm_pieton=oui' si >= couverture_min de ses echantillons",
+      "(tous les pas_echantillon_m) tombent a moins de buffer_m d'un way LINEAIRE",
+      "highway=pedestrian (les anneaux fermes / area=yes ne votent pas : l'anneau",
+      "d'une place longe des facades et matcherait les rues adjacentes).",
+      "Fichier absent = critere strict BD TOPO seul (degradation silencieuse et sure)."
+    ],
+    "fichier": "SourceData/Reseau/osm_pieton_carre10.json",
+    "buffer_m": 6.0,
+    "couverture_min": 0.6,
+    "pas_echantillon_m": 3.0
+  },
+
+  "largeur_repli_m": {
+    "_doc": "utilise UNIQUEMENT si largeur_de_chaussee est absente ou <= 0,5 m. Table IDENTIQUE a Tools/j3c_sols_corridor.py (FALLBACK_LARGEUR) pour que le graphe et la peinture du sol ne divergent jamais.",
+    "par_importance": { "1": 10.5, "2": 7.0, "3": 6.5, "4": 5.5, "5": 4.5, "6": 3.5 },
+    "defaut": 4.0,
+    "chemin": 3.0,
+    "_natures_etroites": ["Chemin", "Route empierrée"],
+    "_regle_voies": "si nombre_de_voies >= 2, le repli vaut max(table, 3,0 m x voies)"
+  },
+
+  "valeurs": {
+    "_doc": "normalisation des enumerations BD TOPO. Toute valeur absente de ces tables est recopiee BRUTE : rien n'est jamais perdu.",
+    "sens_de_circulation": {
+      "Double sens": "double",
+      "Sens direct": "direct",
+      "Sens inverse": "inverse",
+      "Sans objet": "sans_objet"
+    },
+    "acces_vehicule_leger": {
+      "Libre": "libre",
+      "Physiquement impossible": "impossible",
+      "Restreint aux ayants droit": "ayants_droit",
+      "A péage": "peage"
+    },
+    "acces_pieton": {
+      "Libre": "libre",
+      "Restreint aux ayants droit": "ayants_droit",
+      "Passage difficile": "difficile"
+    },
+    "reserve_aux_bus": {
+      "Double sens": "double",
+      "Sens direct": "direct",
+      "Sens inverse": "inverse"
+    }
+  },
+
+  "_pieges": {
+    "vitesse_moyenne_vl": "VITESSE DE PARCOURS MOYENNE CONSTATEE, PAS LA LIMITATION REGLEMENTAIRE. 14 % des troncons sont a 0 km/h et 3,5 % a 1 km/h ; les pics sont a 20/25/30. Utilisable pour un temps de trajet ou une densite de trafic ; JAMAIS pour afficher un panneau ni pour brider un vehicule. La limitation reglementaire n'est PAS dans BD TOPO (chercher OSM maxspeed le jour venu).",
+    "importance": "colonne TEXTE ('1'..'6'), pas un entier. Comparaison en chaine.",
+    "position_par_rapport_au_sol": "colonne TEXTE : '0', '1', '2', '-1' mais AUSSI 'Gué ou radier' (133 objets D031). Parse en entier avec repli a 0.",
+    "z_bdtopo": "l'altitude des sommets vaut -1000,00 quand elle n'est pas renseignee : c'est une sentinelle, pas une altitude. geo_local.py la convertit en null.",
+    "nombre_de_voies": "BD TOPO code '2 voies' des qu'une rue est a double sens : dans un centre ancien, la moitie des ruelles de 4 m sont a '2 voies'. Croiser avec la largeur avant d'en tirer un marquage (le pipeline sol utilise deja un seuil de 5,50 m).",
+    "fictif": "148 troncons fictifs sur le D031 : ils ne portent aucun revetement mais ILS PORTENT LA TOPOLOGIE (traversee de place). Le side-car les CONSERVE avec leur drapeau ; c'est au consommateur de decider.",
+    "prive": "1474 troncons a NULL (ni vrai ni faux) sur le D031 : tester 'is True', jamais 'is not False'."
+  }
+}

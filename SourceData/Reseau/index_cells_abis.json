@@ -1,0 +1,150 @@
+{
+ "emprise": "cells",
+ "bascules_pleine_rue_votables": 0,
+ "bascules_pleine_rue_nature": 7,
+ "cellules_attendues": 16,
+ "cellules_manquantes": [],
+ "edges": 2141,
+ "noeuds_par_cellule_cumules": 1818,
+ "noeuds_distincts_recolles": 1630,
+ "cleabs_distincts": 1952,
+ "aretes_degenerees": 0,
+ "longueur_km": 101.62,
+ "km_par_classe": {
+  "ruelle": 53.17,
+  "rue": 22.29,
+  "pieton": 12.76,
+  "pietonne_pavee": 10.29,
+  "bus": 2.88,
+  "chemin": 0.22
+ },
+ "aretes_par_classe": {
+  "ruelle": 1056,
+  "rue": 528,
+  "pieton": 256,
+  "pietonne_pavee": 235,
+  "bus": 62,
+  "chemin": 4
+ },
+ "ha_chaussee_par_classe": {
+  "ruelle": 20.56,
+  "rue": 12.1,
+  "pietonne_pavee": 4.59,
+  "pieton": 4.47,
+  "bus": 1.81,
+  "chemin": 0.07
+ },
+ "degres": {
+  "1": 200,
+  "2": 455,
+  "3": 747,
+  "4": 209,
+  "5": 19
+ },
+ "composantes": 10,
+ "plus_grande_composante": 1606,
+ "pct_plus_grande": 98.53,
+ "composantes_1_2_noeuds": 7,
+ "recollement_coupes_testees": 376,
+ "recollement_coupes_orphelines": 0,
+ "recollement_coupes_hors_emprise": 139,
+ "noeuds_de_bord": 515,
+ "fictifs": 0,
+ "ponts": 28,
+ "tunnels": 1,
+ "hors_en_service": 0,
+ "volumetrie": {
+  "total_Mo": 0.98,
+  "cellules": 16,
+  "min_Ko": 32.6,
+  "median_Ko": 66.7,
+  "max_Ko": 85.3,
+  "cellule_max": "reseau_0_-1.json"
+ },
+ "lecture_source": {
+  "source": "GPKG BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0)",
+  "troncons_lus": 2989,
+  "geometries": 2989,
+  "multi_parties": 0,
+  "degeneres": 0,
+  "osm_pieton_matches": 211,
+  "lissage": {
+   "runs": 2555,
+   "runs_heterogenes": 19,
+   "run_vote": 24,
+   "rue_nommee": 23,
+   "absorption": 17,
+   "bascules_restantes_nature": 14,
+   "fragments_absorbes": 10
+  }
+ },
+ "cellSizeM": 500.0,
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0)",
+ "classes": "reseau_classes.json v2 sha1=3d62a5cd1f20",
+ "cellules": [
+  [
+   -2,
+   -2
+  ],
+  [
+   -2,
+   -1
+  ],
+  [
+   -2,
+   0
+  ],
+  [
+   -2,
+   1
+  ],
+  [
+   -1,
+   -2
+  ],
+  [
+   -1,
+   -1
+  ],
+  [
+   -1,
+   0
+  ],
+  [
+   -1,
+   1
+  ],
+  [
+   0,
+   -2
+  ],
+  [
+   0,
+   -1
+  ],
+  [
+   0,
+   0
+  ],
+  [
+   0,
+   1
+  ],
+  [
+   1,
+   -2
+  ],
+  [
+   1,
+   -1
+  ],
+  [
+   1,
+   0
+  ],
+  [
+   1,
+   1
+  ]
+ ]
+}

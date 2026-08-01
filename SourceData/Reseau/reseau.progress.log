@@ -1,0 +1,178 @@
+2026-07-31 13:31:28  emprise proto : 4 cellules, fenetre locale X[-500;500] Y[-500;500] m
+2026-07-31 13:31:28  lecture GPKG : 1020 troncons (1020 geometries, 0 multi-parties), 603 morceaux retenus, 0 degeneres ecartes, 0.0 s
+2026-07-31 13:31:28  ecriture : 4 / 4 cellules
+2026-07-31 13:31:28  ecriture terminee en 0.1 s
+2026-07-31 13:31:28  VALIDATION proto : 603 aretes, 467 noeuds recolles, 26.5 km, 4 composantes (la plus grande 98.29 %), 0 degenerees, 0 bords orphelins, 0.27 Mo
+2026-07-31 13:31:28  km par classe : ruelle=17.8, rue=4.6, pieton=2.8, bus=1.1, pietonne_pavee=0.4
+2026-07-31 13:31:28  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_proto.json
+2026-07-31 13:32:19  emprise carre10 : 400 cellules, fenetre locale X[-5000;5000] Y[-5000;5000] m
+2026-07-31 13:32:19    ... 20000 troncons lus, 21435 morceaux retenus (1 s)
+2026-07-31 13:32:20  lecture GPKG : 39348 troncons (39348 geometries, 0 multi-parties), 41378 morceaux retenus, 0 degeneres ecartes, 1.5 s
+2026-07-31 13:32:20  ecriture : 50 / 400 cellules
+2026-07-31 13:32:21  ecriture : 100 / 400 cellules
+2026-07-31 13:32:21  ecriture : 150 / 400 cellules
+2026-07-31 13:32:21  ecriture : 200 / 400 cellules
+2026-07-31 13:32:21  ecriture : 250 / 400 cellules
+2026-07-31 13:32:21  ecriture : 300 / 400 cellules
+2026-07-31 13:32:22  ecriture : 350 / 400 cellules
+2026-07-31 13:32:22  ecriture : 400 / 400 cellules
+2026-07-31 13:32:22  ecriture terminee en 3.0 s
+2026-07-31 13:32:24  VALIDATION carre10 : 41378 aretes, 32106 noeuds recolles, 2274.7 km, 65 composantes (la plus grande 99.30 %), 0 degenerees, 10 bords orphelins, 19.57 Mo
+2026-07-31 13:32:24  km par classe : ruelle=1348.5, rue=294.1, pieton=248.9, autoroute=136.6, pietonne_pavee=132.5, chemin=65.1, bus=34.2, artere=14.7
+2026-07-31 13:32:24  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_carre10.json
+2026-07-31 13:34:24  VALIDATION proto : 603 aretes, 467 noeuds recolles, 26.5 km, 4 composantes (la plus grande 98.29 %), 0 degenerees, coupes 64 testees / 0 orphelines, 0.27 Mo
+2026-07-31 13:34:24  km par classe : ruelle=17.8, rue=4.6, pieton=2.8, bus=1.1, pietonne_pavee=0.4
+2026-07-31 13:34:24  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_proto.json
+2026-07-31 13:34:25  VALIDATION carre10 : 41378 aretes, 32106 noeuds recolles, 2274.7 km, 65 composantes (la plus grande 99.30 %), 0 degenerees, coupes 11036 testees / 0 orphelines, 19.57 Mo
+2026-07-31 13:34:25  km par classe : ruelle=1348.5, rue=294.1, pieton=248.9, autoroute=136.6, pietonne_pavee=132.5, chemin=65.1, bus=34.2, artere=14.7
+2026-07-31 13:34:25  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_carre10.json
+2026-07-31 13:39:21  emprise proto : 4 cellules, fenetre locale X[-500;500] Y[-500;500] m
+2026-07-31 13:39:21  repli sans GPKG : routes_riche_proto.json (571 troncons, riche : toutes les colonnes metier du GPKG, cleabs compris)
+2026-07-31 13:39:21  lecture JSON riche : 571 troncons (571 geometries, 0 multi-parties), 603 morceaux retenus, 0 degeneres ecartes, 0.0 s
+2026-07-31 13:39:21  ecriture : 4 / 4 cellules
+2026-07-31 13:39:21  ecriture terminee en 0.0 s
+2026-07-31 13:39:21  VALIDATION proto : 603 aretes, 468 noeuds recolles, 26.5 km, 4 composantes (la plus grande 98.29 %), 0 degenerees, coupes 64 testees / 0 orphelines, 0.25 Mo
+2026-07-31 13:39:21  km par classe : ruelle=17.8, rue=4.6, pieton=2.8, bus=1.1, pietonne_pavee=0.4
+2026-07-31 13:39:21  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_proto_via_json.json
+2026-07-31 13:39:21  emprise proto : 4 cellules, fenetre locale X[-500;500] Y[-500;500] m
+2026-07-31 13:39:21  lecture GPKG : 1020 troncons (1020 geometries, 0 multi-parties), 603 morceaux retenus, 0 degeneres ecartes, 0.0 s
+2026-07-31 13:39:21  ecriture : 4 / 4 cellules
+2026-07-31 13:39:21  ecriture terminee en 0.1 s
+2026-07-31 13:39:21  VALIDATION proto : 603 aretes, 467 noeuds recolles, 26.5 km, 4 composantes (la plus grande 98.29 %), 0 degenerees, coupes 64 testees / 0 orphelines, 0.27 Mo
+2026-07-31 13:39:21  km par classe : ruelle=17.8, rue=4.6, pieton=2.8, bus=1.1, pietonne_pavee=0.4
+2026-07-31 13:39:21  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_proto.json
+2026-07-31 13:41:23  emprise proto : 4 cellules, fenetre locale X[-500;500] Y[-500;500] m
+2026-07-31 13:41:23  lecture GPKG : 1020 troncons (1020 geometries, 0 multi-parties), 603 morceaux retenus, 0 degeneres ecartes, 0.0 s
+2026-07-31 13:41:23  ecriture : 4 / 4 cellules
+2026-07-31 13:41:23  ecriture terminee en 0.1 s
+2026-07-31 13:41:23  VALIDATION proto : 603 aretes, 467 noeuds recolles, 26.5 km, 4 composantes (la plus grande 98.29 %), 0 degenerees, coupes 64 testees / 0 orphelines, 0.27 Mo
+2026-07-31 13:41:23  km par classe : ruelle=17.8, rue=4.6, pieton=2.8, bus=1.1, pietonne_pavee=0.4
+2026-07-31 13:41:23  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_proto.json
+2026-07-31 13:41:23  emprise carre10 : 400 cellules, fenetre locale X[-5000;5000] Y[-5000;5000] m
+2026-07-31 13:41:24    ... 20000 troncons lus, 21435 morceaux retenus (1 s)
+2026-07-31 13:41:25  lecture GPKG : 39348 troncons (39348 geometries, 0 multi-parties), 41378 morceaux retenus, 0 degeneres ecartes, 1.5 s
+2026-07-31 13:41:25  ecriture : 50 / 400 cellules
+2026-07-31 13:41:25  ecriture : 100 / 400 cellules
+2026-07-31 13:41:25  ecriture : 150 / 400 cellules
+2026-07-31 13:41:26  ecriture : 200 / 400 cellules
+2026-07-31 13:41:26  ecriture : 250 / 400 cellules
+2026-07-31 13:41:26  ecriture : 300 / 400 cellules
+2026-07-31 13:41:26  ecriture : 350 / 400 cellules
+2026-07-31 13:41:26  ecriture : 400 / 400 cellules
+2026-07-31 13:41:26  ecriture terminee en 3.0 s
+2026-07-31 13:41:29  VALIDATION carre10 : 41378 aretes, 32106 noeuds recolles, 2274.7 km, 65 composantes (la plus grande 99.30 %), 0 degenerees, coupes 11036 testees / 0 orphelines, 19.72 Mo
+2026-07-31 13:41:29  km par classe : ruelle=1348.5, rue=294.1, pieton=248.9, autoroute=136.6, pietonne_pavee=132.5, chemin=65.1, bus=34.2, artere=14.7
+2026-07-31 13:41:29  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_carre10.json
+2026-07-31 13:45:56  VALIDATION proto : 603 aretes, 467 noeuds recolles, 26.5 km, 4 composantes (la plus grande 98.29 %), 0 degenerees, coupes 64 testees / 0 orphelines, 0.27 Mo
+2026-07-31 13:45:56  km par classe : ruelle=17.8, rue=4.6, pieton=2.8, bus=1.1, pietonne_pavee=0.4
+2026-07-31 13:45:56  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_proto.json
+2026-07-31 13:46:00  VALIDATION carre10 : 41378 aretes, 32106 noeuds recolles, 2274.7 km, 65 composantes (la plus grande 99.30 %), 0 degenerees, coupes 11036 testees / 0 orphelines, 19.72 Mo
+2026-07-31 13:46:00  km par classe : ruelle=1348.5, rue=294.1, pieton=248.9, autoroute=136.6, pietonne_pavee=132.5, chemin=65.1, bus=34.2, artere=14.7
+2026-07-31 13:46:00  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_carre10.json
+2026-07-31 13:46:11  emprise proto : 4 cellules, fenetre locale X[-500;500] Y[-500;500] m
+2026-07-31 13:46:11  lecture GPKG : 1020 troncons (1020 geometries, 0 multi-parties), 603 morceaux retenus, 0 degeneres ecartes, 0.0 s
+2026-07-31 13:46:11  ecriture : 4 / 4 cellules
+2026-07-31 13:46:11  ecriture terminee en 0.1 s
+2026-07-31 13:46:11  VALIDATION proto : 603 aretes, 467 noeuds recolles, 26.5 km, 4 composantes (la plus grande 98.29 %), 0 degenerees, coupes 64 testees / 0 orphelines, 0.27 Mo
+2026-07-31 13:46:11  km par classe : ruelle=17.8, rue=4.6, pieton=2.8, bus=1.1, pietonne_pavee=0.4
+2026-07-31 13:46:11  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_proto.json
+2026-07-31 13:46:11  emprise carre10 : 400 cellules, fenetre locale X[-5000;5000] Y[-5000;5000] m
+2026-07-31 13:46:12    ... 20000 troncons lus, 21435 morceaux retenus (1 s)
+2026-07-31 13:46:13  lecture GPKG : 39348 troncons (39348 geometries, 0 multi-parties), 41378 morceaux retenus, 0 degeneres ecartes, 1.5 s
+2026-07-31 13:46:13  ecriture : 50 / 400 cellules
+2026-07-31 13:46:13  ecriture : 100 / 400 cellules
+2026-07-31 13:46:13  ecriture : 150 / 400 cellules
+2026-07-31 13:46:14  ecriture : 200 / 400 cellules
+2026-07-31 13:46:14  ecriture : 250 / 400 cellules
+2026-07-31 13:46:14  ecriture : 300 / 400 cellules
+2026-07-31 13:46:14  ecriture : 350 / 400 cellules
+2026-07-31 13:46:14  ecriture : 400 / 400 cellules
+2026-07-31 13:46:14  ecriture terminee en 3.0 s
+2026-07-31 13:46:17  VALIDATION carre10 : 41378 aretes, 32106 noeuds recolles, 2274.7 km, 65 composantes (la plus grande 99.30 %), 0 degenerees, coupes 11036 testees / 0 orphelines, 19.72 Mo
+2026-07-31 13:46:17  km par classe : ruelle=1348.5, rue=294.1, pieton=248.9, autoroute=136.6, pietonne_pavee=132.5, chemin=65.1, bus=34.2, artere=14.7
+2026-07-31 13:46:17  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_carre10.json
+2026-07-31 16:25:04  emprise carre10 : 400 cellules, fenetre locale X[-5000;5000] Y[-5000;5000] m
+2026-07-31 16:25:04  overlay OSM pieton : osm_pieton_carre10.json — 1025 segments lineaires indexes (buffer 6.0 m, couverture >= 60 %)
+2026-07-31 16:25:06    ... 20000 troncons lus, 21435 morceaux retenus (1 s)
+2026-07-31 16:25:07  lecture GPKG : 39348 troncons (39348 geometries, 0 multi-parties), 41378 morceaux retenus, 0 degeneres ecartes, 309 matches OSM pieton, 2.2 s
+2026-07-31 16:25:07  ecriture : 50 / 400 cellules
+2026-07-31 16:25:07  ecriture : 100 / 400 cellules
+2026-07-31 16:25:07  ecriture : 150 / 400 cellules
+2026-07-31 16:25:07  ecriture : 200 / 400 cellules
+2026-07-31 16:25:08  ecriture : 250 / 400 cellules
+2026-07-31 16:25:08  ecriture : 300 / 400 cellules
+2026-07-31 16:25:08  ecriture : 350 / 400 cellules
+2026-07-31 16:25:08  ecriture : 400 / 400 cellules
+2026-07-31 16:25:08  ecriture terminee en 3.8 s
+2026-07-31 16:25:11  VALIDATION carre10 : 41378 aretes, 32106 noeuds recolles, 2274.7 km, 65 composantes (la plus grande 99.30 %), 0 degenerees, coupes 11036 testees / 0 orphelines, 19.72 Mo
+2026-07-31 16:25:11  km par classe : ruelle=1336.7, rue=293.0, pieton=248.9, pietonne_pavee=145.9, autoroute=136.6, chemin=65.1, bus=33.7, artere=14.7
+2026-07-31 16:25:11  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_carre10.json
+2026-07-31 16:28:56  emprise proto : 4 cellules, fenetre locale X[-500;500] Y[-500;500] m
+2026-07-31 16:28:56  overlay OSM pieton : osm_pieton_carre10.json — 1025 segments lineaires indexes (buffer 6.0 m, couverture >= 60 %)
+2026-07-31 16:28:57  lecture GPKG : 1020 troncons (1020 geometries, 0 multi-parties), 603 morceaux retenus, 0 degeneres ecartes, 181 matches OSM pieton, 0.1 s
+2026-07-31 16:28:57  ecriture : 4 / 4 cellules
+2026-07-31 16:28:57  ecriture terminee en 0.1 s
+2026-07-31 16:28:57  VALIDATION proto : 603 aretes, 467 noeuds recolles, 26.5 km, 4 composantes (la plus grande 98.29 %), 0 degenerees, coupes 64 testees / 0 orphelines, 0.27 Mo
+2026-07-31 16:28:57  km par classe : ruelle=12.4, pietonne_pavee=6.5, rue=4.1, pieton=2.8, bus=0.7
+2026-07-31 16:28:57  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_proto.json
+2026-07-31 19:08:55  lissage : 1 runs (1 heterogenes), 1 aretes re-classees par vote, 0 par rue nommee, 0 absorbees (0 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:08:55  lissage : 3 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 0 absorbees (0 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:08:55  lissage : 1 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 0 absorbees (0 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 2 de nature
+2026-07-31 19:08:55  lissage : 5 runs (0 heterogenes), 0 aretes re-classees par vote, 1 par rue nommee, 0 absorbees (0 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:08:55    absorption : 30 m ruelle->pietonne_pavee vers (0,0) ?
+2026-07-31 19:08:55  lissage : 5 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 1 absorbees (1 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:08:55    absorption : 69 m ruelle->pietonne_pavee vers (0,0) ?
+2026-07-31 19:08:55  lissage : 4 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 1 absorbees (1 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:08:55  lissage : 5 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 0 absorbees (0 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:08:55    absorption : 15 m pietonne_pavee->ruelle vers (0,0) ?
+2026-07-31 19:08:55  lissage : 5 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 1 absorbees (1 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:08:55  lissage : 3 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 0 absorbees (0 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:09:15  emprise cells : 16 cellules, fenetre locale X[-1000;1000] Y[-1000;1000] m
+2026-07-31 19:09:15  overlay OSM pieton : osm_pieton_carre10.json — 1025 segments lineaires indexes (buffer 6.0 m, couverture >= 60 %)
+2026-07-31 19:09:15    absorption : 11 m ruelle->rue vers (-970,-552) Boulevard Maréchal Leclerc
+2026-07-31 19:09:15    absorption : 73 m ruelle->rue vers (587,171) Boulevard Lazare Carnot
+2026-07-31 19:09:15    absorption : 79 m ruelle->rue vers (-994,900) ?
+2026-07-31 19:09:15    absorption : 16 m pietonne_pavee->ruelle vers (-171,362) Place de la Bourse
+2026-07-31 19:09:15    absorption : 47 m ruelle->pietonne_pavee vers (-23,542) Place de la Trinité
+2026-07-31 19:09:15    absorption : 76 m ruelle->rue vers (-1002,-440) ?
+2026-07-31 19:09:15    absorption : 74 m ruelle->rue vers (-993,-458) ?
+2026-07-31 19:09:15  lissage : 2555 runs (19 heterogenes), 24 aretes re-classees par vote, 23 par rue nommee, 7 absorbees (7 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 14 de nature
+2026-07-31 19:09:15  lecture GPKG : 2989 troncons (2989 geometries, 0 multi-parties), 2141 morceaux retenus, 0 degeneres ecartes, 211 matches OSM pieton, 0.2 s
+2026-07-31 19:09:15  ecriture : 16 / 16 cellules
+2026-07-31 19:09:15  ecriture terminee en 0.3 s
+2026-07-31 19:09:15  VALIDATION cells : 2141 aretes, 1630 noeuds recolles, 101.6 km, 10 composantes (la plus grande 98.53 %), 0 degenerees, coupes 376 testees / 0 orphelines, 0.98 Mo
+2026-07-31 19:09:15  km par classe : ruelle=53.5, rue=22.1, pieton=12.8, pietonne_pavee=10.2, bus=2.9, chemin=0.2
+2026-07-31 19:09:15  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_cells_abis.json
+2026-07-31 19:14:37  lissage : 1 runs (1 heterogenes), 1 aretes re-classees par vote, 0 par rue nommee, 0 absorbees (0 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:14:37  lissage : 3 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 0 absorbees (0 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:14:37  lissage : 1 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 0 absorbees (0 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 2 de nature
+2026-07-31 19:14:37  lissage : 5 runs (0 heterogenes), 0 aretes re-classees par vote, 1 par rue nommee, 0 absorbees (0 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:14:37    absorption : 30 m ruelle->pietonne_pavee (1 runs) vers (0,0) ?
+2026-07-31 19:14:37  lissage : 5 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 1 absorbees (1 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:14:37    absorption : 69 m ruelle->rue (1 runs) vers (0,0) ?
+2026-07-31 19:14:37  lissage : 4 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 1 absorbees (1 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:14:37    absorption : 210 m ruelle->pietonne_pavee (3 runs) vers (0,0) ?
+2026-07-31 19:14:37  lissage : 9 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 3 absorbees (1 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:14:37  lissage : 5 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 0 absorbees (0 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:14:37    absorption : 15 m pietonne_pavee->ruelle (1 runs) vers (0,0) ?
+2026-07-31 19:14:37  lissage : 5 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 1 absorbees (1 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:14:37  lissage : 3 runs (0 heterogenes), 0 aretes re-classees par vote, 0 par rue nommee, 0 absorbees (0 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 0 de nature
+2026-07-31 19:14:45  emprise cells : 16 cellules, fenetre locale X[-1000;1000] Y[-1000;1000] m
+2026-07-31 19:14:45  overlay OSM pieton : osm_pieton_carre10.json — 1025 segments lineaires indexes (buffer 6.0 m, couverture >= 60 %)
+2026-07-31 19:14:45    absorption : 11 m ruelle->rue (1 runs) vers (-970,-552) Boulevard Maréchal Leclerc
+2026-07-31 19:14:45    absorption : 73 m ruelle->rue (1 runs) vers (587,171) Boulevard Lazare Carnot
+2026-07-31 19:14:45    absorption : 72 m ruelle->rue (2 runs) vers (965,399) ?
+2026-07-31 19:14:45    absorption : 79 m ruelle->rue (1 runs) vers (-994,900) ?
+2026-07-31 19:14:45    absorption : 81 m ruelle->pietonne_pavee (2 runs) vers (-600,148) Place de Bologne
+2026-07-31 19:14:45    absorption : 148 m ruelle->rue (4 runs) vers (-494,-138) Rue du Doyen Gabriel Marty
+2026-07-31 19:14:45    absorption : 16 m pietonne_pavee->ruelle (1 runs) vers (-171,362) Place de la Bourse
+2026-07-31 19:14:45    absorption : 47 m ruelle->pietonne_pavee (1 runs) vers (-23,542) Place de la Trinité
+2026-07-31 19:14:45    absorption : 76 m ruelle->rue (1 runs) vers (-1002,-440) ?
+2026-07-31 19:14:45    absorption : 74 m ruelle->rue (1 runs) vers (-993,-458) ?
+2026-07-31 19:14:45  lissage : 2555 runs (19 heterogenes), 24 aretes re-classees par vote, 23 par rue nommee, 17 absorbees (10 fragments) ; bascules restantes en pleine rue : 0 votables (objectif 0), 14 de nature
+2026-07-31 19:14:45  lecture GPKG : 2989 troncons (2989 geometries, 0 multi-parties), 2141 morceaux retenus, 0 degeneres ecartes, 211 matches OSM pieton, 0.2 s
+2026-07-31 19:14:45  ecriture : 16 / 16 cellules
+2026-07-31 19:14:45  ecriture terminee en 0.3 s
+2026-07-31 19:14:45  VALIDATION cells : 2141 aretes, 1630 noeuds recolles, 101.6 km, 10 composantes (la plus grande 98.53 %), 0 degenerees, coupes 376 testees / 0 orphelines, 0.98 Mo
+2026-07-31 19:14:45  km par classe : ruelle=53.2, rue=22.3, pieton=12.8, pietonne_pavee=10.3, bus=2.9, chemin=0.2
+2026-07-31 19:14:45  index ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\index_cells_abis.json

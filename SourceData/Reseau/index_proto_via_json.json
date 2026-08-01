@@ -1,0 +1,87 @@
+{
+ "emprise": "proto",
+ "cellules_attendues": 4,
+ "cellules_manquantes": [],
+ "edges": 603,
+ "noeuds_par_cellule_cumules": 500,
+ "noeuds_distincts_recolles": 468,
+ "cleabs_distincts": 571,
+ "aretes_degenerees": 0,
+ "longueur_km": 26.54,
+ "km_par_classe": {
+  "ruelle": 17.75,
+  "rue": 4.56,
+  "pieton": 2.81,
+  "bus": 1.05,
+  "pietonne_pavee": 0.36
+ },
+ "aretes_par_classe": {
+  "ruelle": 394,
+  "rue": 112,
+  "pieton": 66,
+  "bus": 20,
+  "pietonne_pavee": 11
+ },
+ "ha_chaussee_par_classe": {
+  "ruelle": 7.02,
+  "rue": 2.23,
+  "pieton": 0.98,
+  "bus": 0.7,
+  "pietonne_pavee": 0.13
+ },
+ "degres": {
+  "1": 83,
+  "2": 102,
+  "3": 216,
+  "4": 64,
+  "5": 3
+ },
+ "composantes": 4,
+ "plus_grande_composante": 460,
+ "pct_plus_grande": 98.29,
+ "composantes_1_2_noeuds": 2,
+ "recollement_coupes_testees": 64,
+ "recollement_coupes_orphelines": 0,
+ "recollement_coupes_hors_emprise": 67,
+ "noeuds_de_bord": 131,
+ "fictifs": 0,
+ "ponts": 0,
+ "tunnels": 0,
+ "hors_en_service": 0,
+ "volumetrie": {
+  "total_Mo": 0.25,
+  "cellules": 4,
+  "min_Ko": 48.7,
+  "median_Ko": 65.9,
+  "max_Ko": 77.7,
+  "cellule_max": "reseau_0_-1.json"
+ },
+ "lecture_source": {
+  "source": "routes_riche_proto.json",
+  "troncons_lus": 571,
+  "geometries": 571,
+  "multi_parties": 0,
+  "degeneres": 0
+ },
+ "cellSizeM": 500.0,
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0)",
+ "classes": "reseau_classes.json v1 sha1=0fd0f76f453e",
+ "cellules": [
+  [
+   -1,
+   -1
+  ],
+  [
+   -1,
+   0
+  ],
+  [
+   0,
+   -1
+  ],
+  [
+   0,
+   0
+  ]
+ ]
+}

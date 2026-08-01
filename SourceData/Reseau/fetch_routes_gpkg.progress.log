@@ -1,0 +1,13 @@
+2026-07-31 13:37:09  FETCH carre10 : bbox locale [-5000 -5000 -> 5000 5000] m
+2026-07-31 13:37:09  sortie riche : 76 colonnes conservees sur 88 (12 ecartees : metadonnees d'acquisition)
+2026-07-31 13:37:11    fenetre Lambert 93 [569041 6274293 -> 579665 6284953] : 39348 lignes candidates lues
+2026-07-31 13:37:11  35851 polylignes retenues, 2316.0 km, 1.6 s
+2026-07-31 13:37:12  ECRIT (a) C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\routes_bdtopo_gpkg_carre10.json  (14.88 Mo)
+2026-07-31 13:37:12  ECRIT (b) C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\routes_riche_carre10.json  (29.49 Mo)
+2026-07-31 13:37:13  controle ecrit : C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\controle_non_regression_carre10.txt
+2026-07-31 13:39:21  FETCH proto : bbox locale [-500 -500 -> 500 500] m
+2026-07-31 13:39:21  sortie riche : 76 colonnes conservees sur 88 (12 ecartees : metadonnees d'acquisition)
+2026-07-31 13:39:21    fenetre Lambert 93 [573642 6278903 -> 575072 6280338] : 1020 lignes candidates lues
+2026-07-31 13:39:21  571 polylignes retenues, 29.8 km, 0.0 s
+2026-07-31 13:39:21  ECRIT (a) C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\routes_bdtopo_gpkg_proto.json  (0.24 Mo)
+2026-07-31 13:39:21  ECRIT (b) C:\Users\User\Documents\Unreal Projects\CityLab\SourceData\Reseau\routes_riche_proto.json  (0.54 Mo)

@@ -1,0 +1,88 @@
+{
+ "emprise": "proto",
+ "cellules_attendues": 4,
+ "cellules_manquantes": [],
+ "edges": 603,
+ "noeuds_par_cellule_cumules": 499,
+ "noeuds_distincts_recolles": 467,
+ "cleabs_distincts": 571,
+ "aretes_degenerees": 0,
+ "longueur_km": 26.54,
+ "km_par_classe": {
+  "ruelle": 12.42,
+  "pietonne_pavee": 6.52,
+  "rue": 4.12,
+  "pieton": 2.81,
+  "bus": 0.67
+ },
+ "aretes_par_classe": {
+  "ruelle": 259,
+  "pietonne_pavee": 163,
+  "rue": 99,
+  "pieton": 66,
+  "bus": 16
+ },
+ "ha_chaussee_par_classe": {
+  "ruelle": 4.65,
+  "pietonne_pavee": 2.98,
+  "rue": 2.01,
+  "pieton": 0.98,
+  "bus": 0.43
+ },
+ "degres": {
+  "1": 82,
+  "2": 101,
+  "3": 217,
+  "4": 64,
+  "5": 3
+ },
+ "composantes": 4,
+ "plus_grande_composante": 459,
+ "pct_plus_grande": 98.29,
+ "composantes_1_2_noeuds": 2,
+ "recollement_coupes_testees": 64,
+ "recollement_coupes_orphelines": 0,
+ "recollement_coupes_hors_emprise": 67,
+ "noeuds_de_bord": 131,
+ "fictifs": 0,
+ "ponts": 0,
+ "tunnels": 0,
+ "hors_en_service": 0,
+ "volumetrie": {
+  "total_Mo": 0.27,
+  "cellules": 4,
+  "min_Ko": 54.1,
+  "median_Ko": 72.7,
+  "max_Ko": 84.7,
+  "cellule_max": "reseau_0_-1.json"
+ },
+ "lecture_source": {
+  "source": "GPKG BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0)",
+  "troncons_lus": 1020,
+  "geometries": 1020,
+  "multi_parties": 0,
+  "degeneres": 0,
+  "osm_pieton_matches": 181
+ },
+ "cellSizeM": 500.0,
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0)",
+ "classes": "reseau_classes.json v2 sha1=3d62a5cd1f20",
+ "cellules": [
+  [
+   -1,
+   -1
+  ],
+  [
+   -1,
+   0
+  ],
+  [
+   0,
+   -1
+  ],
+  [
+   0,
+   0
+  ]
+ ]
+}

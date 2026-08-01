@@ -50,6 +50,25 @@ namespace
 		UKismetSystemLibrary::RaiseScriptError(Message);
 	}
 
+	// LOT A-ter : le SOL demande 100 fois plus de texels que le streaming ne croit.
+	// MESURE (lot 3, point 2) : le generateur ecrit l'UV0 des dalles EN METRES (les
+	// materiaux M_Surf_* / MI_CityGround_* divisent l'UV0 par la taille physique du
+	// scan) alors que le monde est en CENTIMETRES. La metrique de streaming raisonne
+	// en unites monde par unite d'UV : elle croit la texture etiree 100 fois, demande
+	// 100 fois moins de texels et retombe sur le plancher de 64 px — le sol reste
+	// flou jusqu'a bout portant. 100 n'est donc pas un reglage a l'oeil, c'est le
+	// rapport metre/centimetre. Pose A LA CREATION : c'est une propriete PAR
+	// COMPOSANT, elle ne survit pas a une regeneration si on la met apres coup.
+	const float GGroundStreamingDistanceMultiplier = 100.f;
+
+	void ApplyGroundTextureStreaming(UStaticMeshComponent* Component)
+	{
+		if (Component)
+		{
+			Component->StreamingDistanceMultiplier = GGroundStreamingDistanceMultiplier;
+		}
+	}
+
 	// Sampler MNT partage : la dalle 10k x 10k pese ~200 Mo decompressee, elle se
 	// charge UNE fois et reste en cache pour tout l'import (et les suivants).
 	// Cache un emplacement : rechargee seulement si les chemins changent.
@@ -3198,6 +3217,7 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 		AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
 		Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
 		Actor->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		ApplyGroundTextureStreaming(Actor->GetStaticMeshComponent());
 		Actor->SetActorLabel(Name);
 	}
 
@@ -7488,6 +7508,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		++Summary.GroundMeshes;
 		AStaticMeshActor* SlabActor = World->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
 		SlabActor->GetStaticMeshComponent()->SetStaticMesh(SlabMesh);
+		ApplyGroundTextureStreaming(SlabActor->GetStaticMeshComponent());
 		SlabActor->SetActorLabel(SlabName);
 	}
 
@@ -7503,6 +7524,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
 		Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
 		Actor->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		ApplyGroundTextureStreaming(Actor->GetStaticMeshComponent());
 		Actor->SetActorLabel(Name);
 	}
 	for (auto& Pair : ProxyCells)
@@ -7514,6 +7536,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		AStaticMeshActor* Actor = World->SpawnActor<AStaticMeshActor>(Location, FRotator::ZeroRotator);
 		Actor->GetStaticMeshComponent()->SetStaticMesh(Mesh);
 		Actor->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		ApplyGroundTextureStreaming(Actor->GetStaticMeshComponent());
 		Actor->SetActorLabel(Name);
 	}
 
@@ -7545,8 +7568,13 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		}
 		if (ULevelStreamingDynamic* Dyn = Cast<ULevelStreamingDynamic>(Streaming))
 		{
-			Dyn->bInitiallyLoaded = false;
-			Dyn->bInitiallyVisible = false;
+			// LOT A-ter : CHARGE et VISIBLE au runtime DES LA CREATION. Les valeurs par
+			// defaut (false/false) rendaient la ville INVISIBLE en Play a chaque regeneration
+			// streamee — piege paye TROIS fois le 31/07 et rattrape a chaque coup par un
+			// script de post-traitement (SOL2/fix_pie_sol2.py). Ca se decide ICI, pas dans
+			// une checklist : une propriete par sous-niveau ne survit pas a sa recreation.
+			Dyn->bInitiallyLoaded = true;
+			Dyn->bInitiallyVisible = true;
 		}
 		// J3b : visibilite EDITEUR distincte des flags runtime ci-dessus — elle se
 		// sauve avec la map ; invisible, la ville n'affiche que ses proxys.
