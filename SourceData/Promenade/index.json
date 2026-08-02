@@ -1,5 +1,5 @@
 {
- "genere": "2026-08-02T17:19:19",
+ "genere": "2026-08-02T20:05:08",
  "cellSizeM": 500.0,
  "emprise": [
   -1500.0,
@@ -8,7 +8,9 @@
   1500.0
  ],
  "recette": {
-  "regle": "un chemin qui longe (<25 m) le PIED d'un mur de classe quai, mesure du cote BAS au MNT, est une promenade de berge",
+  "regle": "un chemin qui longe (<25 m) le PIED d'un mur de classe quai, mesure du cote BAS au MNT et strictement sous son couronnement (marge 1.5 m), est une promenade de berge. Le troncon est DECOUPE sur ses morceaux mesures : ce qui n'est pas verifie n'est pas peint (correctif iteration utilisateur 2).",
+  "marge_couronnement_m": 1.5,
+  "trou_max_comble_m": 12.0,
   "sources": [
    "BD TOPO nature Sentier/Chemin",
    "OSM footway/path/pedestrian"
@@ -22,11 +24,11 @@
   }
  },
  "totaux": {
-  "troncons": 60,
-  "longueur_m": 4910.1,
+  "troncons": 110,
+  "longueur_m": 5594.8,
   "murs_quai": 111,
-  "murs_borde_pieton": 31,
-  "morceaux": 69
+  "murs_borde_pieton": 46,
+  "morceaux": 122
  },
  "cellules": {
   "-3_-3": {
@@ -38,12 +40,12 @@
    "longueur_m": 0
   },
   "-3_-1": {
-   "troncons": 2,
-   "longueur_m": 80.8
+   "troncons": 4,
+   "longueur_m": 283.5
   },
   "-3_0": {
-   "troncons": 0,
-   "longueur_m": 0
+   "troncons": 6,
+   "longueur_m": 171.9
   },
   "-3_1": {
    "troncons": 0,
@@ -54,32 +56,32 @@
    "longueur_m": 0
   },
   "-2_-3": {
-   "troncons": 2,
-   "longueur_m": 232.5
+   "troncons": 6,
+   "longueur_m": 306.5
   },
   "-2_-2": {
    "troncons": 0,
    "longueur_m": 0
   },
   "-2_-1": {
-   "troncons": 1,
-   "longueur_m": 3.6
+   "troncons": 5,
+   "longueur_m": 227.2
   },
   "-2_0": {
-   "troncons": 14,
-   "longueur_m": 998.0
+   "troncons": 19,
+   "longueur_m": 958.2
   },
   "-2_1": {
-   "troncons": 0,
-   "longueur_m": 0
+   "troncons": 2,
+   "longueur_m": 39.3
   },
   "-2_2": {
-   "troncons": 5,
-   "longueur_m": 400.5
+   "troncons": 7,
+   "longueur_m": 640.9
   },
   "-1_-3": {
-   "troncons": 1,
-   "longueur_m": 68.3
+   "troncons": 2,
+   "longueur_m": 39.9
   },
   "-1_-2": {
    "troncons": 0,
@@ -90,16 +92,16 @@
    "longueur_m": 0
   },
   "-1_0": {
-   "troncons": 7,
-   "longueur_m": 730.0
+   "troncons": 14,
+   "longueur_m": 658.3
   },
   "-1_1": {
-   "troncons": 8,
-   "longueur_m": 928.1
+   "troncons": 17,
+   "longueur_m": 800.5
   },
   "-1_2": {
-   "troncons": 13,
-   "longueur_m": 653.6
+   "troncons": 17,
+   "longueur_m": 550.0
   },
   "0_-3": {
    "troncons": 0,
@@ -122,32 +124,32 @@
    "longueur_m": 0
   },
   "0_2": {
-   "troncons": 2,
-   "longueur_m": 89.5
+   "troncons": 4,
+   "longueur_m": 130.3
   },
   "1_-3": {
    "troncons": 1,
-   "longueur_m": 28.2
+   "longueur_m": 20.1
   },
   "1_-2": {
    "troncons": 2,
-   "longueur_m": 108.7
+   "longueur_m": 37.3
   },
   "1_-1": {
-   "troncons": 2,
-   "longueur_m": 37.7
+   "troncons": 1,
+   "longueur_m": 16.1
   },
   "1_0": {
-   "troncons": 1,
-   "longueur_m": 33.4
+   "troncons": 3,
+   "longueur_m": 203.5
   },
   "1_1": {
-   "troncons": 1,
-   "longueur_m": 52.7
+   "troncons": 3,
+   "longueur_m": 190.0
   },
   "1_2": {
-   "troncons": 3,
-   "longueur_m": 155.2
+   "troncons": 5,
+   "longueur_m": 172.6
   },
   "2_-3": {
    "troncons": 0,
@@ -159,11 +161,11 @@
   },
   "2_-1": {
    "troncons": 2,
-   "longueur_m": 47.3
+   "longueur_m": 45.2
   },
   "2_0": {
    "troncons": 2,
-   "longueur_m": 64.7
+   "longueur_m": 48.0
   },
   "2_1": {
    "troncons": 0,

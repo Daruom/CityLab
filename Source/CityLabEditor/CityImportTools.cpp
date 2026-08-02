@@ -2692,13 +2692,43 @@ namespace
 	//
 	// Rend le nombre de marches posees. 0 = ECARTE : la surface rendue ne presente
 	// pas de denivele exploitable ici, ou la geometrie ne serait pas un escalier.
+	//
+	// ITERATION UTILISATEUR 2 (02/08) — DEUX AJOUTS, tous deux dans ce corps :
+	//
+	// (a) CHAQUE ECART EST JOURNALISE NOMINATIVEMENT. Avant, la passe ne rendait
+	//     qu'un COMPTE agrege (`StairsSkipped`) : impossible de savoir QUELLE volee
+	//     tombait ni pourquoi, donc impossible de verifier un grief utilisateur
+	//     autrement qu'en croyant un total. Une ligne Display par volee, avec son
+	//     cleabs et la mesure qui l'a decidee — jamais Warning ni Error (l'automation
+	//     les eleve en echec de test, regression payee par le lot C1).
+	//
+	// (b) LA PENTE MINIMALE, contre les BISEAUX. Grief utilisateur : des « lames
+	//     anguleuses » sur la place. Cause mesuree : une volee BD TOPO longue posee
+	//     sur du terrain presque plat garde assez de denivele pour passer le plancher
+	//     de 33 cm, mais son giron theorique explose ; le surplus part en paliers et
+	//     la piece devient un biseau de 20 a 40 m couche au sol (mesure : 21,6 m pour
+	//     74,7 cm de denivele, soit 90 % de palier). Le critere qui SEPARE n'est ni le
+	//     denivele ni le nombre de marches — les deux se recouvrent — c'est la PENTE.
+	//     Distribution mesuree sur les 36 volees de l'emprise 3x3 : un vide franc
+	//     entre 9,1 % et 12,7 % (et entre 9,1 % et 15,0 % sur le district). Le seuil
+	//     est pose au MILIEU de ce vide, a 11 % : aucune valeur mesuree n'est a moins
+	//     de 1,7 point de lui. Un escalier reel, meme a grands paliers de repos, tient
+	//     largement au-dessus (les deux volees du Pont Saint-Pierre sont a 23,4 et
+	//     23,6 %, la volee raide de la Daurade a 33,5 %).
 	int32 BuildStairs(FCityMeshBuilder& QM, const FCityStairs& St,
 		const FRenderedGroundZ& RGZ, const FResolvedSurface* Surf, const FVector3f& Tint,
 		int32& OutQuads)
 	{
+		// Constante de recette locale au corps (patch Live Coding : rien hors fonction).
+		// A promouvoir aupres des autres GStair* au prochain vrai build.
+		constexpr float StairMinSlopePct = 11.0f;
+
 		OutQuads = 0;
 		if (!Surf || St.PtsCm.Num() < 2)
 		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("QUAIS V2 escalier ECARTE id=%s cause=SANS_SURFACE_OU_TRACE (%d points)."),
+				*St.Id, St.PtsCm.Num());
 			return 0;
 		}
 
@@ -2714,6 +2744,9 @@ namespace
 		const float RunCm = S[NP - 1];
 		if (RunCm < GStairTreadMinCm * 2.f)
 		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("QUAIS V2 escalier ECARTE id=%s cause=TRACE_TROP_COURT run=%.0f cm (< %.0f)."),
+				*St.Id, RunCm, GStairTreadMinCm * 2.f);
 			return 0;
 		}
 
@@ -2758,7 +2791,22 @@ namespace
 		const float DropCm = ZHi - ZLo;
 		if (DropCm < GStairMinDropCm)
 		{
-			return 0;   // ECARTE : rien a descendre ici
+			// ECARTE : rien a descendre ici
+			UE_LOG(LogCityImport, Display,
+				TEXT("QUAIS V2 escalier ECARTE id=%s cause=PAS_DE_DENIVELE drop=%.1f cm (< %.0f) run=%.0f cm."),
+				*St.Id, DropCm, GStairMinDropCm, RunCm);
+			return 0;
+		}
+		// LE BISEAU : assez de denivele pour passer le plancher, pas assez de pente
+		// pour etre un escalier. Voir l'en-tete de la fonction pour la distribution
+		// mesuree et le vide ou ce seuil est pose.
+		const float SlopePct = 100.f * DropCm / RunCm;
+		if (SlopePct < StairMinSlopePct)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("QUAIS V2 escalier ECARTE id=%s cause=BISEAU_PENTE_TROP_FAIBLE pente=%.1f %% (< %.1f) drop=%.1f cm run=%.0f cm."),
+				*St.Id, SlopePct, StairMinSlopePct, DropCm, RunCm);
+			return 0;
 		}
 
 		// Sens de parcours : on construit TOUJOURS du BAS vers le HAUT. C'est SHi et
@@ -2779,7 +2827,11 @@ namespace
 		const float RiserCm = DropCm / (float)N;
 		if (RiserCm > GStairRiserMaxCm)
 		{
-			return 0;   // ECARTE : meme a 200 marches la contremarche reste impossible
+			// ECARTE : meme a 200 marches la contremarche reste impossible
+			UE_LOG(LogCityImport, Display,
+				TEXT("QUAIS V2 escalier ECARTE id=%s cause=CONTREMARCHE_IMPOSSIBLE riser=%.1f cm (> %.0f) drop=%.1f cm n=%d."),
+				*St.Id, RiserCm, GStairRiserMaxCm, DropCm, N);
+			return 0;
 		}
 
 		float TreadCm = RunCm / (float)N;
@@ -2787,7 +2839,11 @@ namespace
 		float LandingCm = 0.f;
 		if (TreadCm < GStairTreadMinCm)
 		{
-			return 0;   // ECARTE : ce serait une echelle, pas un escalier
+			// ECARTE : ce serait une echelle, pas un escalier
+			UE_LOG(LogCityImport, Display,
+				TEXT("QUAIS V2 escalier ECARTE id=%s cause=ECHELLE giron=%.1f cm (< %.0f) n=%d run=%.0f cm."),
+				*St.Id, TreadCm, GStairTreadMinCm, N, RunCm);
+			return 0;
 		}
 		if (TreadCm > GStairTreadMaxCm)
 		{
@@ -2919,6 +2975,15 @@ namespace
 				FVector3f((float)VersHaut.X, (float)VersHaut.Y, 0.f).GetSafeNormal(), CapUV, Tint);
 			OutQuads += 2;
 		}
+
+		// La contrepartie de l'ECARTE : la volee POSEE se nomme, elle aussi. C'est
+		// cette ligne que lit le VERROU NOMINATIF des deux volees du Pont Saint-Pierre
+		// (work/QUAIS/q_verrou_escaliers.py) — un verrou porte une verite locale, la
+		// regle au-dessus n'en porte aucune.
+		UE_LOG(LogCityImport, Display,
+			TEXT("QUAIS V2 escalier POSEE id=%s marches=%d drop=%.1f cm run=%.0f cm pente=%.1f %% riser=%.2f cm giron=%.1f cm paliers=%d largeur=%.0f cm."),
+			*St.Id, Marches, DropCm, RunCm, 100.f * DropCm / RunCm, RiserCm, TreadCm,
+			NLandings, St.WidthCm);
 
 		return Marches;
 	}
