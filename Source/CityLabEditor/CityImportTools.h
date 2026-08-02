@@ -178,6 +178,38 @@ struct FCityGenProfile
 	 */
 	UPROPERTY() bool bProxyLayer = false;
 
+	/**
+	 * C1 « DISCONTINUITES » — MURS DE SOUTENEMENT.
+	 *
+	 * Le sol est un drape 2,5D : la dalle n'echantillonne le MNT qu'aux coins de ses
+	 * quads (GroundGridN, soit 7,8125 m en desktop). Toute discontinuite verticale
+	 * REELLE — mur de quai, berge maconnee de canal, tranchee ferroviaire — y devient
+	 * une RAMPE de la largeur d'un quad, aux texels etires : le grief « pente bizarre ».
+	 *
+	 * Cette passe pose, le long des breaklines cuites dans SourceData/Murs
+	 * (murs_<x>_<y>.json, produit par work/DISCONT/c1_bake_3x3.py depuis LE MEME MNT
+	 * que le drape), une face VERTICALE surmontee d'un COURONNEMENT horizontal qui
+	 * recouvre la rampe jusqu'a la retrouver de niveau. Materiau : celui des bordures
+	 * (aucun materiau nouveau).
+	 *
+	 * Strategie v1 ASSUMEE : on MASQUE la rampe, on ne re-maille PAS la grille du sol.
+	 * Le Z est lu sur la SURFACE RENDUE (doctrine du Playbook §6), jamais sur le MNT.
+	 *
+	 * Cellule sans fichier = aucun mur pour elle, sans erreur (cuisson partielle).
+	 */
+	UPROPERTY() bool bRetainingWalls = true;
+
+	/** Dossier des breaklines cuites (murs_<x>_<y>.json). Vide = <projet>/SourceData/Murs. */
+	UPROPERTY() FString RetainingWallsPath;
+
+	/**
+	 * Classes de mur posees, en minuscules et separees par des virgules.
+	 * Vide = les trois classes du side-car (« quai,tranchee,talus »). La classe
+	 * « talus » est la moins sure des trois (rupture de pente d'un versant, pas
+	 * forcement maconnee) : ce champ permet de la retirer sans re-cuire le side-car.
+	 */
+	UPROPERTY() FString RetainingWallClasses;
+
 	/** Prereglage desktop complet : 64x64 drape, collision 16x16, pas routes 15 m. */
 	static FCityGenProfile Desktop();
 
@@ -271,6 +303,20 @@ struct FCityStreamedSummary
 
 	/** J3c maquette : tirets de ligne axiale poses (quads de 15 cm). */
 	UPROPERTY() int32 AxialDashes = 0;
+
+	/**
+	 * C1 : quads de MUR DE SOUTENEMENT poses (face verticale + couronnement + dos,
+	 * plus deux bouchons par polyligne). Compteur SEPARE de CurbQuads : un mur n'est
+	 * pas une bordure, et les comparaisons de non-regression ne doivent pas les
+	 * melanger.
+	 */
+	UPROPERTY() int32 RetainingWallQuads = 0;
+
+	/** C1 : polylignes de mur effectivement posees (au moins un quad). */
+	UPROPERTY() int32 RetainingWalls = 0;
+
+	/** C1 : polylignes ECARTEES — la surface rendue n'y presente aucune rampe a masquer. */
+	UPROPERTY() int32 RetainingWallsSkipped = 0;
 };
 
 /** Counts of what GenerateBuildingCollisionCell produced for one cell. */

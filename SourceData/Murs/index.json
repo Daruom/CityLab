@@ -1,0 +1,366 @@
+{
+ "genere": "2026-08-02T11:20:11",
+ "cellSizeM": 500.0,
+ "emprise": [
+  -1500.0,
+  -1500.0,
+  1500.0,
+  1500.0
+ ],
+ "recette": {
+  "source_mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "pas_drape_m": 7.8125,
+  "stencil_m": 2,
+  "seuil_s2_m_par_m": 0.5,
+  "hauteur_min_m": 2.0,
+  "longueur_min_m": 12.0,
+  "simplify_m": 1.0,
+  "depointage_m": 1.0,
+  "pas_profil_m": 4.0,
+  "recul_profil_m": 6.0
+ },
+ "totaux": {
+  "polylignes": 250,
+  "km": 17.754,
+  "par_classe": {
+   "talus": {
+    "n": 86,
+    "km": 4.94
+   },
+   "tranchee": {
+    "n": 49,
+    "km": 4.424
+   },
+   "quai": {
+    "n": 115,
+    "km": 8.39
+   }
+  }
+ },
+ "cellules": {
+  "-3_-3": {
+   "murs": 0,
+   "longueur_m": 0,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "-3_-2": {
+   "murs": 0,
+   "longueur_m": 0,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "-3_-1": {
+   "murs": 9,
+   "longueur_m": 327.4,
+   "par_classe": {
+    "quai": 4,
+    "tranchee": 5,
+    "talus": 0
+   }
+  },
+  "-3_0": {
+   "murs": 37,
+   "longueur_m": 1351.0,
+   "par_classe": {
+    "quai": 26,
+    "tranchee": 5,
+    "talus": 6
+   }
+  },
+  "-3_1": {
+   "murs": 0,
+   "longueur_m": 0,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "-3_2": {
+   "murs": 0,
+   "longueur_m": 0,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "-2_-3": {
+   "murs": 10,
+   "longueur_m": 237.6,
+   "par_classe": {
+    "quai": 10,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "-2_-2": {
+   "murs": 0,
+   "longueur_m": 0,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "-2_-1": {
+   "murs": 7,
+   "longueur_m": 258.7,
+   "par_classe": {
+    "quai": 6,
+    "tranchee": 0,
+    "talus": 1
+   }
+  },
+  "-2_0": {
+   "murs": 9,
+   "longueur_m": 759.8,
+   "par_classe": {
+    "quai": 9,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "-2_1": {
+   "murs": 3,
+   "longueur_m": 543.9,
+   "par_classe": {
+    "quai": 1,
+    "tranchee": 0,
+    "talus": 2
+   }
+  },
+  "-2_2": {
+   "murs": 3,
+   "longueur_m": 373.2,
+   "par_classe": {
+    "quai": 1,
+    "tranchee": 1,
+    "talus": 1
+   }
+  },
+  "-1_-3": {
+   "murs": 0,
+   "longueur_m": 0,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "-1_-2": {
+   "murs": 0,
+   "longueur_m": 0,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "-1_-1": {
+   "murs": 0,
+   "longueur_m": 0,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "-1_0": {
+   "murs": 3,
+   "longueur_m": 400.9,
+   "par_classe": {
+    "quai": 3,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "-1_1": {
+   "murs": 9,
+   "longueur_m": 985.7,
+   "par_classe": {
+    "quai": 2,
+    "tranchee": 4,
+    "talus": 3
+   }
+  },
+  "-1_2": {
+   "murs": 24,
+   "longueur_m": 1528.2,
+   "par_classe": {
+    "quai": 16,
+    "tranchee": 5,
+    "talus": 3
+   }
+  },
+  "0_-3": {
+   "murs": 1,
+   "longueur_m": 40.5,
+   "par_classe": {
+    "quai": 1,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "0_-2": {
+   "murs": 0,
+   "longueur_m": 0,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "0_-1": {
+   "murs": 0,
+   "longueur_m": 0,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "0_0": {
+   "murs": 0,
+   "longueur_m": 0,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "0_1": {
+   "murs": 0,
+   "longueur_m": 0,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "0_2": {
+   "murs": 3,
+   "longueur_m": 91.3,
+   "par_classe": {
+    "quai": 1,
+    "tranchee": 2,
+    "talus": 0
+   }
+  },
+  "1_-3": {
+   "murs": 8,
+   "longueur_m": 625.1,
+   "par_classe": {
+    "quai": 3,
+    "tranchee": 0,
+    "talus": 5
+   }
+  },
+  "1_-2": {
+   "murs": 18,
+   "longueur_m": 956.1,
+   "par_classe": {
+    "quai": 11,
+    "tranchee": 2,
+    "talus": 5
+   }
+  },
+  "1_-1": {
+   "murs": 5,
+   "longueur_m": 486.6,
+   "par_classe": {
+    "quai": 2,
+    "tranchee": 3,
+    "talus": 0
+   }
+  },
+  "1_0": {
+   "murs": 5,
+   "longueur_m": 330.3,
+   "par_classe": {
+    "quai": 5,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "1_1": {
+   "murs": 4,
+   "longueur_m": 299.9,
+   "par_classe": {
+    "quai": 4,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "1_2": {
+   "murs": 2,
+   "longueur_m": 53.5,
+   "par_classe": {
+    "quai": 2,
+    "tranchee": 0,
+    "talus": 0
+   }
+  },
+  "2_-3": {
+   "murs": 30,
+   "longueur_m": 1019.2,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 13,
+    "talus": 17
+   }
+  },
+  "2_-2": {
+   "murs": 10,
+   "longueur_m": 555.3,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 1,
+    "talus": 9
+   }
+  },
+  "2_-1": {
+   "murs": 16,
+   "longueur_m": 1432.5,
+   "par_classe": {
+    "quai": 2,
+    "tranchee": 4,
+    "talus": 10
+   }
+  },
+  "2_0": {
+   "murs": 14,
+   "longueur_m": 1770.9,
+   "par_classe": {
+    "quai": 3,
+    "tranchee": 7,
+    "talus": 4
+   }
+  },
+  "2_1": {
+   "murs": 7,
+   "longueur_m": 808.8,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 3,
+    "talus": 4
+   }
+  },
+  "2_2": {
+   "murs": 4,
+   "longueur_m": 238.2,
+   "par_classe": {
+    "quai": 0,
+    "tranchee": 0,
+    "talus": 4
+   }
+  }
+ }
+}

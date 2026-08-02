@@ -10,6 +10,8 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "HAL/PlatformFileManager.h"
+#include "IImageWrapper.h"
+#include "IImageWrapperModule.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialInstanceConstant.h"
 #include "Materials/MaterialInterface.h"
@@ -17,6 +19,7 @@
 #include "Misc/AutomationTest.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Modules/ModuleManager.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "StaticMeshAttributes.h"
 #include "StaticMeshResources.h"
@@ -2342,6 +2345,277 @@ void FCityImportToolsSpec::Define()
 				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, Mobile);
 			TestEqual(TEXT("Mobile : aucune cellule peinte"), M.MaskedCells, 0);
 			TestEqual(TEXT("Mobile : les deux rubans sont generes"), M.Roads, 2);
+		});
+	});
+
+	// =====================================================================
+	// C1 « DISCONTINUITES » — MURS DE SOUTENEMENT.
+	//
+	// VERROU GEOMETRIQUE, pas un compte : on fabrique un MNT SYNTHETIQUE dont on
+	// connait la falaise au centimetre, on pose une breakline dessus, et on MESURE
+	// dans le mesh produit l'aire des faces verticales, leurs bornes et leur
+	// orientation. Un « RetainingWallQuads > 0 » ne verrait ni un mur a l'envers,
+	// ni un mur qui deborde, ni un mur de la mauvaise hauteur.
+	//
+	// Le MNT synthetique : 200 x 200 px a 1 m, coin NW local (-100, -100),
+	// terrasse HAUTE a 105 m pour x < -20 m, terrasse BASSE a 100 m pour x > -20 m.
+	// L'origine locale (0, 0) tombe sur la terrasse basse : la rebase Capitole met
+	// donc le bas a Z = 0 et le haut a Z = +500 cm.
+	// =====================================================================
+	Describe("C1 murs de soutenement", [this]()
+	{
+		// Ecrit le couple PNG 16 bits + JSON de georeferencement du MNT synthetique.
+		auto WriteSyntheticMnt = [this](const FString& Dir, float CliffXm, float LowM,
+			float HighM) -> bool
+		{
+			constexpr int32 N = 200;
+			TArray<uint16> Alt;
+			Alt.SetNumUninitialized(N * N);
+			for (int32 Row = 0; Row < N; ++Row)
+			{
+				for (int32 Col = 0; Col < N; ++Col)
+				{
+					const double Xm = -100.0 + Col + 0.5;
+					Alt[Row * N + Col] = (uint16)FMath::RoundToInt(
+						((Xm < CliffXm) ? HighM : LowM) * 100.0);
+				}
+			}
+			IImageWrapperModule& Mod =
+				FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
+			const TSharedPtr<IImageWrapper> Wrapper = Mod.CreateImageWrapper(EImageFormat::PNG);
+			if (!Wrapper.IsValid() ||
+				!Wrapper->SetRaw(Alt.GetData(), (int64)Alt.Num() * sizeof(uint16), N, N,
+					ERGBFormat::Gray, 16))
+			{
+				return false;
+			}
+			const TArray64<uint8>& Png = Wrapper->GetCompressed(100);
+			if (!FFileHelper::SaveArrayToFile(Png, *FPaths::Combine(Dir, TEXT("mnt.png"))))
+			{
+				return false;
+			}
+			const FString Json = TEXT(R"({"grid":{"width_px":200,"height_px":200,)")
+				TEXT(R"("pixel_size_m":1.0,"coin_nw_unreal_cm":{"x":-10000,"y":-10000}}})");
+			return FFileHelper::SaveStringToFile(Json, *FPaths::Combine(Dir, TEXT("mnt.json")));
+		};
+
+		// Aire des triangles dont la normale geometrique regarde a peu pres Dir, et
+		// bornes des sommets concernes. Mesure sur la MeshDescription committee.
+		auto MeasureOriented = [](UStaticMesh* Mesh, const FVector3f& Dir, float MinDot,
+			float& OutAreaM2, FBox& OutBounds) -> bool
+		{
+			OutAreaM2 = 0.f;
+			OutBounds.Init();
+			FMeshDescription* MD = Mesh ? Mesh->GetMeshDescription(0) : nullptr;
+			if (!MD || MD->Triangles().Num() == 0)
+			{
+				return false;
+			}
+			TVertexAttributesRef<FVector3f> Pos = FStaticMeshAttributes(*MD).GetVertexPositions();
+			for (const FTriangleID T : MD->Triangles().GetElementIDs())
+			{
+				TArrayView<const FVertexID> V = MD->GetTriangleVertices(T);
+				const FVector3f A = Pos[V[0]], B = Pos[V[1]], C = Pos[V[2]];
+				// MEME convention que FCityMeshBuilder::AddPoly (qui retourne
+				// l'enroulement pour coller a la normale demandee) : la normale
+				// RENDUE est cross(V2 - V0, V1 - V0). La calculer dans l'autre sens
+				// inverserait le test — et il passerait sur un mur a l'envers.
+				const FVector3f Cross = FVector3f::CrossProduct(C - A, B - A);
+				const float Area = 0.5f * Cross.Size();
+				if (Area <= KINDA_SMALL_NUMBER)
+				{
+					continue;
+				}
+				if (FVector3f::DotProduct(Cross.GetSafeNormal(), Dir) < MinDot)
+				{
+					continue;
+				}
+				OutAreaM2 += Area * 1e-4f;      // cm2 -> m2
+				for (int32 k = 0; k < 3; ++k)
+				{
+					OutBounds += FVector(Pos[V[k]].X, Pos[V[k]].Y, Pos[V[k]].Z);
+				}
+			}
+			return true;
+		};
+
+		It("falaise synthetique : un mur VERTICAL, aires attendues, aucune face hors bornes",
+			[this, WriteSyntheticMnt, MeasureOriented]()
+		{
+			const FString Dir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/C1Murs"));
+			IFileManager::Get().DeleteDirectory(*Dir, false, true);
+			IFileManager::Get().MakeDirectory(*Dir, true);
+			if (!TestTrue(TEXT("MNT synthetique ecrit"), WriteSyntheticMnt(Dir, -20.f, 100.f, 105.f)))
+			{
+				return;
+			}
+
+			// Breakline le long de la falaise (x = -20 m), de y = 10 a y = 90 : 80 m,
+			// entierement dans la cellule (-1, 0) d'une grille de 100 m. Le sens de
+			// parcours est +Y, dont la normale GAUCHE (-1, 0) pointe vers le HAUT :
+			// cote_bas = -1 pour que le bas soit a l'est. Le profil declare 5 m.
+			const FString MursDir = FPaths::Combine(Dir, TEXT("Murs"));
+			IFileManager::Get().MakeDirectory(*MursDir, true);
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"cell":[-1,0],"cellSizeM":100.0,"murs":[{"classe":"quai",)")
+				TEXT(R"("cote_bas":-1,"h_med":5.0,"longueur_m":80.0,)")
+				TEXT(R"("pts":[[-20,10],[-20,90]],)")
+				TEXT(R"("profil":[[-20,10,105,100],[-20,90,105,100]]}]})"),
+				*FPaths::Combine(MursDir, TEXT("murs_-1_0.json")));
+			// TEMOIN : la MEME breakline posee en pleine terrasse plate (cellule 0_0).
+			// Elle doit etre ECARTEE — sans ce temoin, le test passerait meme si la
+			// passe posait un mur partout ou on lui en demande un.
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"cell":[0,0],"cellSizeM":100.0,"murs":[{"classe":"quai",)")
+				TEXT(R"("cote_bas":-1,"h_med":5.0,"longueur_m":80.0,)")
+				TEXT(R"("pts":[[40,10],[40,90]],)")
+				TEXT(R"("profil":[[40,10,100,100],[40,90,100,100]]}]})"),
+				*FPaths::Combine(MursDir, TEXT("murs_0_0.json")));
+
+			const FString City = FPaths::Combine(Dir, TEXT("city.json"));
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"buildings":[],"roads":[{"pts":[[10,-50],[60,-50]],"t":"residential","w":6}],"trees":[]})"),
+				*City);
+
+			FCityGenProfile P;
+			P.bDrapeToTerrain = true;
+			P.bSurfaceMaterials = true;      // sans quoi le materiau de bordure est nul
+			P.bRetainingWalls = true;
+			P.TerrainPngPath = FPaths::Combine(Dir, TEXT("mnt.png"));
+			P.TerrainJsonPath = FPaths::Combine(Dir, TEXT("mnt.json"));
+			P.RetainingWallsPath = MursDir;
+
+			const FCityStreamedSummary S = UCityImportTools::ImportCityStreamed(
+				City, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, P);
+
+			TestEqual(TEXT("Un seul mur pose"), S.RetainingWalls, 1);
+			TestEqual(TEXT("Le temoin plat est ECARTE"), S.RetainingWallsSkipped, 1);
+			// 1 segment : face + couronnement + dos, plus 2 bouchons.
+			TestEqual(TEXT("5 quads (face, couronnement, dos, 2 bouchons)"),
+				S.RetainingWallQuads, 5);
+
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_-1_0"));
+			if (!TestNotNull(TEXT("SM_Ground_-1_0 genere"), Ground))
+			{
+				return;
+			}
+			FStaticMeshCompilingManager::Get().FinishAllCompilation();
+
+			// --- LA FACE : verticale, tournee vers l'EST (le bas), 80 m x (5 m + 40 cm
+			//     de pied enterre) = 432 m2. C'est la mesure qui verrait un mur a
+			//     l'envers (aire nulle sur +X) ou de la mauvaise hauteur.
+			float AreaFace = 0.f;
+			FBox BFace(ForceInit);
+			MeasureOriented(Ground, FVector3f(1.f, 0.f, 0.f), 0.99f, AreaFace, BFace);
+			AddInfo(FString::Printf(TEXT("C1 face +X : %.1f m2, bbox X [%.0f ; %.0f] Y [%.0f ; %.0f] Z [%.0f ; %.0f] cm"),
+				AreaFace, BFace.Min.X, BFace.Max.X, BFace.Min.Y, BFace.Max.Y, BFace.Min.Z, BFace.Max.Z));
+			TestTrue(FString::Printf(TEXT("Aire de face %.1f m2 ~ 432 m2 (80 m x 5,40 m)"), AreaFace),
+				FMath::Abs(AreaFace - 432.f) <= 25.f);
+
+			// --- LE DOS : meme longueur, hauteur du seul enfoncement (40 cm) = 32 m2.
+			float AreaBack = 0.f;
+			FBox BBack(ForceInit);
+			MeasureOriented(Ground, FVector3f(-1.f, 0.f, 0.f), 0.99f, AreaBack, BBack);
+			TestTrue(FString::Printf(TEXT("Aire de dos %.1f m2 ~ 32 m2"), AreaBack),
+				FMath::Abs(AreaBack - 32.f) <= 6.f);
+
+			// --- BORNES : rien au-dela de la falaise +/- la portee de sondage
+			//     (1,5 quad de 8,33 m = 12,5 m), rien hors du segment [10 ; 90] m, et
+			//     Z borne par [bas - 40 cm ; haut] = [-40 ; 500] cm.
+			const FBox Wall = BFace + BBack;
+			TestTrue(FString::Printf(TEXT("Aucune face a l'ouest de -32,5 m (min X %.0f cm)"), Wall.Min.X),
+				Wall.Min.X >= -3260.f);
+			TestTrue(FString::Printf(TEXT("Aucune face a l'est de -7,5 m (max X %.0f cm)"), Wall.Max.X),
+				Wall.Max.X <= -740.f);
+			TestTrue(FString::Printf(TEXT("Y dans [10 ; 90] m (%.0f .. %.0f cm)"), Wall.Min.Y, Wall.Max.Y),
+				Wall.Min.Y >= 999.f && Wall.Max.Y <= 9001.f);
+			TestTrue(FString::Printf(TEXT("Z dans [-40 ; 500] cm (%.0f .. %.0f)"), Wall.Min.Z, Wall.Max.Z),
+				Wall.Min.Z >= -41.f && Wall.Max.Z <= 501.f);
+			TestTrue(FString::Printf(TEXT("Le mur monte bien a la terrasse haute (max Z %.0f cm)"), Wall.Max.Z),
+				Wall.Max.Z >= 480.f);
+		});
+
+		It("bRetainingWalls false : le side-car est ignore (rollback par le flag)",
+			[this, WriteSyntheticMnt]()
+		{
+			const FString Dir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/C1MursOff"));
+			IFileManager::Get().DeleteDirectory(*Dir, false, true);
+			IFileManager::Get().MakeDirectory(*Dir, true);
+			if (!TestTrue(TEXT("MNT synthetique ecrit"), WriteSyntheticMnt(Dir, -20.f, 100.f, 105.f)))
+			{
+				return;
+			}
+			const FString MursDir = FPaths::Combine(Dir, TEXT("Murs"));
+			IFileManager::Get().MakeDirectory(*MursDir, true);
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"cell":[-1,0],"cellSizeM":100.0,"murs":[{"classe":"quai",)")
+				TEXT(R"("cote_bas":-1,"h_med":5.0,"longueur_m":80.0,)")
+				TEXT(R"("pts":[[-20,10],[-20,90]],"profil":[[-20,10,105,100]]}]})"),
+				*FPaths::Combine(MursDir, TEXT("murs_-1_0.json")));
+			const FString City = FPaths::Combine(Dir, TEXT("city.json"));
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"buildings":[],"roads":[{"pts":[[10,-50],[60,-50]],"t":"residential","w":6}],"trees":[]})"),
+				*City);
+
+			FCityGenProfile P;
+			P.bDrapeToTerrain = true;
+			P.bSurfaceMaterials = true;
+			P.bRetainingWalls = false;
+			P.TerrainPngPath = FPaths::Combine(Dir, TEXT("mnt.png"));
+			P.TerrainJsonPath = FPaths::Combine(Dir, TEXT("mnt.json"));
+			P.RetainingWallsPath = MursDir;
+			const FCityStreamedSummary S = UCityImportTools::ImportCityStreamed(
+				City, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, P);
+			TestEqual(TEXT("Aucun mur"), S.RetainingWalls, 0);
+			TestEqual(TEXT("Aucun quad de mur"), S.RetainingWallQuads, 0);
+			TestEqual(TEXT("Aucun mur ecarte non plus (la passe n'a pas tourne)"),
+				S.RetainingWallsSkipped, 0);
+		});
+
+		It("side-car cuit pour une autre taille de cellule : refuse plutot que poser a cote",
+			[this, WriteSyntheticMnt]()
+		{
+			const FString Dir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/C1MursTaille"));
+			IFileManager::Get().DeleteDirectory(*Dir, false, true);
+			IFileManager::Get().MakeDirectory(*Dir, true);
+			if (!TestTrue(TEXT("MNT synthetique ecrit"), WriteSyntheticMnt(Dir, -20.f, 100.f, 105.f)))
+			{
+				return;
+			}
+			const FString MursDir = FPaths::Combine(Dir, TEXT("Murs"));
+			IFileManager::Get().MakeDirectory(*MursDir, true);
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"cell":[-1,0],"cellSizeM":500.0,"murs":[{"classe":"quai",)")
+				TEXT(R"("cote_bas":-1,"h_med":5.0,"longueur_m":80.0,)")
+				TEXT(R"("pts":[[-20,10],[-20,90]],"profil":[[-20,10,105,100]]}]})"),
+				*FPaths::Combine(MursDir, TEXT("murs_-1_0.json")));
+			const FString City = FPaths::Combine(Dir, TEXT("city.json"));
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"buildings":[],"roads":[{"pts":[[10,-50],[60,-50]],"t":"residential","w":6}],"trees":[]})"),
+				*City);
+
+			FCityGenProfile P;
+			P.bDrapeToTerrain = true;
+			P.bSurfaceMaterials = true;
+			P.TerrainPngPath = FPaths::Combine(Dir, TEXT("mnt.png"));
+			P.TerrainJsonPath = FPaths::Combine(Dir, TEXT("mnt.json"));
+			P.RetainingWallsPath = MursDir;
+			// Le refus doit etre SILENCIEUX au sens de l'automation (Display, ni Error
+			// ni Warning). Le dossier de murs par defaut est partage par tous les
+			// imports du projet : un import a une autre maille y rencontre
+			// legitimement un side-car qui n'est pas pour lui, ce n'est pas une faute.
+			// Regression payee le 02/08 : la garde en RaiseError faisait tomber DEUX
+			// tests ProfilDesktop, qui importent a 100 m alors que le side-car du
+			// projet est cuit a 500 m.
+			const FCityStreamedSummary S = UCityImportTools::ImportCityStreamed(
+				City, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, P);
+			TestEqual(TEXT("Aucun mur pose"), S.RetainingWalls, 0);
+			TestEqual(TEXT("Aucun quad"), S.RetainingWallQuads, 0);
+			TestEqual(TEXT("Aucun mur ecarte : la cellule n'a meme pas ete lue"),
+				S.RetainingWallsSkipped, 0);
 		});
 	});
 }

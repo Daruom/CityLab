@@ -272,3 +272,20 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
 Chiffré, avant/après, captures commentées, incidents+causes, intégrité confirmée. **Les prémisses du
 brief sont des HYPOTHÈSES : falsifie-les par la mesure avant d'implémenter** — 3 briefs sur 20 ont
 contenu une prémisse fausse ; les agents qui l'ont détectée ont évité des correctifs erronés.
+
+## 10. Pièges du 02/08 (lots OMBRES + DISCONT C1)
+- **Pool Nanite : STRICTEMENT < 2048 Mo.** `r.Nanite.Streaming.StreamingPoolSize 2048` = assert
+  FATAL (le plafond matériel EST 2048 et la valeur doit lui être inférieure).
+- **La file du guetteur SURVIT au redémarrage d'éditeur** : vider `C:\LidarPoC\work\LIDARC\queue`
+  avant de réinstaller, sinon une vieille campagne se rejoue seule (sans focus → frames d'interface).
+- **Un marqueur de log doit porter son TAG** dans le parseur — sinon on dépouille la mauvaise
+  campagne. Dépouiller chaque campagne immédiatement après son run.
+- **Meshes Nanite invisibles aux mesures Python** : `get_num_triangles(0)` rend le repli décimé,
+  `get_section_from_static_mesh` rend vide. Contrôle géométrique fin = spec d'automation C++
+  (maillage source) + captures reprises après redémarrage pour la preuve disque.
+- **Teardown de la map lourde (196 Mo)** : `LogExit: Editor shut down` puis processus qui tourne
+  (cœur 100 %, RAM plate) — le `.umap` n'est PAS réécrit, kill sans risque après 90 s de grâce
+  (`c1_cycle.ps1` : 300 s → 108 s). **Astuce : basculer sur une map LÉGÈRE avant tout cycle
+  d'éditeur** (fermeture en 11 s).
+- **`RaiseError` dans une passe = échec d'automation** pour toute spec qui importe avec d'autres
+  paramètres : les refus non-fatals se journalisent en **Display**, une ligne par passe.

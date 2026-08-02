@@ -853,6 +853,162 @@ namespace
 	constexpr float GMaskCrossLiftCm = 4.f;    // passage pieton au-dessus de la peinture
 	constexpr float GMaskDashLiftCm = 6.f;     // tiret au-dessus du passage, sous le chant (12)
 
+	// -----------------------------------------------------------------------------
+	// C1 « DISCONTINUITES » — LES MURS DE SOUTENEMENT.
+	//
+	// LE PROBLEME, EN UNE PHRASE. La dalle n'echantillonne le MNT qu'aux COINS de ses
+	// quads (7,8125 m en desktop) : une marche verticale reelle de h metres y devient
+	// une RAMPE de h metres sur 7,8 m, aux texels etires. C'est le grief « pente
+	// bizarre » aux quais de la Garonne et aux berges du Canal du Midi.
+	//
+	// CE QU'ON POSE. Le long des breaklines cuites (SourceData/Murs/murs_<x>_<y>.json,
+	// detectees sur LE MEME MNT que le drape, cf. work/DISCONT/murs_bake.py) :
+	//   1. une FACE VERTICALE au PIED de la rampe ;
+	//   2. un COURONNEMENT horizontal, a l'altitude du haut, qui recouvre la rampe
+	//      jusqu'a l'endroit ou la surface rendue retrouve cette altitude ;
+	//   3. un DOS court, pour que la piece ne soit pas un plan sans envers ;
+	//   4. deux BOUCHONS par polyligne (meme raison que pour les bordures).
+	//
+	// POURQUOI LE COURONNEMENT VA JUSQU'AU HAUT DE LA RAMPE, et pas 40 cm comme une
+	// vraie pierre de couronnement : un couronnement etroit FLOTTERAIT au-dessus de
+	// la rampe (la surface rendue, elle, continue de descendre derriere lui) et on
+	// verrait la rampe etiree entre la pierre et le sol. En le poussant jusqu'au
+	// point ou la surface rendue rejoint l'altitude du haut, la piece se REFERME sur
+	// le sol : aucun jour, aucune rampe visible. Physiquement, ca lit comme le
+	// couronnement + la promenade d'un quai, le chemin de halage d'un canal, la berme
+	// d'une tranchee — ce qui est exactement ce qu'il y a la en realite.
+	//
+	// TOUT EST MESURE SUR LA SURFACE RENDUE (doctrine du Playbook §6), jamais sur le
+	// MNT : c'est la surface rendue qui porte la rampe, c'est elle qu'il faut couvrir.
+	// Le side-car ne sert qu'a dire OU et DANS QUEL SENS ; ses z_haut/z_bas servent de
+	// GARDE-FOU (un mur mesure trois fois plus haut que ce que la donnee annonce est
+	// une erreur de lecture, pas une falaise).
+	//
+	// v1 ASSUMEE : on masque la rampe, ON NE RE-MAILLE PAS la grille du sol. Si la
+	// mesure montre un jour que ca ne suffit pas (vue plongeante rasante, ou la
+	// largeur du couronnement se lit comme une esplanade), l'option v2 est le
+	// re-maillage local de la dalle le long de la breakline — a decider sur capture,
+	// pas a improviser.
+	// -----------------------------------------------------------------------------
+	// Pied ENTERRE, meme raison que la bordure (la dalle rendue et le mur divergent de
+	// quelques centimetres entre deux sommets de grille) — mais a l'echelle d'un mur.
+	constexpr float GWallSinkCm = 40.f;
+	// Marche de recherche du pied et de la crete, le long de la normale. Pas de 50 cm,
+	// portee 1,5 quad de dalle : au-dela, ce n'est plus la rampe du drape, c'est le
+	// terrain. Tolerance de 8 cm = on considere la surface « de niveau ».
+	constexpr float GWallProbeStepCm = 50.f;
+	constexpr float GWallProbeSpanQuads = 1.5f;
+	constexpr float GWallLevelTolCm = 8.f;
+	// Un mur de moins de 1 m de hauteur MESUREE sur la surface rendue n'a rien a
+	// masquer : la rampe y est deja invisible. Ecarte et compte.
+	constexpr float GWallMinHeightCm = 100.f;
+	// Garde-fou : la hauteur mesuree ne peut pas depasser trois fois celle qu'annonce
+	// le side-car (une lecture qui part dans le decor plutot qu'une vraie falaise).
+	constexpr float GWallHeightGuard = 3.0f;
+
+	// Une breakline, telle qu'elle sort du side-car (deja decoupee a la cellule).
+	struct FRetainingWall
+	{
+		TArray<FVector2D> PtsCm;   // polyligne, cm locaux
+		int32 CoteBas = -1;        // +1/-1 le long de la normale GAUCHE du sens de parcours
+		float HMedCm = 0.f;        // hauteur mediane annoncee par le side-car (garde-fou)
+		FString Classe;            // quai | tranchee | talus
+	};
+
+	FString RetainingWallsDir(const FCityGenProfile& Gen)
+	{
+		return Gen.RetainingWallsPath.IsEmpty()
+			? FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/Murs"))
+			: Gen.RetainingWallsPath;
+	}
+
+	// Rend false SANS erreur si la cellule n'a pas de fichier : une cellule sans
+	// breakline cuite est un cas NORMAL (cuisson partielle, zone hors emprise).
+	bool LoadRetainingWallCell(const FString& Dir, int32 CellX, int32 CellY, float CellSizeM,
+		const TSet<FString>& Classes, TArray<FRetainingWall>& Out, int32& OutTailleKo,
+		double& OutTailleCuiteM)
+	{
+		const FString Path = FPaths::Combine(Dir, FString::Printf(TEXT("murs_%d_%d.json"), CellX, CellY));
+		FString Text;
+		if (!FFileHelper::LoadFileToString(Text, *Path))
+		{
+			return false;
+		}
+		TSharedPtr<FJsonObject> Root;
+		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid())
+		{
+			RaiseError(FString::Printf(TEXT("Retaining wall file '%s' is not valid JSON."), *Path));
+			return false;
+		}
+		// GARDE DE TAILLE DE CELLULE — et pourquoi ce n'est PAS une erreur.
+		// Un side-car cuit pour une AUTRE taille de cellule poserait ses murs a une
+		// demi-cellule d'ecart : on refuse, comme pour les masques de sol. Mais le
+		// dossier par DEFAUT est partage par tous les imports du projet, et un import
+		// a une autre maille (les tests d'automation tournent a 100 m) rencontre alors
+		// un side-car qui n'est simplement PAS POUR LUI — ce n'est pas une faute, c'est
+		// un cas normal. On COMPTE et on le dira UNE fois en Display a la fin de la
+		// passe. (Ni Error, ni Warning : l'automation eleve les deux en echec de test —
+		// meme raison que le repli de FSurfaceLibrary::Resolve. Regression trouvee par
+		// la spec le 02/08 : 2 tests ProfilDesktop tombaient sur 36 erreurs de garde.)
+		double BakedCellM = 0.0;
+		if (Root->TryGetNumberField(TEXT("cellSizeM"), BakedCellM) &&
+			!FMath::IsNearlyEqual((float)BakedCellM, CellSizeM, 0.01f))
+		{
+			++OutTailleKo;
+			OutTailleCuiteM = BakedCellM;
+			return false;
+		}
+		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+		if (!Root->TryGetArrayField(TEXT("murs"), Arr))
+		{
+			return true;
+		}
+		for (const TSharedPtr<FJsonValue>& V : *Arr)
+		{
+			const TSharedPtr<FJsonObject>& O = V->AsObject();
+			if (!O.IsValid())
+			{
+				continue;
+			}
+			FRetainingWall W;
+			// TryGet* et non Get* : un champ manquant est un side-car d'une version
+			// anterieure, pas une erreur — et Get* journalise, ce que l'automation
+			// eleverait en echec de test.
+			FString Classe;
+			O->TryGetStringField(TEXT("classe"), Classe);
+			W.Classe = Classe.ToLower();
+			if (Classes.Num() > 0 && !Classes.Contains(W.Classe))
+			{
+				continue;
+			}
+			const TArray<TSharedPtr<FJsonValue>>* P = nullptr;
+			if (!O->TryGetArrayField(TEXT("pts"), P))
+			{
+				continue;
+			}
+			for (const TSharedPtr<FJsonValue>& PV : *P)
+			{
+				const TArray<TSharedPtr<FJsonValue>>& C = PV->AsArray();
+				if (C.Num() >= 2)
+				{
+					W.PtsCm.Add(FVector2D(C[0]->AsNumber() * 100.0, C[1]->AsNumber() * 100.0));
+				}
+			}
+			if (W.PtsCm.Num() < 2)
+			{
+				continue;
+			}
+			double CoteBas = -1.0;
+			double HMed = 0.0;
+			O->TryGetNumberField(TEXT("cote_bas"), CoteBas);
+			O->TryGetNumberField(TEXT("h_med"), HMed);
+			W.CoteBas = (CoteBas >= 0.0) ? 1 : -1;
+			W.HMedCm = (float)(HMed * 100.0);
+			Out.Add(MoveTemp(W));
+		}
+		return true;
+	}
+
 	// Le RELIEF d'une cellule, lu dans sols_<x>_<y>.json. Tout est deja decoupe au
 	// prep (bordures orientees chaussee a gauche, tirets debites, passages
 	// dedoublonnes) : ici on ne fait que poser des quads.
@@ -1930,6 +2086,248 @@ namespace
 				*OutQuads += 2;
 			}
 		}
+	}
+
+	// -----------------------------------------------------------------------------
+	// C1 — POSE D'UN MUR DE SOUTENEMENT le long d'une breakline.
+	//
+	// Pour chaque sommet on MESURE la rampe sur la surface rendue, des deux cotes de
+	// la ligne, en marchant le long de la normale :
+	//   - vers le BAS : on avance tant que la surface DESCEND ; le premier palier est
+	//     le PIED de la rampe (Zpied, distance Dpied) ;
+	//   - vers le HAUT : on avance tant qu'elle MONTE ; le premier palier est la
+	//     CRETE (Zcrete, distance Dcrete).
+	// Le mur est alors : face verticale au pied, de Zpied - enfoncement a Zcrete ;
+	// couronnement horizontal a Zcrete, du pied jusqu'a la crete ; dos au droit de la
+	// crete. La piece se referme donc EXACTEMENT sur le sol de part et d'autre.
+	//
+	// Le sens de parcours ne porte AUCUNE convention implicite : c'est CoteBas qui dit
+	// de quel cote est le bas (side-car), et on n'en deduit rien d'autre.
+	struct FWallSection
+	{
+		FVector2D Pied = FVector2D::ZeroVector;   // point du pied, cm
+		FVector2D Crete = FVector2D::ZeroVector;  // point de la crete, cm
+		float ZPied = 0.f;
+		float ZCrete = 0.f;
+		bool bValide = false;
+	};
+
+	FWallSection MeasureWallSection(const FVector2D& PCm, const FVector2D& NormLow,
+		const FRenderedGroundZ& RGZ, float QuadCm, float GuardCm)
+	{
+		FWallSection S;
+		const float Span = FMath::Max(QuadCm * GWallProbeSpanQuads, GWallProbeStepCm);
+		const int32 Steps = FMath::Max(1, FMath::CeilToInt32(Span / GWallProbeStepCm));
+
+		// PIED : on descend tant que ca descend.
+		S.Pied = PCm;
+		S.ZPied = RGZ.At(PCm.X, PCm.Y);
+		for (int32 i = 1; i <= Steps; ++i)
+		{
+			const FVector2D Q = PCm + NormLow * (double)(i * GWallProbeStepCm);
+			const float Z = RGZ.At(Q.X, Q.Y);
+			if (Z > S.ZPied - GWallLevelTolCm)
+			{
+				break;   // la surface ne descend plus : on est au palier bas
+			}
+			S.Pied = Q;
+			S.ZPied = Z;
+		}
+		// CRETE : on monte tant que ca monte.
+		S.Crete = PCm;
+		S.ZCrete = RGZ.At(PCm.X, PCm.Y);
+		for (int32 i = 1; i <= Steps; ++i)
+		{
+			const FVector2D Q = PCm - NormLow * (double)(i * GWallProbeStepCm);
+			const float Z = RGZ.At(Q.X, Q.Y);
+			if (Z < S.ZCrete + GWallLevelTolCm)
+			{
+				break;   // la surface ne monte plus : on est au palier haut
+			}
+			S.Crete = Q;
+			S.ZCrete = Z;
+		}
+		const float H = S.ZCrete - S.ZPied;
+		S.bValide = (H >= GWallMinHeightCm) && (GuardCm <= 0.f || H <= GuardCm * GWallHeightGuard);
+		return S;
+	}
+
+	// Rend le nombre de quads poses. 0 = la surface rendue ne presente aucune rampe
+	// a masquer ici (cas NORMAL sur un mur que le relief a deja avale).
+	//
+	// v2 (02/08) — UN MUR EST UNE PIECE CONTINUE. Correctif vu SUR CAPTURE, pas
+	// deduit : la v1 cherchait le pied et la crete SEGMENT PAR SEGMENT le long
+	// d'une normale qui saute a chaque sommet, et SAUTAIT tout segment dont la
+	// section echouait. Resultat photographie aux quais de Saint-Pierre : une
+	// rangee d'ECRANS decales lateralement, troues, par lesquels on voyait
+	// justement la rampe qu'on venait masquer. Trois changements, tous dans le
+	// sens de la continuite :
+	//   1. NORMALES DE SOMMET (moyenne des deux segments adjacents) : deux quads
+	//      consecutifs partagent EXACTEMENT leur arete ;
+	//   2. OFFSETS MEDIANS pour toute la polyligne : on marche a chaque sommet mais
+	//      on retient la MEDIANE des distances — une seule geometrie laterale pour
+	//      tout le mur. Le Z, lui, reste lu sommet par sommet : le mur suit le
+	//      terrain en hauteur sans se disloquer en plan ;
+	//   3. VALIDATION AU NIVEAU DE LA POLYLIGNE : aucun segment n'est plus saute ;
+	//      la ou la marche s'eteint, le mur se PINCE a hauteur nulle.
+	int32 BuildRetainingWall(FCityMeshBuilder& QM, const FRetainingWall& Wall,
+		const FRenderedGroundZ& RGZ, const FResolvedSurface* Surf, const FVector3f& Tint,
+		float QuadCm)
+	{
+		if (!Surf || Wall.PtsCm.Num() < 2)
+		{
+			return 0;
+		}
+		// Le mur suit la dalle RENDUE : meme decoupage adaptatif que les bordures,
+		// sinon la face verticale coupe les facettes de la grille en biais.
+		TArray<FVector2D> Pts;
+		SubdivideOnRenderedGround(Wall.PtsCm, RGZ, GCurbSagToleranceCm, GCurbSagMaxDepth, Pts);
+		const int32 N = Pts.Num();
+		if (N < 2)
+		{
+			return 0;
+		}
+
+		// --- 1. normales de SOMMET ----------------------------------------------
+		TArray<FVector2D> Norm;
+		Norm.SetNum(N);
+		for (int32 i = 0; i < N; ++i)
+		{
+			FVector2D Dir = Pts[FMath::Min(N - 1, i + 1)] - Pts[FMath::Max(0, i - 1)];
+			if (Dir.IsNearlyZero())
+			{
+				Dir = FVector2D(1.0, 0.0);
+			}
+			Dir.Normalize();
+			Norm[i] = FVector2D(-Dir.Y, Dir.X) * (double)Wall.CoteBas;
+		}
+
+		// --- 2. marche a chaque sommet, puis MEDIANE des distances ---------------
+		TArray<float> DFoot, DCrest;
+		DFoot.Reserve(N);
+		DCrest.Reserve(N);
+		for (int32 i = 0; i < N; ++i)
+		{
+			const FWallSection S = MeasureWallSection(Pts[i], Norm[i], RGZ, QuadCm, Wall.HMedCm);
+			DFoot.Add((float)(S.Pied - Pts[i]).Size());
+			DCrest.Add((float)(S.Crete - Pts[i]).Size());
+		}
+		auto Mediane = [](TArray<float>& V) -> float
+		{
+			V.Sort();
+			return V.Num() ? V[V.Num() / 2] : 0.f;
+		};
+		const float OffFoot = Mediane(DFoot);
+		const float OffCrest = Mediane(DCrest);
+
+		// --- 3. Z relus aux offsets retenus, pinces (Zcrete >= Zpied) ------------
+		TArray<FVector2D> PFoot, PCrest;
+		TArray<float> ZFoot, ZCrest, Hauteurs;
+		PFoot.SetNum(N);
+		PCrest.SetNum(N);
+		ZFoot.SetNum(N);
+		ZCrest.SetNum(N);
+		Hauteurs.Reserve(N);
+		for (int32 i = 0; i < N; ++i)
+		{
+			PFoot[i] = Pts[i] + Norm[i] * (double)OffFoot;
+			PCrest[i] = Pts[i] - Norm[i] * (double)OffCrest;
+			ZFoot[i] = RGZ.At(PFoot[i].X, PFoot[i].Y);
+			ZCrest[i] = FMath::Max(RGZ.At(PCrest[i].X, PCrest[i].Y), ZFoot[i]);
+			Hauteurs.Add(ZCrest[i] - ZFoot[i]);
+		}
+		const float HMed = Mediane(Hauteurs);
+		if (HMed < GWallMinHeightCm ||
+			(Wall.HMedCm > 0.f && HMed > Wall.HMedCm * GWallHeightGuard))
+		{
+			return 0;
+		}
+
+		const FVector3f Up(0, 0, 1);
+		const FPolygonGroupID Group = QM.GetOrCreateGroup(Surf->SlotName(), Surf->Material);
+		auto WorldUV = [](const FVector3f& P) { return FVector2f(P.X * 0.01f, P.Y * 0.01f); };
+		auto V3 = [](const FVector2D& P, float Z) { return FVector3f((float)P.X, (float)P.Y, Z); };
+
+		int32 Quads = 0;
+		float Arc = 0.f;
+		for (int32 i = 0; i + 1 < N; ++i)
+		{
+			const float SegLen = (float)(Pts[i + 1] - Pts[i]).Size();
+			if (SegLen < 1.f)
+			{
+				continue;
+			}
+			const FVector2D NLow = (Norm[i] + Norm[i + 1]).GetSafeNormal();
+			const float U0 = Arc * 0.01f;
+			const float U1 = (Arc + SegLen) * 0.01f;
+			Arc += SegLen;
+			// V de l'UV : la hauteur REELLE a chaque extremite (un mur dont la hauteur
+			// varie ne doit pas etirer son motif de pierre).
+			const float VA = (ZCrest[i] - ZFoot[i] + GWallSinkCm) * 0.01f;
+			const float VB = (ZCrest[i + 1] - ZFoot[i + 1] + GWallSinkCm) * 0.01f;
+
+			// 1. FACE VERTICALE, au pied de la rampe, tournee vers le BAS.
+			const FVector3f F[4] = {
+				V3(PFoot[i], ZFoot[i] - GWallSinkCm),
+				V3(PFoot[i + 1], ZFoot[i + 1] - GWallSinkCm),
+				V3(PFoot[i + 1], ZCrest[i + 1]),
+				V3(PFoot[i], ZCrest[i]) };
+			const FVector2f FUV[4] = {
+				FVector2f(U0, 0.f), FVector2f(U1, 0.f),
+				FVector2f(U1, VB), FVector2f(U0, VA) };
+			QM.AddPoly(Group, F, 4,
+				FVector3f((float)NLow.X, (float)NLow.Y, 0.f).GetSafeNormal(), FUV, Tint);
+
+			// 2. COURONNEMENT horizontal, du pied jusqu'a la crete, a l'altitude du
+			//    haut : c'est LUI qui recouvre la rampe etiree. UV MONDE, comme le
+			//    chant des bordures — le motif reste en phase avec la dalle.
+			const FVector3f C[4] = {
+				V3(PFoot[i], ZCrest[i]),
+				V3(PFoot[i + 1], ZCrest[i + 1]),
+				V3(PCrest[i + 1], ZCrest[i + 1]),
+				V3(PCrest[i], ZCrest[i]) };
+			const FVector2f CUV[4] = { WorldUV(C[0]), WorldUV(C[1]), WorldUV(C[2]), WorldUV(C[3]) };
+			QM.AddPoly(Group, C, 4, Up, CUV, Tint);
+
+			// 3. DOS, au droit de la crete : sans lui la piece est un plan sans envers
+			//    des qu'on la regarde depuis la terrasse haute. Il est enterre.
+			const FVector3f W[4] = {
+				V3(PCrest[i + 1], ZCrest[i + 1]),
+				V3(PCrest[i], ZCrest[i]),
+				V3(PCrest[i], ZCrest[i] - GWallSinkCm),
+				V3(PCrest[i + 1], ZCrest[i + 1] - GWallSinkCm) };
+			const FVector2f WUV[4] = {
+				FVector2f(U1, 0.f), FVector2f(U0, 0.f),
+				FVector2f(U0, GWallSinkCm * 0.01f), FVector2f(U1, GWallSinkCm * 0.01f) };
+			QM.AddPoly(Group, W, 4,
+				FVector3f(-(float)NLow.X, -(float)NLow.Y, 0.f).GetSafeNormal(), WUV, Tint);
+			Quads += 3;
+		}
+		if (Quads > 0)
+		{
+			// BOUCHONS de fin : une piece OUVERTE laisse voir son interieur par ses
+			// deux bouts (meme raison que pour les bordures).
+			const FVector2D D0 = (Pts[1] - Pts[0]).GetSafeNormal();
+			const FVector2D D1 = (Pts[N - 1] - Pts[N - 2]).GetSafeNormal();
+			const FVector3f CapA[4] = {
+				V3(PFoot[0], ZFoot[0] - GWallSinkCm),
+				V3(PCrest[0], ZCrest[0] - GWallSinkCm),
+				V3(PCrest[0], ZCrest[0]),
+				V3(PFoot[0], ZCrest[0]) };
+			const FVector3f CapB[4] = {
+				V3(PFoot[N - 1], ZFoot[N - 1] - GWallSinkCm),
+				V3(PFoot[N - 1], ZCrest[N - 1]),
+				V3(PCrest[N - 1], ZCrest[N - 1]),
+				V3(PCrest[N - 1], ZCrest[N - 1] - GWallSinkCm) };
+			const FVector2f CapUV[4] = {
+				FVector2f(0.f, 0.f), FVector2f(1.f, 0.f), FVector2f(1.f, 1.f), FVector2f(0.f, 1.f) };
+			QM.AddPoly(Group, CapA, 4,
+				FVector3f(-(float)D0.X, -(float)D0.Y, 0.f).GetSafeNormal(), CapUV, Tint);
+			QM.AddPoly(Group, CapB, 4,
+				FVector3f((float)D1.X, (float)D1.Y, 0.f).GetSafeNormal(), CapUV, Tint);
+			Quads += 2;
+		}
+		return Quads;
 	}
 
 	// TIRET de ligne axiale : un quad de 15 cm de large. Le debitage (3 m plein /
@@ -7660,6 +8058,89 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		LogSink(TEXT("bordurette d'herbe"), SinkGrass, GGrassCurbHeightCm);
 	}
 
+	// --- C1 « DISCONTINUITES » : LES MURS DE SOUTENEMENT.
+	// Passe INDEPENDANTE de la maquette du sol (une berge de canal n'a pas besoin
+	// d'un masque de chaussee), mais elle exige le DRAPE : sans relief, il n'y a
+	// aucune rampe a masquer. Elle vit, comme les bordures, dans les cellules de
+	// RUBANS (SM_Ground_*) : un mur n'a rien a faire dans la dalle porteuse.
+	if (Gen.bRetainingWalls && Drape.IsActive())
+	{
+		const FString WallDir = RetainingWallsDir(Gen);
+		TSet<FString> Classes;
+		if (!Gen.RetainingWallClasses.IsEmpty())
+		{
+			TArray<FString> Parts;
+			Gen.RetainingWallClasses.ToLower().ParseIntoArray(Parts, TEXT(","), true);
+			for (FString& P : Parts)
+			{
+				Classes.Add(P.TrimStartAndEnd());
+			}
+		}
+		TArray<FString> Files;
+		IFileManager::Get().FindFiles(Files, *(WallDir / TEXT("murs_*.json")), true, false);
+		// Le mur reprend LE MATERIAU DES BORDURES (dalle assombrie x0,92) : aucun
+		// materiau nouveau, et la meme grammaire minerale que la pierre de la rue.
+		// FSurfaceLibrary::Resolve rend nullptr quand bSurfaceMaterials est faux —
+		// on le DIT plutot que de ne rien poser en silence.
+		const FResolvedSurface* WallSurf = Surfaces.Resolve(&GSurfCurb);
+		if (!WallSurf)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("Murs de soutenement demandes mais bSurfaceMaterials est faux : aucun mur pose."));
+		}
+		const FVector3f WallTint(0.85f, 0.85f, 0.80f);
+		FRenderedGroundZ WallRGZ;
+		WallRGZ.Init(Drape, Gen.GroundGridN, Cell);
+		const float QuadCm = (Gen.GroundGridN > 0) ? Cell / (float)Gen.GroundGridN : Cell;
+		int32 CellsWithWalls = 0;
+		int32 CellsWrongSize = 0;
+		double BakedCellM = 0.0;
+		for (const FString& File : Files)
+		{
+			FString Rest = FPaths::GetBaseFilename(File);
+			Rest.RemoveFromStart(TEXT("murs_"));
+			FString Sx, Sy;
+			if (!Rest.Split(TEXT("_"), &Sx, &Sy, ESearchCase::CaseSensitive, ESearchDir::FromEnd))
+			{
+				continue;
+			}
+			TArray<FRetainingWall> Walls;
+			if (!LoadRetainingWallCell(WallDir, FCString::Atoi(*Sx), FCString::Atoi(*Sy),
+				CellSizeM, Classes, Walls, CellsWrongSize, BakedCellM) || Walls.Num() == 0)
+			{
+				continue;
+			}
+			++CellsWithWalls;
+			for (const FRetainingWall& W : Walls)
+			{
+				const int32 Q = BuildRetainingWall(
+					GetIn(GroundCells, W.PtsCm[0], Cell, bLinearColors, bWorldUVs),
+					W, WallRGZ, WallSurf, WallTint, QuadCm);
+				if (Q > 0)
+				{
+					Summary.RetainingWallQuads += Q;
+					++Summary.RetainingWalls;
+				}
+				else
+				{
+					++Summary.RetainingWallsSkipped;
+				}
+			}
+		}
+		UE_LOG(LogCityImport, Display,
+			TEXT("Murs de soutenement : %d cellules, %d murs poses (%d quads), %d ecartes (aucune rampe a masquer) — dossier '%s'."),
+			CellsWithWalls, Summary.RetainingWalls, Summary.RetainingWallQuads,
+			Summary.RetainingWallsSkipped, *WallDir);
+		if (CellsWrongSize > 0)
+		{
+			// UNE ligne pour toute la passe, en Display : le side-car trouve n'est pas
+			// pour cette maille, ce n'est pas une faute (voir LoadRetainingWallCell).
+			UE_LOG(LogCityImport, Display,
+				TEXT("Murs de soutenement : %d cellules IGNOREES — leur side-car est cuit pour des cellules de %.0f m et cet import travaille a %.0f m."),
+				CellsWrongSize, BakedCellM, CellSizeM);
+		}
+	}
+
 	// --- Dalles de sol PEINTES : grilles 12x12 par cellule, sommets teintes par
 	// echantillonnage des surfaces (eau > bois > parc). Toujours residentes, elles
 	// portent l'apparence de la map au-dela des distances de cull des films 3D —
@@ -8065,11 +8546,11 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	FEditorFileUtils::SaveDirtyPackages(/*bPromptUserToSave=*/false, /*bSaveMapPackages=*/true,
 		/*bSaveContentPackages=*/true);
 	UE_LOG(LogCityImport, Display,
-		TEXT("Ville streamee : %d batiments, %d routes, %d arbres — %d sols, %d proxys, %d meshes detail, %d collisions batiments, %d blocs, %d patchs de carrefour, %d quads de bordure, %d passages pietons (%d reportes), %d orphelins ecartes. Tout est sauve."),
+		TEXT("Ville streamee : %d batiments, %d routes, %d arbres — %d sols, %d proxys, %d meshes detail, %d collisions batiments, %d blocs, %d patchs de carrefour, %d quads de bordure, %d passages pietons (%d reportes), %d orphelins ecartes, %d murs de soutenement (%d quads). Tout est sauve."),
 		Summary.Buildings, Summary.Roads, Summary.Trees, Summary.GroundMeshes, Summary.ProxyMeshes,
 		Summary.BuildingMeshes, Summary.BuildingColMeshes, Summary.StreamingBlocks,
 		Summary.JunctionPatches, Summary.CurbQuads, Summary.Crossings, Summary.CrossingsDeferred,
-		Summary.OrphanRibbons);
+		Summary.OrphanRibbons, Summary.RetainingWalls, Summary.RetainingWallQuads);
 	if (Summary.MaskedCells > 0)
 	{
 		UE_LOG(LogCityImport, Display,
