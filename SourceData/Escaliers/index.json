@@ -1,5 +1,5 @@
 {
- "genere": "2026-08-02T17:04:28",
+ "genere": "2026-08-02T19:17:33",
  "cellSizeM": 500.0,
  "emprise": [
   -1500.0,
@@ -9,9 +9,10 @@
  ],
  "recette": {
   "sources": [
-   "BD TOPO routes_riche_carre10.json nature='Escalier'",
-   "OSM osm_berges_carre10.json couche 'steps' (highway=steps)"
+   "BD TOPO routes_riche_carre10.json nature='Escalier'"
   ],
+  "inclure_osm": false,
+  "inclure_osm_note": "OSM highway=steps ECARTE sur verdict utilisateur (02/08) : sur ce corridor les seuls escaliers reels sont les 2 BD TOPO du Pont Saint-Pierre ; les steps OSM sont du bruit ou d'autres objets. Mecanique conservee — OSM reviendra derriere un critere de corroboration (aboutir au pied d'un mur de classe quai).",
   "largeur_defaut_m": 2.5,
   "longueur_min_m": 3.0,
   "dedoublonnage": {
@@ -22,157 +23,157 @@
   "z": "AUCUN — le denivele se lit au SOL RENDU aux extremites (doctrine Playbook S6)"
  },
  "totaux": {
-  "escaliers": 448,
+  "escaliers": 35,
   "bdtopo": 35,
-  "osm": 413,
-  "longueur_m": 4626.8,
-  "marches_connues": 208,
-  "morceaux_apres_decoupe": 456
+  "osm": 0,
+  "longueur_m": 878.1,
+  "marches_connues": 0,
+  "morceaux_apres_decoupe": 36
  },
  "cellules": {
   "-3_-3": {
-   "escaliers": 7,
-   "longueur_m": 29.5
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "-3_-2": {
-   "escaliers": 9,
-   "longueur_m": 60.5
+   "escaliers": 1,
+   "longueur_m": 15.0
   },
   "-3_-1": {
-   "escaliers": 4,
-   "longueur_m": 33.2
+   "escaliers": 1,
+   "longueur_m": 5.8
   },
   "-3_0": {
-   "escaliers": 17,
-   "longueur_m": 166.9
+   "escaliers": 4,
+   "longueur_m": 52.1
   },
   "-3_1": {
-   "escaliers": 10,
-   "longueur_m": 94.3
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "-3_2": {
    "escaliers": 0,
    "longueur_m": 0
   },
   "-2_-3": {
-   "escaliers": 13,
-   "longueur_m": 121.8
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "-2_-2": {
-   "escaliers": 29,
-   "longueur_m": 350.1
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "-2_-1": {
-   "escaliers": 13,
-   "longueur_m": 137.3
+   "escaliers": 3,
+   "longueur_m": 56.0
   },
   "-2_0": {
-   "escaliers": 20,
-   "longueur_m": 231.7
+   "escaliers": 4,
+   "longueur_m": 101.3
   },
   "-2_1": {
-   "escaliers": 12,
-   "longueur_m": 95.0
+   "escaliers": 1,
+   "longueur_m": 13.6
   },
   "-2_2": {
-   "escaliers": 3,
-   "longueur_m": 14.1
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "-1_-3": {
-   "escaliers": 4,
-   "longueur_m": 45.0
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "-1_-2": {
-   "escaliers": 3,
-   "longueur_m": 15.5
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "-1_-1": {
-   "escaliers": 10,
-   "longueur_m": 47.0
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "-1_0": {
-   "escaliers": 29,
-   "longueur_m": 330.5
+   "escaliers": 4,
+   "longueur_m": 100.9
   },
   "-1_1": {
-   "escaliers": 4,
-   "longueur_m": 61.7
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "-1_2": {
-   "escaliers": 22,
-   "longueur_m": 277.1
+   "escaliers": 3,
+   "longueur_m": 150.8
   },
   "0_-3": {
-   "escaliers": 3,
-   "longueur_m": 38.6
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "0_-2": {
-   "escaliers": 5,
-   "longueur_m": 46.4
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "0_-1": {
-   "escaliers": 64,
-   "longueur_m": 619.1
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "0_0": {
-   "escaliers": 24,
-   "longueur_m": 127.7
+   "escaliers": 1,
+   "longueur_m": 7.8
   },
   "0_1": {
-   "escaliers": 11,
-   "longueur_m": 116.6
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "0_2": {
-   "escaliers": 15,
-   "longueur_m": 151.8
+   "escaliers": 1,
+   "longueur_m": 10.5
   },
   "1_-3": {
-   "escaliers": 1,
-   "longueur_m": 6.2
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "1_-2": {
-   "escaliers": 41,
-   "longueur_m": 359.2
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "1_-1": {
-   "escaliers": 3,
-   "longueur_m": 19.9
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "1_0": {
-   "escaliers": 25,
-   "longueur_m": 265.5
+   "escaliers": 1,
+   "longueur_m": 19.4
   },
   "1_1": {
-   "escaliers": 3,
-   "longueur_m": 11.1
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "1_2": {
-   "escaliers": 4,
-   "longueur_m": 41.9
+   "escaliers": 1,
+   "longueur_m": 21.1
   },
   "2_-3": {
-   "escaliers": 17,
-   "longueur_m": 246.0
+   "escaliers": 3,
+   "longueur_m": 87.2
   },
   "2_-2": {
-   "escaliers": 18,
-   "longueur_m": 268.8
+   "escaliers": 7,
+   "longueur_m": 172.5
   },
   "2_-1": {
    "escaliers": 0,
    "longueur_m": 0
   },
   "2_0": {
-   "escaliers": 2,
-   "longueur_m": 11.8
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "2_1": {
-   "escaliers": 2,
-   "longueur_m": 34.3
+   "escaliers": 0,
+   "longueur_m": 0
   },
   "2_2": {
-   "escaliers": 9,
-   "longueur_m": 121.5
+   "escaliers": 1,
+   "longueur_m": 53.4
   }
  }
 }
