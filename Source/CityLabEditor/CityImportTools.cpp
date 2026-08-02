@@ -922,6 +922,102 @@ namespace
 			: Gen.RetainingWallsPath;
 	}
 
+	// =========================================================================
+	// LOT VELOCITE — LE FILTRE DE CELLULES (« mode district »)
+	//
+	// Une regeneration complete du proto 3x3 coute ~35 min ; l'immense majorite
+	// des iterations ne regarde qu'un quartier. Le filtre borne CHAQUE passe aux
+	// cellules visees. Il est FERME PAR DEFAUT (chaine vide) : sans lui, pas une
+	// seule branche du generateur ne change.
+	// =========================================================================
+
+	/**
+	 * "-2_0, -2_1" -> { (-2,0), (-2,1) }. Rend false si la chaine est vide ou si
+	 * AUCUNE cellule n'a pu etre lue (auquel cas l'appelant traite la ville entiere :
+	 * un filtre illisible ne doit jamais se traduire par « ne rien generer », qui
+	 * ressemblerait a une purge reussie).
+	 */
+	bool ParseCellFilter(const FString& Spec, TSet<FIntPoint>& Out)
+	{
+		Out.Reset();
+		if (Spec.TrimStartAndEnd().IsEmpty())
+		{
+			return false;
+		}
+		TArray<FString> Parts;
+		Spec.ParseIntoArray(Parts, TEXT(","), true);
+		int32 Mauvais = 0;
+		for (FString& P : Parts)
+		{
+			FString Sx, Sy;
+			// Split PAR LA FIN : l'indice X peut etre negatif ("-2_0"), un split par le
+			// debut couperait sur le signe et rendrait ("", "2_0").
+			if (!P.TrimStartAndEnd().Split(TEXT("_"), &Sx, &Sy,
+				ESearchCase::CaseSensitive, ESearchDir::FromEnd))
+			{
+				++Mauvais;
+				continue;
+			}
+			Sx.TrimStartAndEndInline();
+			Sy.TrimStartAndEndInline();
+			if (Sx.IsEmpty() || Sy.IsEmpty() || !Sx.IsNumeric() || !Sy.IsNumeric())
+			{
+				++Mauvais;
+				continue;
+			}
+			Out.Add(FIntPoint(FCString::Atoi(*Sx), FCString::Atoi(*Sy)));
+		}
+		if (Mauvais > 0)
+		{
+			// Display et non Warning : l'automation eleve les Warning en echec de test
+			// (lecon C1 §12.3), et une entree mal formee se voit deja au compte final.
+			UE_LOG(LogCityImport, Display,
+				TEXT("Filtre de cellules : %d entree(s) illisible(s) dans '%s' — %d cellule(s) retenue(s)."),
+				Mauvais, *Spec, Out.Num());
+		}
+		return Out.Num() > 0;
+	}
+
+	/**
+	 * "SM_Bldg_-2_0_Wall" avec le prefixe "SM_Bldg_" -> (-2, 0).
+	 * Rend false si le label ne porte pas le prefixe ou pas deux entiers derriere.
+	 * C'est ce qui permet a la purge d'idempotence de ne detruire QUE les acteurs
+	 * des cellules visees — la seule chose qui separe une regeneration partielle
+	 * d'une destruction de la ville.
+	 */
+	bool CellFromLabel(const FString& Label, const TCHAR* Prefix, FIntPoint& Out)
+	{
+		FString Rest = Label;
+		if (!Rest.RemoveFromStart(Prefix, ESearchCase::CaseSensitive))
+		{
+			return false;
+		}
+		TArray<FString> Toks;
+		Rest.ParseIntoArray(Toks, TEXT("_"), false);
+		if (Toks.Num() < 2 || !Toks[0].IsNumeric() || !Toks[1].IsNumeric())
+		{
+			return false;
+		}
+		Out = FIntPoint(FCString::Atoi(*Toks[0]), FCString::Atoi(*Toks[1]));
+		return true;
+	}
+
+	/** Boite englobante (cm) des cellules visees, dilatee de MarginCm. */
+	FBox2D CellFilterBounds(const TSet<FIntPoint>& Cells, float CellCm, float MarginCm)
+	{
+		FBox2D Box(ForceInit);
+		for (const FIntPoint& K : Cells)
+		{
+			Box += FVector2D(K.X * CellCm, K.Y * CellCm);
+			Box += FVector2D((K.X + 1) * CellCm, (K.Y + 1) * CellCm);
+		}
+		if (Box.bIsValid)
+		{
+			Box = Box.ExpandBy(MarginCm);
+		}
+		return Box;
+	}
+
 	// Rend false SANS erreur si la cellule n'a pas de fichier : une cellule sans
 	// breakline cuite est un cas NORMAL (cuisson partielle, zone hors emprise).
 	bool LoadRetainingWallCell(const FString& Dir, int32 CellX, int32 CellY, float CellSizeM,
@@ -3667,12 +3763,34 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 		return Summary;
 	}
 
+	// --- LOT VELOCITE : MODE DISTRICT (voir FCityGenProfile::CellFilter) ---------
+	TSet<FIntPoint> CellSet;
+	const bool bCellFilter = ParseCellFilter(Gen.CellFilter, CellSet);
+	const float FilterCellM = (Gen.CellFilterSizeM > 0.f) ? Gen.CellFilterSizeM : CellSizeM;
+	if (bCellFilter && !FMath::IsNearlyEqual(FilterCellM, CellSizeM))
+	{
+		RaiseError(FString::Printf(
+			TEXT("CellFilter est exprime pour des cellules de %.0f m et cet import travaille a %.0f m."),
+			FilterCellM, CellSizeM));
+		return Summary;
+	}
+
 	// Idempotence : un re-import remplace les surfaces existantes.
+	// Mode district : purge BORNEE aux cellules visees ; CitySurfaceTrees (acteur
+	// unique, non decoupe par cellule) est conserve, et donc pas reconstruit non plus.
 	TArray<AActor*> ToDestroy;
 	for (TActorIterator<AActor> It(World); It; ++It)
 	{
 		const FString L = It->GetActorLabel();
-		if (L.StartsWith(TEXT("SM_Surface_")) || L == TEXT("CitySurfaceTrees"))
+		if (L.StartsWith(TEXT("SM_Surface_")))
+		{
+			FIntPoint K;
+			if (!bCellFilter || (CellFromLabel(L, TEXT("SM_Surface_"), K) && CellSet.Contains(K)))
+			{
+				ToDestroy.Add(*It);
+			}
+		}
+		else if (L == TEXT("CitySurfaceTrees") && !bCellFilter)
 		{
 			ToDestroy.Add(*It);
 		}
@@ -3683,6 +3801,11 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 	}
 
 	const float Cell = CellSizeM * 100.f;
+	auto CelluleVisee = [&CellSet, bCellFilter, Cell](const FVector2D& P)
+	{
+		return !bCellFilter || CellSet.Contains(
+			FIntPoint(FMath::FloorToInt(P.X / Cell), FMath::FloorToInt(P.Y / Cell)));
+	};
 	TMap<FIntPoint, TUniquePtr<FCityMeshBuilder>> Cells;
 	auto GetCell = [&](const FVector2D& P) -> FCityMeshBuilder&
 	{
@@ -3735,6 +3858,10 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 			{
 				continue;
 			}
+			if (!CelluleVisee(Centroid(Pts)))
+			{
+				continue;   // mode district : polygone hors des cellules visees
+			}
 			if (SignedArea(Pts) < 0)
 			{
 				Algo::Reverse(Pts);
@@ -3763,6 +3890,13 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 			ReadPts(O->GetArrayField(TEXT("pts")), Pts);
 			if (Pts.Num() < 3)
 			{
+				continue;
+			}
+			// Mode district : l'INDEX AVANCE quand meme (il commande l'etagement Z du
+			// polygone et, si bVariedGrass, sa classe d'herbe).
+			if (!CelluleVisee(Centroid(Pts)))
+			{
+				++GreenIndex;
 				continue;
 			}
 			if (SignedArea(Pts) < 0)
@@ -3851,6 +3985,12 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 			{
 				continue;
 			}
+			// Mode district : l'INDEX AVANCE (il ensemence la variation de BuildRail).
+			if (!CelluleVisee(Pts[0]))
+			{
+				++Index;
+				continue;
+			}
 			// Desktop : meme traitement que les routes (re-echantillonnage + drapage).
 			const TArray<FVector2D>* RailPts = &Pts;
 			TArray<FVector2D> Resampled;
@@ -3888,7 +4028,15 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 	}
 
 	// --- Arbres disperses : HISM dedie, mesh SM_CityTree reutilise s'il existe ---
-	if (ScatterXf.Num() > 0)
+	// Mode district : CitySurfaceTrees est un acteur UNIQUE (pas de decoupage par
+	// cellule) — il n'a pas ete detruit, on ne le reconstruit donc pas.
+	if (ScatterXf.Num() > 0 && bCellFilter)
+	{
+		UE_LOG(LogCityImport, Display,
+			TEXT("Mode district : CitySurfaceTrees conserve tel quel (%d arbres disperses non reposes)."),
+			ScatterXf.Num());
+	}
+	if (ScatterXf.Num() > 0 && !bCellFilter)
 	{
 		const FString TreePath = AssetFolder / TEXT("SM_CityTree");
 		UStaticMesh* TreeMesh = LoadObject<UStaticMesh>(nullptr,
@@ -3914,10 +4062,8 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 		Hism->SetupAttachment(Root2);
 		TreeActor->AddInstanceComponent(Hism);
 		Hism->RegisterComponent();
-		for (const FTransform& Xf : ScatterXf)
-		{
-			Hism->AddInstance(Xf);
-		}
+		// LOT VELOCITE (L3) : un seul AddInstances (un seul arbre spatial construit).
+		Hism->AddInstances(ScatterXf, /*bShouldReturnIndices=*/false, /*bWorldSpace=*/false);
 		TreeActor->SetActorLabel(TEXT("CitySurfaceTrees"));
 	}
 
@@ -3969,18 +4115,110 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 		return Summary;
 	}
 
-	// Idempotence (passe vege-seule rejouable) : efface la vege precedente.
-	TArray<AActor*> ToDestroy;
-	for (TActorIterator<AActor> It(World); It; ++It)
+	// --- LOT VELOCITE : MODE DISTRICT -------------------------------------------
+	// La vegetation est le SEUL cas ou le filtre ne peut pas se contenter de « ne pas
+	// regenerer » : ses acteurs sont groupes PAR MESH (contrainte HISM), pas par
+	// cellule. Detruire CityVeg_SM_KikuyuGrass_03 pour re-semer un quartier effacerait
+	// les 98 000 touffes de toute la ville.
+	// La strategie retenue garde l'AUTORITE UNIQUE de cette passe : c'est toujours ce
+	// meme code qui trace et qui pose ; on RETIRE de chaque HISM les seules instances
+	// tombant dans l'emprise visee, puis on y ajoute celles qu'on vient de semer.
+	TSet<FIntPoint> CellSet;
+	bool bCellFilter = ParseCellFilter(Gen.CellFilter, CellSet);
+	if (bCellFilter && Gen.CellFilterSizeM <= 0.f)
 	{
-		if (It->GetActorLabel().StartsWith(TEXT("CityVeg")))
+		// Display (pas Warning : l'automation eleve les Warning en echec). Le refus est
+		// EXPLICITE : une passe qui se croirait filtree et re-semerait toute la ville
+		// coute 30 minutes et un diagnostic faux.
+		UE_LOG(LogCityImport, Display,
+			TEXT("Vegetation : CellFilter renseigne mais CellFilterSizeM = 0 — FILTRE IGNORE, passe complete. ")
+			TEXT("ImportVegetation n'a pas de parametre CellSizeM : la taille de maille doit venir du profil."));
+		bCellFilter = false;
+		CellSet.Reset();
+	}
+	const float FilterCellCm = Gen.CellFilterSizeM * 100.f;
+	auto DansLeFiltre = [&CellSet, bCellFilter, FilterCellCm](double Xcm, double Ycm)
+	{
+		return !bCellFilter || CellSet.Contains(FIntPoint(
+			FMath::FloorToInt(Xcm / FilterCellCm), FMath::FloorToInt(Ycm / FilterCellCm)));
+	};
+
+	// Idempotence (passe vege-seule rejouable) : efface la vege precedente.
+	// Mode district : on ne detruit RIEN, on VIDE l'emprise visee de chaque HISM.
+	TMap<FString, AActor*> ActeursVeg;
+	TMap<FString, UHierarchicalInstancedStaticMeshComponent*> HismVeg;
+	// ⭐ Instances CONSERVEES (hors emprise) des SEULS acteurs qui en perdent. On ne
+	// RETIRE pas : on RELIT, on garde ce qui reste, et on repose tout d'un coup.
+	// MESURE qui a impose ce choix (premier run filtre, 4 cellules) :
+	// RemoveInstances(indices) sur 99 580 instances reparties dans 31 HISM a coute
+	// 264 s — soit 2,65 ms par instance retiree, la meme signature quadratique que
+	// l'AddInstance unitaire du levier L3 ; le reste de la passe (trace + pose de
+	// 98 297 instances) tenait dans 3,0 s. ClearInstances + UN AddInstances ramene
+	// tout le paquet au regime lineaire deja mesure a la regeneration complete.
+	TMap<FString, TArray<FTransform>> GardeesParActeur;
+	int32 NumInstancesRetirees = 0;
+	{
+		TArray<AActor*> ToDestroy;
+		for (TActorIterator<AActor> It(World); It; ++It)
 		{
-			ToDestroy.Add(*It);
+			const FString L = It->GetActorLabel();
+			if (!L.StartsWith(TEXT("CityVeg")))
+			{
+				continue;
+			}
+			if (!bCellFilter)
+			{
+				ToDestroy.Add(*It);
+				continue;
+			}
+			// Indexation PAR LABEL D'ACTEUR (piege du Playbook §4 : les noms de
+			// COMPOSANT ne sont uniques que dans un acteur — « Veg » les designe tous).
+			TArray<UHierarchicalInstancedStaticMeshComponent*> Comps;
+			It->GetComponents(Comps);
+			if (Comps.Num() != 1)
+			{
+				continue;
+			}
+			ActeursVeg.Add(L, *It);
+			HismVeg.Add(L, Comps[0]);
+			const int32 N = Comps[0]->GetInstanceCount();
+			TArray<FTransform> Gardees;
+			Gardees.Reserve(N);
+			int32 NRetire = 0;
+			for (int32 i = 0; i < N; ++i)
+			{
+				FTransform Xf;
+				if (!Comps[0]->GetInstanceTransform(i, Xf, /*bWorldSpace=*/true))
+				{
+					continue;
+				}
+				if (DansLeFiltre(Xf.GetTranslation().X, Xf.GetTranslation().Y))
+				{
+					++NRetire;
+				}
+				else
+				{
+					Gardees.Add(Xf);
+				}
+			}
+			// Un acteur qui ne perd RIEN n'est pas touche du tout : ni vide, ni repose.
+			if (NRetire > 0)
+			{
+				NumInstancesRetirees += NRetire;
+				GardeesParActeur.Add(L, MoveTemp(Gardees));
+			}
+		}
+		for (AActor* A : ToDestroy)
+		{
+			World->DestroyActor(A);
 		}
 	}
-	for (AActor* A : ToDestroy)
+	if (bCellFilter)
 	{
-		World->DestroyActor(A);
+		UE_LOG(LogCityImport, Display,
+			TEXT("Vegetation MODE DISTRICT : %d cellule(s) de %.0f m — %d acteurs CityVeg conserves, ")
+			TEXT("%d instances retirees de l'emprise visee."),
+			CellSet.Num(), Gen.CellFilterSizeM, ActeursVeg.Num(), NumInstancesRetirees);
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* Instances = nullptr;
@@ -4034,6 +4272,14 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 	// collectes pour le diagnostic mais N'ENTRENT PLUS dans la decision de pose.
 	TSet<const AActor*> ProxySources;
 	{
+		// Mode district : seules les surfaces qui RECOUVRENT l'emprise visee sont
+		// doublees. Le critere est la boite du mesh en monde et non son indice de
+		// cellule : un polygone vert est range dans la cellule de son CENTROIDE mais
+		// peut deborder largement sur ses voisines — la boite, elle, ne ment pas.
+		// Duplication + Build() d'un mesh de sol 64x64 coute ~0,3 s : 75 -> 6 doubles,
+		// c'est une part majeure du cout fixe de la passe.
+		const FBox2D Emprise = bCellFilter
+			? CellFilterBounds(CellSet, FilterCellCm, 0.f) : FBox2D(ForceInit);
 		TArray<AStaticMeshActor*> SolActors;
 		for (TActorIterator<AStaticMeshActor> It(World); It; ++It)
 		{
@@ -4041,6 +4287,17 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 			if (L.StartsWith(TEXT("SM_Surface_")) ||
 				(L.StartsWith(TEXT("SM_Slab_")) && !L.EndsWith(TEXT("_Col"))))
 			{
+				if (bCellFilter)
+				{
+					FVector Origine, Etendue;
+					It->GetActorBounds(/*bOnlyCollidingComponents=*/false, Origine, Etendue);
+					const FBox2D Boite(FVector2D(Origine.X - Etendue.X, Origine.Y - Etendue.Y),
+						FVector2D(Origine.X + Etendue.X, Origine.Y + Etendue.Y));
+					if (!Emprise.Intersect(Boite))
+					{
+						continue;
+					}
+				}
 				SolActors.Add(*It);
 			}
 		}
@@ -4564,6 +4821,12 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 		FVegInst Inst;
 		Inst.X = O->GetNumberField(TEXT("x")) * 100.0;
 		Inst.Y = O->GetNumberField(TEXT("y")) * 100.0;
+		// Mode district : ecarte AVANT tout travail. C'est ici que se gagne l'essentiel
+		// du temps — chaque instance retenue coute une colonne de traces complete.
+		if (!DansLeFiltre(Inst.X, Inst.Y))
+		{
+			continue;
+		}
 		double Scale = 1.0; O->TryGetNumberField(TEXT("scale"), Scale);
 		double Yaw = 0.0;   O->TryGetNumberField(TEXT("yaw"), Yaw);
 		Inst.Scale = (float)Scale;
@@ -4723,22 +4986,55 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 				2.f * RayonFosseArbusteCm(MedScale) * 0.01f);
 		}
 
-		AActor* VegActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
-		// Les instances deja posees ont une collision de canopee : sans cette ligne, les
-		// traces des meshes suivants s'epuisent dans les feuillages des arbres precedents
-		// (constate au run du 30/07 : 5 670 replis GroundZ au lieu de ~0).
-		TraceParams.AddIgnoredActor(VegActor);
-		USceneComponent* Root2 = NewObject<USceneComponent>(VegActor, TEXT("Root"), RF_Transactional);
-		VegActor->SetRootComponent(Root2);
-		VegActor->AddInstanceComponent(Root2);
-		Root2->RegisterComponent();
-		Root2->SetWorldLocation(Location);
+		// Mode district : on REPREND l'acteur existant de ce mesh (ses instances hors
+		// emprise ont ete conservees, celles de l'emprise viennent d'etre retirees).
+		const FString VegLabel = FString::Printf(TEXT("CityVeg_%s"), *Mesh->GetName());
+		AActor* VegActor = bCellFilter ? ActeursVeg.FindRef(VegLabel) : nullptr;
 		UHierarchicalInstancedStaticMeshComponent* Hism =
-			NewObject<UHierarchicalInstancedStaticMeshComponent>(VegActor, TEXT("Veg"), RF_Transactional);
-		Hism->SetStaticMesh(Mesh);
-		Hism->SetupAttachment(Root2);
-		VegActor->AddInstanceComponent(Hism);
-		Hism->RegisterComponent();
+			bCellFilter ? HismVeg.FindRef(VegLabel) : nullptr;
+		const bool bNouvelActeur = (VegActor == nullptr || Hism == nullptr);
+		if (bNouvelActeur)
+		{
+			VegActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
+			// Les instances deja posees ont une collision de canopee : sans cette ligne, les
+			// traces des meshes suivants s'epuisent dans les feuillages des arbres precedents
+			// (constate au run du 30/07 : 5 670 replis GroundZ au lieu de ~0).
+			// (Les acteurs REPRIS, eux, sont deja dans la liste d'ignores : le balayage
+			// initial de TraceParams ignore tout « CityVeg ».)
+			TraceParams.AddIgnoredActor(VegActor);
+			USceneComponent* Root2 = NewObject<USceneComponent>(VegActor, TEXT("Root"), RF_Transactional);
+			VegActor->SetRootComponent(Root2);
+			VegActor->AddInstanceComponent(Root2);
+			Root2->RegisterComponent();
+			Root2->SetWorldLocation(Location);
+			Hism = NewObject<UHierarchicalInstancedStaticMeshComponent>(VegActor, TEXT("Veg"), RF_Transactional);
+			Hism->SetStaticMesh(Mesh);
+			Hism->SetupAttachment(Root2);
+			VegActor->AddInstanceComponent(Hism);
+			Hism->RegisterComponent();
+		}
+		// ⭐ LOT VELOCITE (L3) — LA POSE SE FAIT PAR LOT, ET C'EST TOUT LE SUJET.
+		// Mesure V6 : 530 991 instances en 331 s, 1 228 632 en 1 762 s — x2,3
+		// d'instances pour x5,3 de temps. La cause est dans le moteur, pas chez nous :
+		// UHierarchicalInstancedStaticMeshComponent::AddInstance appelle
+		// BuildTreeIfOutdated() a CHAQUE appel, donc reconstruit l'arbre spatial du
+		// composant a chaque touffe (HierarchicalInstancedStaticMesh.cpp). AddInstances
+		// (pluriel) fait le meme travail utile et ne rebatit l'arbre QU'UNE FOIS.
+		// On accumule donc les transforms et on pose tout a la fin de la boucle.
+		// C'est SANS effet sur la geometrie : la pose est deja le dernier geste de
+		// chaque instance (« plus aucun rejet possible passe ce point »), et les traces
+		// ignorent de toute facon les acteurs CityVeg — une instance posee n'a jamais
+		// influence la pose de la suivante.
+		TArray<FTransform> APoser;
+		// Mode district : les instances CONSERVEES de cet acteur ouvrent le lot ; le
+		// HISM est vide puis repose EN UNE FOIS (conservees + nouvelles).
+		if (TArray<FTransform>* Gardees = GardeesParActeur.Find(VegLabel))
+		{
+			Hism->ClearInstances();
+			APoser = MoveTemp(*Gardees);
+			GardeesParActeur.Remove(VegLabel);
+		}
+		APoser.Reserve(APoser.Num() + Pair.Value.Num());
 		for (const FVegInst& InstSrc : Pair.Value)
 		{
 			// Copie MUTABLE : la retraction hors chaussee (lot6) DEPLACE X/Y, et tout ce
@@ -5280,10 +5576,13 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 			}
 
 			// POSE EFFECTIVE : plus aucun rejet possible passe ce point.
-			const FTransform Xf(FRotator(0, Inst.Yaw, 0),
-				FVector(Inst.X, Inst.Y, SolZ), FVector(Inst.Scale));
-			Hism->AddInstance(Xf, /*bWorldSpace*/ true);
+			APoser.Add(FTransform(FRotator(0, Inst.Yaw, 0),
+				FVector(Inst.X, Inst.Y, SolZ), FVector(Inst.Scale)));
 			++Summary.Instances;
+		}
+		if (APoser.Num() > 0)
+		{
+			Hism->AddInstances(APoser, /*bShouldReturnIndices=*/false, /*bWorldSpace=*/true);
 		}
 		// Touffes d'herbe : reglages de RENDU poses A LA CREATION, dans l'unique
 		// autorite de pose (V6 : plus aucun fondu — cf. GClumpCullStartCm ; toujours
@@ -5295,9 +5594,12 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 			Hism->InstanceEndCullDistance = GClumpCullEndCm;
 			Hism->SetCastShadow(false);
 		}
-		VegActor->SetActorLabel(FString::Printf(TEXT("CityVeg_%s"), *Mesh->GetName()));
+		if (bNouvelActeur)
+		{
+			VegActor->SetActorLabel(VegLabel);
+			++Summary.Actors;
+		}
 		++Summary.Meshes;
-		++Summary.Actors;
 	}
 
 	// --- FOSSES DE PLANTATION : un mesh, un HISM, toutes les fosses --------------
@@ -5355,35 +5657,60 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 					SM.MaterialInterface->CheckMaterialUsage(MATUSAGE_InstancedStaticMeshes);
 				}
 			}
-			AActor* PitActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
-			USceneComponent* PitRoot =
-				NewObject<USceneComponent>(PitActor, TEXT("Root"), RF_Transactional);
-			PitActor->SetRootComponent(PitRoot);
-			PitActor->AddInstanceComponent(PitRoot);
-			PitRoot->RegisterComponent();
-			PitRoot->SetWorldLocation(Location);
+			// Mode district : meme regle que les meshes de vegetation — l'acteur des
+			// fosses est REPRIS, ses fosses hors emprise sont deja conservees.
+			const FString PitLabel(TEXT("CityVeg_TreePits"));
+			AActor* PitActor = bCellFilter ? ActeursVeg.FindRef(PitLabel) : nullptr;
 			UHierarchicalInstancedStaticMeshComponent* PitHism =
-				NewObject<UHierarchicalInstancedStaticMeshComponent>(PitActor, TEXT("Pits"),
+				bCellFilter ? HismVeg.FindRef(PitLabel) : nullptr;
+			const bool bNouvellesFosses = (PitActor == nullptr || PitHism == nullptr);
+			if (bNouvellesFosses)
+			{
+				PitActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
+				USceneComponent* PitRoot =
+					NewObject<USceneComponent>(PitActor, TEXT("Root"), RF_Transactional);
+				PitActor->SetRootComponent(PitRoot);
+				PitActor->AddInstanceComponent(PitRoot);
+				PitRoot->RegisterComponent();
+				PitRoot->SetWorldLocation(Location);
+				PitHism = NewObject<UHierarchicalInstancedStaticMeshComponent>(PitActor, TEXT("Pits"),
 					RF_Transactional);
-			PitHism->SetStaticMesh(PitMesh);
-			PitHism->SetupAttachment(PitRoot);
-			PitActor->AddInstanceComponent(PitHism);
-			PitHism->RegisterComponent();
+				PitHism->SetStaticMesh(PitMesh);
+				PitHism->SetupAttachment(PitRoot);
+				PitActor->AddInstanceComponent(PitHism);
+				PitHism->RegisterComponent();
+			}
+			else if (PitHism->GetStaticMesh() != PitMesh)
+			{
+				PitHism->SetStaticMesh(PitMesh);
+			}
 			PitHism->SetCastShadow(false);   // un disque plat au sol n'ombre rien
+			// LOT VELOCITE (L3) : un seul AddInstances.
+			// Echelle (S,S,1) : le carre grandit, mais le relief VERTICAL du cadre
+			// (hauteur, creux, jupe) reste absolu — une grande fosse n'a pas un cadre
+			// deux fois plus haut.
+			TArray<FTransform> PitXf;
+			if (TArray<FTransform>* Gardees = GardeesParActeur.Find(PitLabel))
+			{
+				PitHism->ClearInstances();
+				PitXf = MoveTemp(*Gardees);
+				GardeesParActeur.Remove(PitLabel);
+			}
+			PitXf.Reserve(PitXf.Num() + Pits.Num());
 			for (const FPitInst& P : Pits)
 			{
-				// Echelle (S,S,1) : le carre grandit, mais le relief VERTICAL du cadre
-				// (hauteur, creux, jupe) reste absolu — une grande fosse n'a pas un
-				// cadre deux fois plus haut.
-				PitHism->AddInstance(FTransform(P.Rot,
-					FVector(P.Xcm, P.Ycm, P.Zcm), FVector(P.Scale, P.Scale, 1.f)),
-					/*bWorldSpace*/ true);
+				PitXf.Add(FTransform(P.Rot,
+					FVector(P.Xcm, P.Ycm, P.Zcm), FVector(P.Scale, P.Scale, 1.f)));
 			}
+			PitHism->AddInstances(PitXf, /*bShouldReturnIndices=*/false, /*bWorldSpace=*/true);
 			// Le prefixe CityVeg est VOULU : la passe vege-seule suivante detruit ces
 			// acteurs comme les autres (idempotence), et le trace les ignore.
-			PitActor->SetActorLabel(TEXT("CityVeg_TreePits"));
 			Summary.Pits = Pits.Num();
-			++Summary.Actors;
+			if (bNouvellesFosses)
+			{
+				PitActor->SetActorLabel(PitLabel);
+				++Summary.Actors;
+			}
 			++Summary.Meshes;
 		}
 	}
@@ -5435,38 +5762,83 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 						SM.MaterialInterface->CheckMaterialUsage(MATUSAGE_InstancedStaticMeshes);
 					}
 				}
-				AActor* SPActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
-				USceneComponent* SPRoot =
-					NewObject<USceneComponent>(SPActor, TEXT("Root"), RF_Transactional);
-				SPActor->SetRootComponent(SPRoot);
-				SPActor->AddInstanceComponent(SPRoot);
-				SPRoot->RegisterComponent();
-				SPRoot->SetWorldLocation(Location);
+				// Mode district : acteur REPRIS s'il existe (cf. fosses carrees).
+				const FString SPLabel(TEXT("CityVeg_ShrubPits"));
+				AActor* SPActor = bCellFilter ? ActeursVeg.FindRef(SPLabel) : nullptr;
 				UHierarchicalInstancedStaticMeshComponent* SPHism =
-					NewObject<UHierarchicalInstancedStaticMeshComponent>(SPActor,
+					bCellFilter ? HismVeg.FindRef(SPLabel) : nullptr;
+				const bool bNouvellesRondes = (SPActor == nullptr || SPHism == nullptr);
+				if (bNouvellesRondes)
+				{
+					SPActor = World->SpawnActor<AActor>(Location, FRotator::ZeroRotator);
+					USceneComponent* SPRoot =
+						NewObject<USceneComponent>(SPActor, TEXT("Root"), RF_Transactional);
+					SPActor->SetRootComponent(SPRoot);
+					SPActor->AddInstanceComponent(SPRoot);
+					SPRoot->RegisterComponent();
+					SPRoot->SetWorldLocation(Location);
+					SPHism = NewObject<UHierarchicalInstancedStaticMeshComponent>(SPActor,
 						TEXT("ShrubPits"), RF_Transactional);
-				SPHism->SetStaticMesh(ShrubMesh);
-				SPHism->SetupAttachment(SPRoot);
-				SPActor->AddInstanceComponent(SPHism);
-				SPHism->RegisterComponent();
+					SPHism->SetStaticMesh(ShrubMesh);
+					SPHism->SetupAttachment(SPRoot);
+					SPActor->AddInstanceComponent(SPHism);
+					SPHism->RegisterComponent();
+				}
+				else if (SPHism->GetStaticMesh() != ShrubMesh)
+				{
+					SPHism->SetStaticMesh(ShrubMesh);
+				}
 				SPHism->SetCastShadow(false);
+				// LOT VELOCITE (L3) : un seul AddInstances.
+				// Echelle (S,S,1) : le disque grandit, le relief VERTICAL (anneau,
+				// monticule, jupe) reste absolu.
+				TArray<FTransform> SPXf;
+				if (TArray<FTransform>* Gardees = GardeesParActeur.Find(SPLabel))
+				{
+					SPHism->ClearInstances();
+					SPXf = MoveTemp(*Gardees);
+					GardeesParActeur.Remove(SPLabel);
+				}
+				SPXf.Reserve(SPXf.Num() + ShrubPits.Num());
 				for (const FPitInst& P : ShrubPits)
 				{
-					// Echelle (S,S,1) : le disque grandit, le relief VERTICAL (anneau,
-					// monticule, jupe) reste absolu.
-					SPHism->AddInstance(FTransform(P.Rot,
-						FVector(P.Xcm, P.Ycm, P.Zcm), FVector(P.Scale, P.Scale, 1.f)),
-						/*bWorldSpace*/ true);
+					SPXf.Add(FTransform(P.Rot,
+						FVector(P.Xcm, P.Ycm, P.Zcm), FVector(P.Scale, P.Scale, 1.f)));
 				}
+				SPHism->AddInstances(SPXf, /*bShouldReturnIndices=*/false, /*bWorldSpace=*/true);
 				// Prefixe CityVeg VOULU : detruit comme les autres au prochain re-import
 				// (idempotence) et ignore par le trace.
-				SPActor->SetActorLabel(TEXT("CityVeg_ShrubPits"));
 				NumShrubPitsPoses = ShrubPits.Num();
-				++Summary.Actors;
+				if (bNouvellesRondes)
+				{
+					SPActor->SetActorLabel(SPLabel);
+					++Summary.Actors;
+				}
 				++Summary.Meshes;
 			}
 		}
 	}
+
+	// Mode district : les acteurs qui ONT PERDU des instances dans l'emprise mais n'en
+	// recoivent AUCUNE nouvelle (une essence qui a disparu du quartier). Ils n'ont pas
+	// ete vides plus haut — on le fait ici, sinon leurs anciennes instances resteraient
+	// dans l'emprise qu'on vient de re-semer.
+	int32 NumActeursVides = 0;
+	for (TPair<FString, TArray<FTransform>>& P : GardeesParActeur)
+	{
+		UHierarchicalInstancedStaticMeshComponent* H = HismVeg.FindRef(P.Key);
+		if (!H)
+		{
+			continue;
+		}
+		H->ClearInstances();
+		if (P.Value.Num() > 0)
+		{
+			H->AddInstances(P.Value, /*bShouldReturnIndices=*/false, /*bWorldSpace=*/true);
+		}
+		++NumActeursVides;
+	}
+	GardeesParActeur.Reset();
 
 	// Cleanup des proxys de trace : acteurs detruits, duplicatas transient au GC.
 	// Les films/dalles d'ORIGINE n'ont jamais ete touches (rien de dirty).
@@ -5639,6 +6011,26 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 		MaskSampler.NumCellsLoaded(), TraceProxies.Num(),
 		NumFosseGagnee, NumFossePerdue,
 		MaskSampler.HasNoise() ? TEXT("CHARGE") : TEXT("ABSENT"), CurbSegs.Num());
+	if (bCellFilter)
+	{
+		// En mode district les compteurs ci-dessus portent sur les CELLULES VISEES,
+		// jamais sur la ville : une comparaison de non-regression se fait sur une
+		// regeneration COMPLETE. La ligne ci-dessous donne le solde reel des HISM.
+		int32 TotalApres = 0;
+		for (const TPair<FString, UHierarchicalInstancedStaticMeshComponent*>& P : HismVeg)
+		{
+			if (P.Value)
+			{
+				TotalApres += P.Value->GetInstanceCount();
+			}
+		}
+		UE_LOG(LogCityImport, Display,
+			TEXT("Vegetation MODE DISTRICT : -%d instances retirees / +%d reposees ; ")
+			TEXT("%d acteur(s) vide(s) de leur part de district sans nouvelle instance ; ")
+			TEXT("total dans les %d acteurs CityVeg repris = %d."),
+			NumInstancesRetirees, Summary.Instances + Summary.Pits + NumShrubPitsPoses,
+			NumActeursVides, HismVeg.Num(), TotalApres);
+	}
 	UE_LOG(LogCityImport, Display,
 		TEXT("Pose sur SURFACE RENDUE (lot5) : %d instances que l'ancienne regle aurait ")
 		TEXT("posees plus de 30 cm trop haut (dont %d de plus d'1 m, maximum %.0f cm) — la ")
@@ -7407,6 +7799,44 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	}
 	UEditorLevelUtils::MakeLevelCurrent(World->PersistentLevel, true);
 
+	// --- LOT VELOCITE : MODE DISTRICT -------------------------------------------
+	// CellFilter vide = tout le code qui suit est celui d'avant, a l'octet pres.
+	TSet<FIntPoint> CellSet;
+	const bool bCellFilter = ParseCellFilter(Gen.CellFilter, CellSet);
+	const float FilterCellM = (Gen.CellFilterSizeM > 0.f) ? Gen.CellFilterSizeM : CellSizeM;
+	if (bCellFilter && !FMath::IsNearlyEqual(FilterCellM, CellSizeM))
+	{
+		// Un filtre exprime dans une AUTRE maille designerait d'autres cellules que
+		// celles que cette passe fabrique : on refuse plutot que de purger a cote.
+		RaiseError(FString::Printf(
+			TEXT("CellFilter est exprime pour des cellules de %.0f m et cet import travaille a %.0f m."),
+			FilterCellM, CellSizeM));
+		return Summary;
+	}
+	// Une cellule est « visee » quand elle est dans le filtre — ou quand il n'y a pas
+	// de filtre du tout (la ville entiere).
+	auto CelluleVisee = [&CellSet, bCellFilter](const FIntPoint& K)
+	{
+		return !bCellFilter || CellSet.Contains(K);
+	};
+	auto CelluleDe = [](const FVector2D& P, float SizeCm)
+	{
+		return FIntPoint(FMath::FloorToInt(P.X / SizeCm), FMath::FloorToInt(P.Y / SizeCm));
+	};
+	const bool bProxyLayer = Gen.bProxyLayer && !bCellFilter;
+	if (bCellFilter && Gen.bProxyLayer)
+	{
+		UE_LOG(LogCityImport, Display,
+			TEXT("Mode district : bProxyLayer ignore — la couche proxy a sa propre maille (%.0f m)."),
+			ProxyCellSizeM);
+	}
+	if (bCellFilter)
+	{
+		UE_LOG(LogCityImport, Display,
+			TEXT("MODE DISTRICT : %d cellule(s) de %.0f m regenerees, le reste de la ville n'est pas touche."),
+			CellSet.Num(), CellSizeM);
+	}
+
 	// Lot B : bascule matiere desktop. Le chemin batiments GEOMETRIQUES est pris des
 	// qu'un flag Lot B batiments est actif ; bPBRMaterials commande les materiaux
 	// DefaultLit, l'encodage LINEAIRE des vertex colors, la fin de l'ombrage cuit
@@ -7421,9 +7851,34 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	// echoue en silence sur un niveau invisible (constate sur le proto : generations
 	// empilees 8 -> 16), et un niveau sauve invisible rend la ville « proxys seuls »
 	// dans l'editeur CityLab (3 sessions de diagnostic payees le 25/07).
+	// Mode district : SEULS les blocs qui portent une cellule visee sont rendus
+	// visibles (donc charges, puis re-sauves plus bas). C'est la moitie de l'economie
+	// de la passe filtree : a 3x3 km, 16 sous-niveaux de 1 km rendus visibles puis
+	// resauves coutent bien plus cher que la geometrie d'un quartier.
+	TSet<FIntPoint> BlocsVises;
+	if (bCellFilter)
+	{
+		for (const FIntPoint& K : CellSet)
+		{
+			BlocsVises.Add(FIntPoint(
+				FMath::FloorToInt(K.X * CellSizeM / BlockSizeM),
+				FMath::FloorToInt(K.Y * CellSizeM / BlockSizeM)));
+		}
+	}
+	auto BlocVise = [&](const FString& PackageName) -> bool
+	{
+		if (!bCellFilter)
+		{
+			return true;
+		}
+		FIntPoint B;
+		return CellFromLabel(FPackageName::GetShortName(PackageName), TEXT("L_T10_B_"), B)
+			&& BlocsVises.Contains(B);
+	};
 	for (ULevelStreaming* S : World->GetStreamingLevels())
 	{
-		if (S && S->GetWorldAssetPackageName().StartsWith(BlocksFolder))
+		if (S && S->GetWorldAssetPackageName().StartsWith(BlocksFolder) &&
+			BlocVise(S->GetWorldAssetPackageName()))
 		{
 			S->SetShouldBeVisibleInEditor(true);
 			if (ULevel* Lvl = S->GetLoadedLevel())
@@ -7434,16 +7889,34 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	}
 
 	// Idempotence : couches precedentes + heritage monolithique SM_City_*.
+	// EN MODE DISTRICT la purge est BORNEE aux cellules visees — c'est le point le
+	// plus dangereux du filtre : une purge restee globale effacerait la ville et la
+	// passe ne reconstruirait que le quartier. Un acteur dont le label ne rend pas de
+	// cellule lisible (heritage SM_City_*, CityTrees) est donc CONSERVE.
 	TArray<AActor*> ToDestroy;
 	for (TActorIterator<AActor> It(World); It; ++It)
 	{
 		const FString L = It->GetActorLabel();
-		if (L.StartsWith(TEXT("SM_Ground_")) || L.StartsWith(TEXT("SM_Slab_")) ||
+		const bool bCandidat =
+			L.StartsWith(TEXT("SM_Ground_")) || L.StartsWith(TEXT("SM_Slab_")) ||
 			L.StartsWith(TEXT("SM_Proxy_")) ||
-			L.StartsWith(TEXT("SM_City_")) || L.StartsWith(TEXT("SM_Bldg_")) || L == TEXT("CityTrees"))
+			L.StartsWith(TEXT("SM_City_")) || L.StartsWith(TEXT("SM_Bldg_")) || L == TEXT("CityTrees");
+		if (!bCandidat)
 		{
-			ToDestroy.Add(*It);
+			continue;
 		}
+		if (bCellFilter)
+		{
+			FIntPoint K;
+			const bool bLu =
+				CellFromLabel(L, TEXT("SM_Ground_"), K) || CellFromLabel(L, TEXT("SM_Slab_"), K) ||
+				CellFromLabel(L, TEXT("SM_Bldg_"), K);
+			if (!bLu || !CellSet.Contains(K))
+			{
+				continue;
+			}
+		}
+		ToDestroy.Add(*It);
 	}
 	for (AActor* A : ToDestroy)
 	{
@@ -7491,6 +7964,42 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		}
 		return *B;
 	};
+	// Meme fabrique, adressee par CLE et non par point (mode district, ci-dessous).
+	auto GetInKey = [](TMap<FIntPoint, TUniquePtr<FCityMeshBuilder>>& Map, const FIntPoint& Key,
+		bool bLinear = false, bool bUV1 = false) -> FCityMeshBuilder&
+	{
+		TUniquePtr<FCityMeshBuilder>& B = Map.FindOrAdd(Key);
+		if (!B)
+		{
+			B = MakeUnique<FCityMeshBuilder>();
+			B->bLinearColors = bLinear;
+			if (bUV1)
+			{
+				B->EnableWorldUV1();
+			}
+		}
+		return *B;
+	};
+	// ⭐ MODE DISTRICT — LA FUITE DE GEOMETRIE VERS LA CELLULE VOISINE, ET SA GARDE.
+	//
+	// Defaut MESURE au premier run filtre (cellules -2_0/-2_1/-1_0/-1_1) : quatre
+	// SM_Ground_ de plus dans le monde, exactement les voisines EST et SUD du district
+	// (0_0, 0_1, -2_2, -1_2), en DOUBLE — et l'asset du voisin reecrit avec le seul
+	// fragment qui avait deborde.
+	// Cause : bordures, bordurettes, tirets et murs sont deja decoupes A LA CELLULE au
+	// prep, mais le premier sommet d'une polyligne peut tomber EXACTEMENT sur la
+	// frontiere est ou sud ; `floor` le range alors dans la cellule suivante. En
+	// generation complete c'est sans consequence (toutes les cellules sont refaites) ;
+	// en generation filtree, cette cellule-la n'est ni purgee ni reconstruite — on
+	// creait donc un acteur en double et on ECRASAIT l'asset du voisin.
+	// Garde : en mode district, une geometrie qui sortirait du filtre est rangee dans sa
+	// cellule PROPRIETAIRE (celle du fichier dont elle vient). Rien n'est perdu, rien ne
+	// deborde. Hors mode district, la cle est celle d'avant, au bit pres.
+	auto CleSol = [&](const FVector2D& P, const FIntPoint& Proprio) -> FIntPoint
+	{
+		const FIntPoint K(FMath::FloorToInt(P.X / Cell), FMath::FloorToInt(P.Y / Cell));
+		return (!bCellFilter || CellSet.Contains(K)) ? K : Proprio;
+	};
 	auto ReadPts = [](const TArray<TSharedPtr<FJsonValue>>& In, TArray<FVector2D>& Out)
 	{
 		for (const TSharedPtr<FJsonValue>& V : In)
@@ -7528,6 +8037,16 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			FVector2D Centroid(0, 0);
 			for (const FVector2D& P : Pts) { Centroid += P; }
 			Centroid /= Pts.Num();
+			// Mode district : hors des cellules visees on n'entre pas dans la fabrique,
+			// mais L'INDEX AVANCE QUAND MEME — c'est lui qui donne a chaque batiment sa
+			// teinte et sa sous-tuile (UsageTint/UsageTile, deterministes par indice).
+			// Le sauter re-colorierait tous les batiments suivants, et la cellule
+			// regeneree ne ressemblerait plus a ses voisines.
+			if (bCellFilter && !CellSet.Contains(CelluleDe(Centroid, Cell)))
+			{
+				++Index;
+				continue;
+			}
 			// Cours interieures (J3b cours) : anneaux CW (metres) livres par
 			// j3b_ajoute_cours.py. Chaque trou -> mur de cour + toit qui retombe vers
 			// l'avant-toit interieur + collision ajouree. Ignore si le contour a du etre
@@ -7598,7 +8117,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			// V6 : la couche proxy est supprimee (cf. FCityGenProfile::bProxyLayer).
 			// On ne la CONSTRUIT plus du tout : a l'echelle 3x3 km c'est autant de
 			// geometrie, d'assets et d'acteurs en moins, pas seulement une visibilite.
-			if (Gen.bProxyLayer)
+			if (bProxyLayer)
 			{
 				BuildProxyBuilding(GetIn(ProxyCells, Centroid, ProxyCell, bLinearColors), Pts, Hcm,
 					Gen.bMarbleWhite ? MarbleTint() : Tint,
@@ -7638,6 +8157,14 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				continue;
 			}
 			const FIntPoint Key(FCString::Atoi(*Sx), FCString::Atoi(*Sy));
+			// Mode district : on ne LIT meme pas le JSON des cellules hors filtre —
+			// c'est la passe la plus lourde a l'entree (bordures, bordurettes, tirets
+			// de 36 cellules), et elle n'a rien a dire sur un quartier qu'on ne
+			// regenere pas.
+			if (!CelluleVisee(Key))
+			{
+				continue;
+			}
 			FGroundMaskCell Data;
 			if (LoadGroundMaskCell(Dir, Key.X, Key.Y, CellSizeM, Data))
 			{
@@ -7799,6 +8326,16 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			{
 				continue;
 			}
+			// Mode district. Un ruban entier part dans la cellule de son PREMIER point
+			// (regle de fusion de GetIn) : filtrer sur cette meme cellule est donc exact
+			// — un ruban qui deborde sur la voisine appartient au mesh de la cellule
+			// d'origine, qui n'est pas touche tant qu'elle n'est pas visee.
+			// L'INDEX avance : il ensemence la variation de BuildRoad.
+			if (bCellFilter && !CellSet.Contains(CelluleDe(Pts[0], Cell)))
+			{
+				++Index;
+				continue;
+			}
 			// v4 — LE PIETON EST LA DALLE : en profil revetements, aucune voie pietonne
 			// ne produit de ruban. C'est LA simplification structurelle de la v4 (le
 			// lacis pieton du centre faisait a lui seul l'effet « grand puzzle »). Le
@@ -7923,7 +8460,8 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			const FJunctionNode& Node = Pair.Value;
 			// J3c maquette : un carrefour PEINT n'a pas besoin d'un disque de
 			// rattrapage — il n'y a plus de rubans a raccorder.
-			if (bMaskedActive || !Node.WantsPatch() || Node.MaxHalfCm < 150.f)
+			if (bMaskedActive || !Node.WantsPatch() || Node.MaxHalfCm < 150.f ||
+				!CelluleVisee(CelluleDe(Node.PosCm, Cell)))
 			{
 				continue;
 			}
@@ -7956,7 +8494,8 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			for (const TPair<FIntPoint, FCrossingSite>& Pair : CrossingSites)
 			{
 				const FCrossingSite& Site = Pair.Value;
-				if (Site.RoadHalfCm <= 0.f || !PedestrianNodes.Contains(Pair.Key))
+				if (Site.RoadHalfCm <= 0.f || !PedestrianNodes.Contains(Pair.Key) ||
+					!CelluleVisee(CelluleDe(Site.PosCm, Cell)))
 				{
 					continue;
 				}
@@ -8008,7 +8547,8 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			const FGroundMaskCell& Data = Pair.Value;
 			for (const TArray<FVector2D>& Line : Data.Curbs)
 			{
-				BuildMaskCurb(GetIn(GroundCells, Line[0], Cell, bLinearColors, bWorldUVs),
+				BuildMaskCurb(GetInKey(GroundCells, CleSol(Line[0], Pair.Key),
+						bLinearColors, bWorldUVs),
 					Line, RGZ, CurbSurf, Tint, &Summary.CurbQuads,
 					GCurbHeightCm, GCurbTopWidthCm, &SinkRoad);
 			}
@@ -8019,21 +8559,24 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			// juger le volume pose sans le confondre avec celui de la voirie.
 			for (const TArray<FVector2D>& Line : Data.GrassEdges)
 			{
-				BuildMaskCurb(GetIn(GroundCells, Line[0], Cell, bLinearColors, bWorldUVs),
+				BuildMaskCurb(GetInKey(GroundCells, CleSol(Line[0], Pair.Key),
+						bLinearColors, bWorldUVs),
 					Line, RGZ, CurbSurf, Tint, &Summary.GrassCurbQuads,
 					GGrassCurbHeightCm, GGrassCurbTopWidthCm, &SinkGrass);
 			}
 			for (const FMaskCrossing& Site : Data.Crossings)
 			{
 				const float Zcm = RGZ.At(Site.PosCm.X, Site.PosCm.Y) + GMaskCrossLiftCm;
-				BuildCrossing(GetIn(GroundCells, Site.PosCm, Cell, bLinearColors, bWorldUVs),
+				BuildCrossing(GetInKey(GroundCells, CleSol(Site.PosCm, Pair.Key),
+						bLinearColors, bWorldUVs),
 					Site.PosCm, Site.DirCm, Site.HalfWCm, Zcm, CrossSurf, Tint);
 				++Summary.Crossings;
 			}
 			for (const FVector4& Seg : Data.Axial)
 			{
 				const FVector2D A(Seg.X, Seg.Y);
-				BuildAxialDash(GetIn(GroundCells, A, Cell, bLinearColors, bWorldUVs),
+				BuildAxialDash(GetInKey(GroundCells, CleSol(A, Pair.Key),
+						bLinearColors, bWorldUVs),
 					A, FVector2D(Seg.Z, Seg.W), RGZ, MarkSurf, Tint);
 				++Summary.AxialDashes;
 			}
@@ -8104,6 +8647,12 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			{
 				continue;
 			}
+			// Mode district : le side-car est deja decoupe a la cellule, le filtre se
+			// lit donc directement sur le nom du fichier.
+			if (!CelluleVisee(FIntPoint(FCString::Atoi(*Sx), FCString::Atoi(*Sy))))
+			{
+				continue;
+			}
 			TArray<FRetainingWall> Walls;
 			if (!LoadRetainingWallCell(WallDir, FCString::Atoi(*Sx), FCString::Atoi(*Sy),
 				CellSizeM, Classes, Walls, CellsWrongSize, BakedCellM) || Walls.Num() == 0)
@@ -8111,10 +8660,12 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				continue;
 			}
 			++CellsWithWalls;
+			const FIntPoint CelluleMur(FCString::Atoi(*Sx), FCString::Atoi(*Sy));
 			for (const FRetainingWall& W : Walls)
 			{
 				const int32 Q = BuildRetainingWall(
-					GetIn(GroundCells, W.PtsCm[0], Cell, bLinearColors, bWorldUVs),
+					GetInKey(GroundCells, CleSol(W.PtsCm[0], CelluleMur),
+						bLinearColors, bWorldUVs),
 					W, WallRGZ, WallSurf, WallTint, QuadCm);
 				if (Q > 0)
 				{
@@ -8263,8 +8814,16 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	// change d'une cellule a l'autre, donc elle se resout dans la boucle.
 	FResolvedSurface MaskedSurf;
 	MaskedSurf.Class = &GSurfMaskedGround;
+	// Garde de sortie du mode district (doit toujours valoir 0 grace a CleSol) : on ne
+	// cree ni n'ecrase JAMAIS l'asset d'une cellule qu'on n'a pas purgee.
+	int32 CellulesHorsFiltre = 0;
 	for (const FIntPoint& Key : SlabKeys)
 	{
+		if (!CelluleVisee(Key))
+		{
+			++CellulesHorsFiltre;
+			continue;
+		}
 		FCityMeshBuilder SlabBuilder;
 		SlabBuilder.bLinearColors = bLinearColors;
 		if (bWorldUVs)
@@ -8315,6 +8874,11 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	// Slot Wall = sentiers (vertex color) ; slot Glass = rubans textures.
 	for (auto& Pair : GroundCells)
 	{
+		if (!CelluleVisee(Pair.Key))
+		{
+			++CellulesHorsFiltre;
+			continue;
+		}
 		const FString Name = FString::Printf(TEXT("SM_Ground_%d_%d"), Pair.Key.X, Pair.Key.Y);
 		UStaticMesh* Mesh = CreateMeshAsset(AssetFolder / Name, *Pair.Value, SlabMat, RoadMat, false,
 			false, 0.f, nullptr, bNanite);
@@ -8324,6 +8888,14 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		Actor->GetStaticMeshComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		ApplyGroundTextureStreaming(Actor->GetStaticMeshComponent());
 		Actor->SetActorLabel(Name);
+	}
+	if (CellulesHorsFiltre > 0)
+	{
+		// Display : ce n'est pas une erreur de spec, c'est un compteur de non-regression.
+		// S'il devient non nul, c'est qu'un chemin de geometrie echappe encore a CleSol.
+		UE_LOG(LogCityImport, Display,
+			TEXT("MODE DISTRICT : %d cellule(s) HORS FILTRE ecartees a la sortie (doit valoir 0)."),
+			CellulesHorsFiltre);
 	}
 	for (auto& Pair : ProxyCells)
 	{
@@ -8500,8 +9072,20 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	UEditorLevelUtils::MakeLevelCurrent(World->PersistentLevel, true);
 
 	// --- Arbres : residents, un mesh + un HISM (identique a ImportCityDistrict) ---
+	// Mode district : l'acteur CityTrees est UNIQUE pour toute la ville (un seul HISM,
+	// pas de decoupage par cellule) — il n'a donc pas ete detruit par la purge bornee,
+	// et le reconstruire ici DOUBLERAIT les arbres. On le laisse tel quel et on le dit.
+	// (Sans consequence sur le pipeline Sol2 : sa section "trees" est vide, toute la
+	// vegetation passe par ImportVegetation.)
 	const TArray<TSharedPtr<FJsonValue>>* TreesJson = nullptr;
-	if (Root->TryGetArrayField(TEXT("trees"), TreesJson) && TreesJson->Num() > 0)
+	if (bCellFilter && Root->TryGetArrayField(TEXT("trees"), TreesJson) && TreesJson->Num() > 0)
+	{
+		UE_LOG(LogCityImport, Display,
+			TEXT("Mode district : les %d arbres residents (CityTrees) sont CONSERVES tels quels — ")
+			TEXT("cet acteur n'est pas decoupe par cellule."), TreesJson->Num());
+	}
+	TreesJson = nullptr;
+	if (!bCellFilter && Root->TryGetArrayField(TEXT("trees"), TreesJson) && TreesJson->Num() > 0)
 	{
 		FCityMeshBuilder TreeBuilder;
 		BuildTree(TreeBuilder);
@@ -8522,6 +9106,11 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		TreeActor->AddInstanceComponent(Hism);
 		Hism->RegisterComponent();
 		int32 Index = 0;
+		// LOT VELOCITE (L3) : les transforms sont accumulees puis posees en UN SEUL
+		// AddInstances. Voir le commentaire de fond dans ImportVegetation : un
+		// AddInstance unitaire reconstruit l'arbre spatial du HISM a CHAQUE instance.
+		TArray<FTransform> TreeXf;
+		TreeXf.Reserve(TreesJson->Num());
 		for (const TSharedPtr<FJsonValue>& V : *TreesJson)
 		{
 			const TArray<TSharedPtr<FJsonValue>>& C = V->AsArray();
@@ -8532,10 +9121,14 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			const float Yaw = FMath::Frac(FMath::Sin(Index * 78.233f) * 12543.21f) * 360.f;
 			const float Scale = 0.8f + 0.5f * FMath::Frac(FMath::Sin(Index * 39.11f) * 6543.87f);
 			const double Tx = C[0]->AsNumber() * 100.0, Ty = C[1]->AsNumber() * 100.0;
-			Hism->AddInstance(FTransform(FRotator(0, Yaw, 0),
+			TreeXf.Add(FTransform(FRotator(0, Yaw, 0),
 				FVector(Tx, Ty, Drape.GroundZ(Tx, Ty)), FVector(Scale)));
 			++Summary.Trees;
 			++Index;
+		}
+		if (TreeXf.Num() > 0)
+		{
+			Hism->AddInstances(TreeXf, /*bShouldReturnIndices=*/false, /*bWorldSpace=*/false);
 		}
 		TreeActor->SetActorLabel(TEXT("CityTrees"));
 	}

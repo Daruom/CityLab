@@ -101,6 +101,8 @@ manuelle ; `$Args` est une variable AUTOMATIQUE (renomme tes paramètres) ; pas 
   label d'acteur, ou par `(acteur, composant)`.
 
 ## 5. Builds & cycle éditeur (atelier permanent)
+> ⭐ **Lis d'abord le §11 « LA BOUCLE D'ITÉRATION PAR DÉFAUT »** : mode district, règles Live
+> Coding et chronos attendus. Ce §5 reste la référence des pièges de cycle.
 - Objectif : **1 redémarrage d'éditeur max par lot.** Données/matériaux/config → MCP live.
 - Build : fermer l'éditeur (par CHEMIN), `Build.bat CityLabEditor Win64 Development -project="…\CityLab.uproject" -WaitMutex -NoHotReloadFromIDE` (~12-20 s), rouvrir via **PowerShell**
   (Git Bash mangle `/Game/...`). Corps de fonction → Live Coding OK pour itérer, mais **JAMAIS
@@ -289,3 +291,113 @@ contenu une prémisse fausse ; les agents qui l'ont détectée ont évité des c
   d'éditeur** (fermeture en 11 s).
 - **`RaiseError` dans une passe = échec d'automation** pour toute spec qui importe avec d'autres
   paramètres : les refus non-fatals se journalisent en **Display**, une ligne par passe.
+
+---
+
+## 11. ⭐ LA BOUCLE D'ITÉRATION PAR DÉFAUT (lot VÉLOCITÉ, 02/08 — **tout est mesuré**)
+
+> **C'est la nouvelle façon de faire par défaut** (décision utilisateur). Une régé complète du
+> proto 3×3 coûtait ~32 min ; elle en coûte **3** — et l'itération courante, celle qu'on rejoue
+> vingt fois par après-midi, coûte **≈ 1 à 2 min**. Ne régénère plus la ville entière pour
+> regarder un quartier.
+
+### 11.1 Le mode district — `FCityGenProfile::CellFilter`
+```
+CellFilter="-2_0,-2_1,-1_0,-1_1"   CellFilterSizeM=500.0
+```
+Vide (défaut) = comportement historique, ville entière, **bit pour bit**. Renseigné, les trois
+passes (`ImportCityStreamed`, `ImportCitySurfaces`, `ImportVegetation`) ne traitent que ces
+cellules : purge d'idempotence **bornée** aux acteurs de ces cellules, masques/murs/bâtiments/
+routes filtrés, et **seuls les sous-niveaux qui les portent** sont chargés, remplis et sauvés.
+* **Choisis un district qui tient dans UN bloc de streaming** (`BlockSizeM`, 1 km = 2×2 cellules
+  de 500 m) : un seul `L_T10_B_*` à charger et à resauver.
+* `ImportVegetation` n'a pas de paramètre `CellSizeM` : elle **exige `CellFilterSizeM`**, sinon
+  elle ignore le filtre et le dit en Display (une passe qui se croirait filtrée coûterait 30 min).
+* Les compteurs du résumé portent alors sur les **cellules visées**, pas sur la ville : une
+  comparaison de non-régression se fait sur une régé **complète**.
+* Incompatible avec `bProxyLayer` (autre maille) : le filtre l'emporte, avec une ligne de log.
+
+### 11.2 ⚠️ NE REJOUE PAS LA VÉGÉTATION SI LE SOL N'A PAS BOUGÉ — c'est LE poste dominant
+La végé trace `SM_Surface_`/`SM_Slab_`, que la passe streamed reconstruit **à l'identique** :
+tant que les masques, le MNT et le JSON végétal n'ont pas changé, les instances déjà posées
+restent valides (vérifié : `veg_delta = 0` à chaque run filtré). Mesure sur le district de
+4 cellules :
+
+| | passes | queue de travail **différé** de l'éditeur ensuite |
+|---|---:|---:|
+| district **sans** végétation | **14,6 s** | **2,0 s** |
+| district **avec** végétation | 39,2 s | **~640 s** (10 min 40) |
+
+La queue n'est pas un artefact : le log moteur montre **31 ticks en 10,5 min**. Elle vient de la
+reconstruction des arbres spatiaux HISM et du ré-upload des 1,25 M d'instances (le mode district
+vide puis repose chaque HISM touché — et l'herbe est partout). C'est ce que la passe `_WARM` des
+captures absorbe, d'où des captures à **353 s** juste après une régé végétation contre **61 s**
+sur un éditeur stabilisé.
+→ **Règle** : `ImportVegetation` seulement quand le sol a bougé (masques recuits, MNT, veg.json).
+→ Levier futur si ça gêne : découper les HISM de végétation **par cellule** (ou par bloc) au lieu
+d'un HISM global par mesh — le district ne rebâtirait alors que sa part.
+
+### 11.3 Live Coding — le cadre, et ce qui est vraiment disponible
+* **Corps de fonction / `.cpp` uniquement.** Tout changement de LAYOUT (UCLASS/USTRUCT, headers,
+  UHT) reste interdit : cycle complet scripté.
+* ⚠️ **Le toolset MCP `LiveCodingToolset.CompileLiveCoding` N'EXISTE PAS** sur ce serveur
+  (`list_toolsets` fait foi). La voie qui marche : la **commande console `LiveCoding.Compile`**,
+  jouée par le guetteur — **asynchrone**, verdict à lire dans `Saved/Logs/CityLab.log` sous
+  `LogLiveCoding` (`Live coding succeeded` / `failed`). Outil prêt : `work/VELOCITE/vel_lc.ps1`.
+* ⛔ **N'émets JAMAIS `LiveCoding.Enable` ni `LiveCoding.Console`** en session pilotée :
+  `LiveCodingConsole.exe` tourne **déjà** depuis le démarrage de l'éditeur (Live Coding est actif
+  par la config). Toggler une console vivante a **gelé l'éditeur** le 02/08. Signature du piège :
+  **un cœur à 100 %, RAM parfaitement plate, log moteur muet, AUCUNE modale, `Responding=False`**
+  — kill + relance, rien n'est perdu si la dernière passe a sauvé.
+* Chronos mesurés : **compile 15,6 à 18,9 s**, éditeur jamais fermé, contre **139 s** pour le
+  cycle complet (fermeture 110 s + build 10-12 s + réouverture 16 s) — plus le rechargement de la
+  map lourde.
+* **Rebuild complet propre périodique** : les patchs s'accumulent. Après une série de patchs, ou
+  avant toute mesure qui compte (spec d'automation, perf, campagne), refais un vrai build.
+* ⚠️ La règle « jamais de passe LOURDE sous patch Live Coding » (crash D3D12) **tient toujours**.
+  Une passe **district** (14-40 s) a tourné sans incident sous patch ; une régé complète, non
+  testée sous patch — ne la tente pas.
+
+### 11.3 bis Quand un VRAI build s'impose
+Changement de layout (`UPROPERTY`, `USTRUCT`, `.h`) · ajout/retrait d'un champ de profil ·
+avant une spec d'automation · avant toute campagne de mesure · après une série de patchs LC ·
+dès qu'un comportement devient inexplicable. Cycle scripté : `work/VELOCITE/vel_cycle.ps1`
+(`-Fermer -Builder -Ouvrir`, chronos écrits dans `chronos.log`).
+
+### 11.4 Les chronos à attendre (proto 3×3, 36 cellules, 1,25 M d'instances)
+
+| itération | chrono mesuré |
+|---|---:|
+| **Boucle A — donnée/side-car** : re-cuisson (18,7 s) + verrou SENS (1,1 s) + régé district sans végé (16,1 s) + 2 captures (68,3 s) | **1 min 44** |
+| **Boucle B — C++ corps de fonction** : édition (~15 s) + Live Coding (18,9 s) + régé district sans végé (16,1 s) + mesure de l'effet (~15 s) + 2 captures (61,5 s) | **≈ 2 min 05** |
+| régé **district** seule, sans végétation | **14,6 s** |
+| régé **district** seule, avec végétation | 39,2 s **+ ~640 s de queue** |
+| régé **3×3 complète** (streamed 120 + surfaces 14 + végé 42 + verrou 10,5) | **3 min 10** |
+| cycle éditeur complet (fermeture + build + réouverture) | 2 min 19 |
+| captures 2 poses sur éditeur stabilisé (dont passe `_WARM`) | 61 s |
+
+*(Référence d'avant le lot : régé 3×3 complète ~32 min, dont **1 762 s** rien que pour la
+végétation.)*
+
+### 11.5 Vérifier qu'un changement a PRIS EFFET
+* **La capture ne tranche pas les petites amplitudes.** 20 cm sur un mur de 6 m vu à 190 m :
+  les deux images sont indiscernables. C'est la **mesure** qui juge.
+* Sur du Nanite, les triangles sont invisibles à Python (§10) — mais **les BORNES du maillage
+  le sont** (`StaticMesh.get_bounds()`, elles viennent de `UStaticMesh::GetBounds`, pas des
+  données de rendu). Outil prêt : `work/VELOCITE/py/v6_bounds.py`. Exemple mesuré : un pied de
+  mur enterré 20 cm plus bas se lit **−20,00 cm exactement sur 4 cellules sur 4**, `zmax`
+  inchangé (preuve que la mesure discrimine).
+* Un **compteur du résumé** est le discriminant le plus simple quand il existe : la boucle A
+  a fait passer `RetainingWalls` de **24/1944 quads → 23/1771 → 24/1944** au retour.
+
+### 11.6 Le discriminant obligatoire d'une régé filtrée
+Rejouer une régé district **sans rien changer** doit rendre un état **strictement identique** :
+nombre d'acteurs par préfixe inchangé, `veg_total` inchangé au **delta 0**, zéro écart par
+acteur. Script prêt : `work/VELOCITE/py/v2_regen_district.py` (il photographie avant/après).
+⚠️ **Le défaut que ce discriminant a attrapé** : bordures, bordurettes, tirets et murs sont
+découpés à la cellule au prep, mais le PREMIER sommet d'une polyligne peut tomber exactement sur
+la frontière **est ou sud** ; `floor` le range alors dans la cellule suivante — **non purgée et
+non visée**. Résultat : 4 `SM_Ground_` en double et **l'asset du voisin écrasé** par le fragment
+débordé. Garde posée dans `CityImportTools.cpp` (`CleSol` : en mode district, la géométrie va
+dans sa cellule **propriétaire**) + un compteur de sortie « cellules hors filtre écartées » qui
+**doit valoir 0**.

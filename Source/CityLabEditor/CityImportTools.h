@@ -210,6 +210,44 @@ struct FCityGenProfile
 	 */
 	UPROPERTY() FString RetainingWallClasses;
 
+	/**
+	 * LOT VELOCITE — MODE DISTRICT : « ne regenere QUE ces cellules ».
+	 *
+	 * Liste de cellules « x_y » separees par des virgules, ex. "-2_0,-2_1,-1_0".
+	 * VIDE (defaut) = comportement historique, ville entiere, bit pour bit : toutes
+	 * les branches ci-dessous sont gardees par un booleen qui reste faux.
+	 *
+	 * Ce que le filtre change, passe par passe :
+	 *  - ImportCityStreamed : la purge d'idempotence ne detruit QUE les acteurs
+	 *    SM_Ground_/SM_Slab_/SM_Bldg_ des cellules VISEES (le reste de la ville n'est
+	 *    pas touche) ; batiments, routes, masques, murs, dalles et blocs de streaming
+	 *    ne traitent que ces cellules ; seuls les sous-niveaux qui les portent sont
+	 *    charges, remplis et sauves.
+	 *  - ImportCitySurfaces : idem pour les SM_Surface_.
+	 *  - ImportVegetation : la vege est par MESH et non par cellule — on ne detruit
+	 *    donc PAS les acteurs CityVeg_* ; on RETIRE de chaque HISM les seules
+	 *    instances dont la position tombe dans l'emprise visee, puis on y ajoute
+	 *    celles que la passe vient de semer. L'autorite de pose reste unique : c'est
+	 *    le meme code qui trace et qui pose, seule sa PORTEE change.
+	 *
+	 * Ce que le filtre NE fait PAS, et c'est volontaire : les compteurs du resume
+	 * portent alors sur les cellules VISEES, pas sur la ville — une comparaison de
+	 * non-regression se fait sur une regeneration COMPLETE.
+	 *
+	 * Incompatible avec bProxyLayer (la couche proxy a sa propre maille) : le filtre
+	 * l'emporte et la couche n'est pas construite, avec une ligne de log.
+	 */
+	UPROPERTY() FString CellFilter;
+
+	/**
+	 * Taille, en metres, des cellules auxquelles CellFilter fait reference.
+	 * 0 (defaut) = la taille de cellule de la passe (CellSizeM). ImportVegetation
+	 * n'a PAS de parametre CellSizeM : elle EXIGE ce champ des que CellFilter est
+	 * renseigne, sinon elle ignore le filtre et le DIT (une passe silencieusement
+	 * complete serait pire qu'un refus).
+	 */
+	UPROPERTY() float CellFilterSizeM = 0.f;
+
 	/** Prereglage desktop complet : 64x64 drape, collision 16x16, pas routes 15 m. */
 	static FCityGenProfile Desktop();
 
