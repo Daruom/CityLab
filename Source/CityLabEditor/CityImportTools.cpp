@@ -913,7 +913,31 @@ namespace
 		int32 CoteBas = -1;        // +1/-1 le long de la normale GAUCHE du sens de parcours
 		float HMedCm = 0.f;        // hauteur mediane annoncee par le side-car (garde-fou)
 		FString Classe;            // quai | tranchee | talus
+		// QUAIS V4 : le prep a MESURE qu'une zone pietonne basse borde ce mur du
+		// cote bas. C'est la condition NATIONALE des gradins (voir GTier* plus bas).
+		bool bBordePieton = false;
 	};
+
+	// =========================================================================
+	// LOT QUAIS V4 — LES GRADINS DE QUAI.
+	//
+	// La photo de reference de l'utilisateur (quai de la Daurade au crepuscule)
+	// montre ce que la face lisse ne sait pas rendre : le quai n'y tombe pas d'un
+	// bloc dans l'eau, il DESCEND EN LARGES MARCHES sur lesquelles les gens
+	// s'assoient. C'est un motif francais courant partout ou un quai borde une
+	// promenade basse — donc une regle nationale, pas un cas toulousain.
+	//
+	// Dimensions : une assise, pas une marche. 45 cm de haut (on s'y assoit, hauteur
+	// de banc haute) x 70 cm de profondeur (on y pose les pieds, ou on s'y allonge).
+	// Ce sont les deux constantes a tourner en boucle B.
+	constexpr float GTierRiseCm = 45.f;
+	constexpr float GTierRunCm = 70.f;
+	// Sous 2 m de hauteur MESUREE, un mur ne porte pas deux gradins : il reste lisse.
+	constexpr float GTierMinHeightCm = 200.f;
+	// Un gradin ne peut pas manger plus que la portee de sondage du mur : au-dela on
+	// ne masque plus la rampe, on construit une esplanade. Le nombre de gradins est
+	// donc PLAFONNE par la place disponible entre le pied et la crete.
+	constexpr int32 GTierMaxCount = 24;
 
 	FString RetainingWallsDir(const FCityGenProfile& Gen)
 	{
@@ -1100,7 +1124,140 @@ namespace
 			O->TryGetNumberField(TEXT("h_med"), HMed);
 			W.CoteBas = (CoteBas >= 0.0) ? 1 : -1;
 			W.HMedCm = (float)(HMed * 100.0);
+			// QUAIS V4 : absent d'un side-car anterieur au lot = faux, donc face lisse.
+			O->TryGetBoolField(TEXT("borde_pieton"), W.bBordePieton);
 			Out.Add(MoveTemp(W));
+		}
+		return true;
+	}
+
+	// =========================================================================
+	// LOT QUAIS V2 — LES ESCALIERS.
+	//
+	// LES CONSTANTES, ET D'OU ELLES VIENNENT.
+	// La contremarche de 16 a 17 cm est la valeur d'usage francaise (et la borne
+	// haute reglementaire des ERP) : c'est elle qui FIXE LE NOMBRE DE MARCHES, parce
+	// que c'est la seule des deux dimensions qu'on ne peut pas negocier — un escalier
+	// dont les contremarches ne sont pas egales se lit immediatement comme faux.
+	constexpr float GStairRiserCm = 16.5f;
+	// Bornes de rattrapage : le nombre de marches est un ENTIER, la contremarche
+	// reelle vaut donc dZ/n et doit rester dans la fourchette d'usage.
+	constexpr float GStairRiserMinCm = 13.0f;
+	constexpr float GStairRiserMaxCm = 19.0f;
+	// Le giron se DEDUIT de la longueur en plan. Sous 22 cm ce n'est plus un
+	// escalier mais une echelle : on ECARTE et on compte. Au-dessus de 45 cm ce
+	// n'est plus une marche : le surplus part en PALIERS (voir ci-dessous).
+	constexpr float GStairTreadMinCm = 22.f;
+	constexpr float GStairTreadMaxCm = 45.f;
+	// LE PALIER, ET POURQUOI IL EXISTE. Mesure aux deux escaliers du Pont
+	// Saint-Pierre : 7,84 m de denivele pour 31,9 m de trace en plan. Un giron
+	// uniforme vaudrait 66 cm — ni une marche, ni une pente : une aberration. Un
+	// grand escalier de quai francais est en realite une suite de VOLEES separees
+	// de PALIERS de repos. On repartit donc le surplus de longueur en paliers de
+	// ~2 m, et la volee redevient lisible.
+	constexpr float GStairLandingCm = 200.f;
+	// Largeur par defaut quand aucune source ne la donne (mesure : 0/35 renseignes
+	// en BD TOPO, 0/436 en OSM sur l'emprise) — volee urbaine courante.
+	constexpr float GStairWidthCm = 250.f;
+	constexpr float GStairWidthMinCm = 80.f;
+	constexpr float GStairWidthMaxCm = 1200.f;
+	// Sous une marche de denivele, il n'y a pas d'escalier a poser : on ECARTE.
+	constexpr float GStairMinDropCm = 33.f;
+	// Un escalier de plus de 200 marches sur l'emprise d'une cellule est une erreur
+	// de lecture du sol rendu, pas un escalier.
+	constexpr int32 GStairMaxSteps = 200;
+	// Pied ENTERRE : meme raison que le mur — la dalle rendue et la volee divergent
+	// de quelques centimetres entre deux sommets de la grille du drape.
+	constexpr float GStairSinkCm = 30.f;
+
+	// Une volee, telle qu'elle sort du side-car (deja decoupee a la cellule).
+	struct FCityStairs
+	{
+		TArray<FVector2D> PtsCm;    // polyligne EN PLAN, cm locaux — aucun Z
+		float WidthCm = GStairWidthCm;
+		int32 MarchesSideCar = 0;   // step_count OSM quand il existe : GARDE-FOU seul
+		FString Source;             // bdtopo | osm
+		FString Id;
+	};
+
+	FString StairsDir(const FCityGenProfile& Gen)
+	{
+		return Gen.StairsPath.IsEmpty()
+			? FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/Escaliers"))
+			: Gen.StairsPath;
+	}
+
+	// Meme grammaire, memes gardes et meme discipline de journalisation que
+	// LoadRetainingWallCell : cellule sans fichier = cas NORMAL (false sans erreur),
+	// side-car cuit pour une autre maille = refus COMPTE, en Display, jamais en
+	// Error (l'automation eleve Error et Warning en echec de test — regression payee
+	// par le lot C1 le 02/08).
+	bool LoadStairsCell(const FString& Dir, int32 CellX, int32 CellY, float CellSizeM,
+		TArray<FCityStairs>& Out, int32& OutTailleKo, double& OutTailleCuiteM)
+	{
+		const FString Path = FPaths::Combine(Dir, FString::Printf(TEXT("escaliers_%d_%d.json"), CellX, CellY));
+		FString Text;
+		if (!FFileHelper::LoadFileToString(Text, *Path))
+		{
+			return false;
+		}
+		TSharedPtr<FJsonObject> Root;
+		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid())
+		{
+			RaiseError(FString::Printf(TEXT("Stairs file '%s' is not valid JSON."), *Path));
+			return false;
+		}
+		double BakedCellM = 0.0;
+		if (Root->TryGetNumberField(TEXT("cellSizeM"), BakedCellM) &&
+			!FMath::IsNearlyEqual((float)BakedCellM, CellSizeM, 0.01f))
+		{
+			++OutTailleKo;
+			OutTailleCuiteM = BakedCellM;
+			return false;
+		}
+		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+		if (!Root->TryGetArrayField(TEXT("escaliers"), Arr))
+		{
+			return true;
+		}
+		for (const TSharedPtr<FJsonValue>& V : *Arr)
+		{
+			const TSharedPtr<FJsonObject>& O = V->AsObject();
+			if (!O.IsValid())
+			{
+				continue;
+			}
+			FCityStairs S;
+			const TArray<TSharedPtr<FJsonValue>>* P = nullptr;
+			if (!O->TryGetArrayField(TEXT("pts"), P))
+			{
+				continue;
+			}
+			for (const TSharedPtr<FJsonValue>& PV : *P)
+			{
+				const TArray<TSharedPtr<FJsonValue>>& C = PV->AsArray();
+				if (C.Num() >= 2)
+				{
+					S.PtsCm.Add(FVector2D(C[0]->AsNumber() * 100.0, C[1]->AsNumber() * 100.0));
+				}
+			}
+			if (S.PtsCm.Num() < 2)
+			{
+				continue;
+			}
+			double W = 0.0;
+			if (O->TryGetNumberField(TEXT("largeur_m"), W))
+			{
+				S.WidthCm = FMath::Clamp((float)(W * 100.0), GStairWidthMinCm, GStairWidthMaxCm);
+			}
+			double M = 0.0;
+			if (O->TryGetNumberField(TEXT("marches"), M))
+			{
+				S.MarchesSideCar = (int32)M;
+			}
+			O->TryGetStringField(TEXT("source"), S.Source);
+			O->TryGetStringField(TEXT("id"), S.Id);
+			Out.Add(MoveTemp(S));
 		}
 		return true;
 	}
@@ -2268,8 +2425,9 @@ namespace
 	//      la ou la marche s'eteint, le mur se PINCE a hauteur nulle.
 	int32 BuildRetainingWall(FCityMeshBuilder& QM, const FRetainingWall& Wall,
 		const FRenderedGroundZ& RGZ, const FResolvedSurface* Surf, const FVector3f& Tint,
-		float QuadCm)
+		float QuadCm, bool bTiers, int32& OutTiers)
 	{
+		OutTiers = 0;
 		if (!Surf || Wall.PtsCm.Num() < 2)
 		{
 			return 0;
@@ -2344,6 +2502,36 @@ namespace
 		auto WorldUV = [](const FVector3f& P) { return FVector2f(P.X * 0.01f, P.Y * 0.01f); };
 		auto V3 = [](const FVector2D& P, float Z) { return FVector3f((float)P.X, (float)P.Y, Z); };
 
+		// --- 3 bis. QUAIS V4 : LES GRADINS -----------------------------------------
+		// Trois conditions, toutes MESUREES, aucune devinee :
+		//   (a) le profil est demande (bQuayTiers, plus le drapeau du profil) ;
+		//   (b) le side-car a mesure une zone PIETONNE BASSE contre ce mur
+		//       (`borde_pieton`) — un gradin qui donne sur rien n'a aucun sens ;
+		//   (c) la hauteur MESUREE sur la surface rendue laisse la place a au moins
+		//       deux gradins, et la profondeur disponible entre le pied et la crete
+		//       aussi. Sinon la face reste lisse — sans rien compter comme un echec.
+		// Le nombre de gradins est decide UNE FOIS pour toute la polyligne : un mur
+		// qui changerait de nombre de gradins d'un segment a l'autre serait un
+		// escalier casse, pas un quai.
+		const float SpanCm = OffFoot + OffCrest;
+		int32 NTiers = 0;
+		float TierRunCm = 0.f;
+		if (bTiers && Wall.bBordePieton && HMed >= GTierMinHeightCm && SpanCm > GTierRunCm)
+		{
+			const int32 ParHauteur = FMath::RoundToInt32(HMed / GTierRiseCm);
+			const int32 ParPlace = FMath::FloorToInt32(SpanCm / GTierRunCm);
+			NTiers = FMath::Clamp(FMath::Min(ParHauteur, ParPlace), 0, GTierMaxCount);
+			if (NTiers < 2)
+			{
+				NTiers = 0;    // un gradin unique, c'est une face lisse
+			}
+			else
+			{
+				TierRunCm = FMath::Min(GTierRunCm, SpanCm / (float)NTiers);
+			}
+		}
+		OutTiers = NTiers;
+
 		int32 Quads = 0;
 		float Arc = 0.f;
 		for (int32 i = 0; i + 1 < N; ++i)
@@ -2362,24 +2550,74 @@ namespace
 			const float VA = (ZCrest[i] - ZFoot[i] + GWallSinkCm) * 0.01f;
 			const float VB = (ZCrest[i + 1] - ZFoot[i + 1] + GWallSinkCm) * 0.01f;
 
-			// 1. FACE VERTICALE, au pied de la rampe, tournee vers le BAS.
-			const FVector3f F[4] = {
-				V3(PFoot[i], ZFoot[i] - GWallSinkCm),
-				V3(PFoot[i + 1], ZFoot[i + 1] - GWallSinkCm),
-				V3(PFoot[i + 1], ZCrest[i + 1]),
-				V3(PFoot[i], ZCrest[i]) };
-			const FVector2f FUV[4] = {
-				FVector2f(U0, 0.f), FVector2f(U1, 0.f),
-				FVector2f(U1, VB), FVector2f(U0, VA) };
-			QM.AddPoly(Group, F, 4,
-				FVector3f((float)NLow.X, (float)NLow.Y, 0.f).GetSafeNormal(), FUV, Tint);
+			// Position et altitude a la fraction t du trajet pied -> crete.
+			// t = 0 : le pied ; t = 1 : la crete. Le Z suit la MEME fraction, ce qui
+			// fait que le profil se referme exactement sur le sol aux deux bouts.
+			auto PLerp = [&](int32 k, float t) { return PFoot[k] + (PCrest[k] - PFoot[k]) * (double)t; };
+			auto ZLerp = [&](int32 k, float t) { return ZFoot[k] + (ZCrest[k] - ZFoot[k]) * t; };
 
-			// 2. COURONNEMENT horizontal, du pied jusqu'a la crete, a l'altitude du
-			//    haut : c'est LUI qui recouvre la rampe etiree. UV MONDE, comme le
-			//    chant des bordures — le motif reste en phase avec la dalle.
+			// 1. LA FACE, en gradins ou lisse. Dans les deux cas elle part du pied
+			//    ENTERRE et arrive a l'altitude de la crete : la difference est le
+			//    chemin entre les deux.
+			float TFin = 0.f;    // fraction atteinte par la face — le couronnement prend la suite
+			if (NTiers >= 2)
+			{
+				// GRADINS : contremarche verticale + assise horizontale, NTiers fois.
+				// La premiere contremarche part du pied enterre, comme la face lisse.
+				for (int32 k = 0; k < NTiers; ++k)
+				{
+					const float t0 = (float)k * TierRunCm / SpanCm;
+					const float t1 = (float)(k + 1) * TierRunCm / SpanCm;
+					const float f0 = (float)k / (float)NTiers;
+					const float f1 = (float)(k + 1) / (float)NTiers;
+					const float ZA0 = (k == 0) ? (ZFoot[i] - GWallSinkCm) : ZLerp(i, f0);
+					const float ZB0 = (k == 0) ? (ZFoot[i + 1] - GWallSinkCm) : ZLerp(i + 1, f0);
+					// (a) contremarche
+					const FVector3f R[4] = {
+						V3(PLerp(i, t0), ZA0),
+						V3(PLerp(i + 1, t0), ZB0),
+						V3(PLerp(i + 1, t0), ZLerp(i + 1, f1)),
+						V3(PLerp(i, t0), ZLerp(i, f1)) };
+					const FVector2f RUV[4] = {
+						FVector2f(U0, 0.f), FVector2f(U1, 0.f),
+						FVector2f(U1, (ZLerp(i + 1, f1) - ZB0) * 0.01f),
+						FVector2f(U0, (ZLerp(i, f1) - ZA0) * 0.01f) };
+					QM.AddPoly(Group, R, 4,
+						FVector3f((float)NLow.X, (float)NLow.Y, 0.f).GetSafeNormal(), RUV, Tint);
+					// (b) assise
+					const FVector3f T[4] = {
+						V3(PLerp(i, t0), ZLerp(i, f1)),
+						V3(PLerp(i + 1, t0), ZLerp(i + 1, f1)),
+						V3(PLerp(i + 1, t1), ZLerp(i + 1, f1)),
+						V3(PLerp(i, t1), ZLerp(i, f1)) };
+					const FVector2f TUV[4] = { WorldUV(T[0]), WorldUV(T[1]), WorldUV(T[2]), WorldUV(T[3]) };
+					QM.AddPoly(Group, T, 4, Up, TUV, Tint);
+					Quads += 2;
+					TFin = t1;
+				}
+			}
+			else
+			{
+				// FACE VERTICALE lisse, au pied de la rampe, tournee vers le BAS.
+				const FVector3f F[4] = {
+					V3(PFoot[i], ZFoot[i] - GWallSinkCm),
+					V3(PFoot[i + 1], ZFoot[i + 1] - GWallSinkCm),
+					V3(PFoot[i + 1], ZCrest[i + 1]),
+					V3(PFoot[i], ZCrest[i]) };
+				const FVector2f FUV[4] = {
+					FVector2f(U0, 0.f), FVector2f(U1, 0.f),
+					FVector2f(U1, VB), FVector2f(U0, VA) };
+				QM.AddPoly(Group, F, 4,
+					FVector3f((float)NLow.X, (float)NLow.Y, 0.f).GetSafeNormal(), FUV, Tint);
+			}
+
+			// 2. COURONNEMENT horizontal, de la fin de la face jusqu'a la crete, a
+			//    l'altitude du haut : c'est LUI qui recouvre la rampe etiree. UV
+			//    MONDE, comme le chant des bordures — le motif reste en phase avec
+			//    la dalle. En gradins il ne couvre que ce que les assises ont laisse.
 			const FVector3f C[4] = {
-				V3(PFoot[i], ZCrest[i]),
-				V3(PFoot[i + 1], ZCrest[i + 1]),
+				V3(PLerp(i, TFin), ZCrest[i]),
+				V3(PLerp(i + 1, TFin), ZCrest[i + 1]),
 				V3(PCrest[i + 1], ZCrest[i + 1]),
 				V3(PCrest[i], ZCrest[i]) };
 			const FVector2f CUV[4] = { WorldUV(C[0]), WorldUV(C[1]), WorldUV(C[2]), WorldUV(C[3]) };
@@ -2397,7 +2635,9 @@ namespace
 				FVector2f(U0, GWallSinkCm * 0.01f), FVector2f(U1, GWallSinkCm * 0.01f) };
 			QM.AddPoly(Group, W, 4,
 				FVector3f(-(float)NLow.X, -(float)NLow.Y, 0.f).GetSafeNormal(), WUV, Tint);
-			Quads += 3;
+			// couronnement + dos ; la face lisse en ajoute un, les gradins ont deja
+			// compte leurs 2 x NTiers quads dans la boucle.
+			Quads += (NTiers >= 2) ? 2 : 3;
 		}
 		if (Quads > 0)
 		{
@@ -2424,6 +2664,263 @@ namespace
 			Quads += 2;
 		}
 		return Quads;
+	}
+
+	// =========================================================================
+	// LOT QUAIS V2 — BuildStairs : LA VOLEE DE MARCHES.
+	//
+	// CE QUE LA DONNEE DIT, ET CE QU'ELLE NE DIT PAS.
+	// Le side-car donne un TRACE EN PLAN et une largeur. Il ne donne AUCUN Z — ni
+	// BD TOPO ni OSM ne codent l'altitude de ces troncons. Tout le relief est donc
+	// LU SUR LA SURFACE RENDUE (doctrine du Playbook §6, la meme que les murs) : on
+	// echantillonne le sol rendu aux deux extremites, la difference est le denivele
+	// a franchir, et c'est elle qui commande la volee.
+	//
+	// LE PROFIL, ET POURQUOI IL EST COMME CA.
+	// n = round(dZ / 16,5 cm), puis la contremarche REELLE vaut dZ/n et doit tomber
+	// dans la fourchette d'usage [13 ; 19] cm — sinon on ajuste n d'une marche.
+	// Le giron se deduit de la longueur en plan. Quand il depasse 45 cm — ce qui est
+	// LE cas des grands escaliers de quai (mesure : 7,84 m de denivele pour 31,9 m
+	// de trace au Pont Saint-Pierre, soit 66 cm de giron uniforme) — le surplus part
+	// en PALIERS de repos, comme dans la realite, et la volee redevient lisible.
+	//
+	// LES LIMONS. Une volee posee « en l'air » sur un terrain en pente montre son
+	// dessous des qu'on la regarde d'en bas — c'est exactement la vue depuis le
+	// fleuve, celle de la pose C1. Chaque marche porte donc deux flancs pleins qui
+	// descendent jusqu'au sol RENDU (enterres de 30 cm), et la volee est fermee en
+	// tete comme en pied.
+	//
+	// Rend le nombre de marches posees. 0 = ECARTE : la surface rendue ne presente
+	// pas de denivele exploitable ici, ou la geometrie ne serait pas un escalier.
+	int32 BuildStairs(FCityMeshBuilder& QM, const FCityStairs& St,
+		const FRenderedGroundZ& RGZ, const FResolvedSurface* Surf, const FVector3f& Tint,
+		int32& OutQuads)
+	{
+		OutQuads = 0;
+		if (!Surf || St.PtsCm.Num() < 2)
+		{
+			return 0;
+		}
+
+		// --- 1. abscisse curviligne et longueur en plan --------------------------
+		const int32 NP = St.PtsCm.Num();
+		TArray<float> S;
+		S.SetNum(NP);
+		S[0] = 0.f;
+		for (int32 i = 1; i < NP; ++i)
+		{
+			S[i] = S[i - 1] + (float)(St.PtsCm[i] - St.PtsCm[i - 1]).Size();
+		}
+		const float RunCm = S[NP - 1];
+		if (RunCm < GStairTreadMinCm * 2.f)
+		{
+			return 0;
+		}
+
+		// Position et direction a une abscisse donnee (le trace peut avoir des coudes).
+		auto PointAt = [&](float s) -> FVector2D
+		{
+			s = FMath::Clamp(s, 0.f, RunCm);
+			for (int32 i = 1; i < NP; ++i)
+			{
+				if (s <= S[i] || i == NP - 1)
+				{
+					const float d = FMath::Max(S[i] - S[i - 1], 1e-4f);
+					const float u = FMath::Clamp((s - S[i - 1]) / d, 0.f, 1.f);
+					return St.PtsCm[i - 1] + (St.PtsCm[i] - St.PtsCm[i - 1]) * (double)u;
+				}
+			}
+			return St.PtsCm[NP - 1];
+		};
+		auto DirAt = [&](float s) -> FVector2D
+		{
+			const FVector2D A = PointAt(FMath::Max(0.f, s - 25.f));
+			const FVector2D B = PointAt(FMath::Min(RunCm, s + 25.f));
+			const FVector2D D = B - A;
+			return D.IsNearlyZero() ? FVector2D(1.0, 0.0) : D.GetSafeNormal();
+		};
+
+		// --- 2. le denivele, LU SUR LA SURFACE RENDUE ----------------------------
+		// Aux extremites exactes le sol rendu peut deja etre celui du palier : on
+		// prend le MIN et le MAX sur un balayage du trace, ce qui est aussi ce qui
+		// rend la volee robuste a un trace qui deborde d'un cote ou de l'autre.
+		const int32 NS = FMath::Clamp(FMath::CeilToInt32(RunCm / 50.f), 4, 400);
+		float ZLo = FLT_MAX, ZHi = -FLT_MAX;
+		float SLo = 0.f, SHi = 0.f;
+		for (int32 i = 0; i <= NS; ++i)
+		{
+			const float s = RunCm * (float)i / (float)NS;
+			const FVector2D P = PointAt(s);
+			const float Z = RGZ.At(P.X, P.Y);
+			if (Z < ZLo) { ZLo = Z; SLo = s; }
+			if (Z > ZHi) { ZHi = Z; SHi = s; }
+		}
+		const float DropCm = ZHi - ZLo;
+		if (DropCm < GStairMinDropCm)
+		{
+			return 0;   // ECARTE : rien a descendre ici
+		}
+
+		// Sens de parcours : on construit TOUJOURS du BAS vers le HAUT. C'est SHi et
+		// SLo qui le disent — aucune convention implicite n'est tiree du sens du
+		// trace du side-car (meme discipline que CoteBas pour les murs).
+		const bool bMonteAvecS = (SHi > SLo);
+		auto SAt = [&](float t) -> float   // t dans [0;1], 0 = bas
+		{
+			return bMonteAvecS ? (RunCm * t) : (RunCm * (1.f - t));
+		};
+
+		// --- 3. le profil : nombre de marches, contremarche, giron, paliers ------
+		int32 N = FMath::RoundToInt32(DropCm / GStairRiserCm);
+		N = FMath::Clamp(N, 1, GStairMaxSteps);
+		// rattrapage : la contremarche reelle doit rester dans la fourchette d'usage
+		while (N < GStairMaxSteps && DropCm / (float)N > GStairRiserMaxCm) { ++N; }
+		while (N > 1 && DropCm / (float)N < GStairRiserMinCm) { --N; }
+		const float RiserCm = DropCm / (float)N;
+		if (RiserCm > GStairRiserMaxCm)
+		{
+			return 0;   // ECARTE : meme a 200 marches la contremarche reste impossible
+		}
+
+		float TreadCm = RunCm / (float)N;
+		int32 NLandings = 0;
+		float LandingCm = 0.f;
+		if (TreadCm < GStairTreadMinCm)
+		{
+			return 0;   // ECARTE : ce serait une echelle, pas un escalier
+		}
+		if (TreadCm > GStairTreadMaxCm)
+		{
+			// Le surplus de longueur part en paliers de repos, repartis dans la volee.
+			TreadCm = GStairTreadMaxCm;
+			const float Reste = RunCm - TreadCm * (float)N;
+			NLandings = FMath::Clamp(FMath::RoundToInt32(Reste / GStairLandingCm), 1, FMath::Max(1, N - 1));
+			LandingCm = Reste / (float)NLandings;
+		}
+
+		// Ou tombent les paliers : apres chaque bloc de marches, repartis regulierement.
+		auto EstPalierApres = [&](int32 iMarche) -> bool
+		{
+			if (NLandings <= 0 || iMarche >= N - 1)
+			{
+				return false;
+			}
+			const int32 Bloc = FMath::Max(1, N / (NLandings + 1));
+			return ((iMarche + 1) % Bloc) == 0 &&
+				((iMarche + 1) / Bloc) <= NLandings;
+		};
+
+		// --- 4. pose --------------------------------------------------------------
+		const FVector3f Up(0, 0, 1);
+		const FPolygonGroupID Group = QM.GetOrCreateGroup(Surf->SlotName(), Surf->Material);
+		const float HalfW = St.WidthCm * 0.5f;
+		auto V3 = [](const FVector2D& P, float Z) { return FVector3f((float)P.X, (float)P.Y, Z); };
+		auto WorldUV = [](const FVector3f& P) { return FVector2f(P.X * 0.01f, P.Y * 0.01f); };
+
+		int32 Marches = 0;
+		float sCur = 0.f;     // avancement DANS LE SENS DE LA MONTEE, depuis le bas
+		float zCur = ZLo;     // altitude du nez de la marche courante
+		for (int32 i = 0; i < N; ++i)
+		{
+			const float sBas = sCur;
+			const float sHaut = sCur + TreadCm;
+			const float sFin = sHaut + (EstPalierApres(i) ? LandingCm : 0.f);
+			const float zBas = zCur;
+			const float zHaut = zCur + RiserCm;
+
+			// Le profil d'un escalier qui monte : la CONTREMARCHE se dresse au NEZ
+			// (abscisse sBas) de zBas a zHaut, PUIS le giron court a plat de sBas a
+			// sFin. Faire partir le giron de sHaut laisserait un jour de la largeur
+			// d'une marche entre les deux.
+			const FVector2D PB = PointAt(SAt(sBas / RunCm));
+			const FVector2D PF = PointAt(SAt(sFin / RunCm));
+			const FVector2D DB = DirAt(SAt(sBas / RunCm));
+			const FVector2D DF = DirAt(SAt(sFin / RunCm));
+			const FVector2D NB(-DB.Y, DB.X), NF(-DF.Y, DF.X);
+
+			const FVector2D BL = PB - NB * (double)HalfW, BR = PB + NB * (double)HalfW;
+			const FVector2D FL = PF - NF * (double)HalfW, FR = PF + NF * (double)HalfW;
+
+			// La normale de la CONTREMARCHE regarde vers le bas de la volee.
+			const FVector2D VersBas = bMonteAvecS ? -DB : DB;
+			const FVector3f NRise((float)VersBas.X, (float)VersBas.Y, 0.f);
+
+			// (a) CONTREMARCHE : le rectangle vertical qui monte de zBas a zHaut, a
+			//     l'aplomb du NEZ de la marche.
+			{
+				const FVector3f Q[4] = { V3(BL, zBas), V3(BR, zBas), V3(BR, zHaut), V3(BL, zHaut) };
+				const FVector2f UV[4] = {
+					FVector2f(0.f, 0.f), FVector2f(St.WidthCm * 0.01f, 0.f),
+					FVector2f(St.WidthCm * 0.01f, RiserCm * 0.01f), FVector2f(0.f, RiserCm * 0.01f) };
+				QM.AddPoly(Group, Q, 4, NRise.GetSafeNormal(), UV, Tint);
+				++OutQuads;
+			}
+			// (b) GIRON (le palier eventuel est dans le MEME quad : c'est la meme
+			//     surface horizontale, simplement plus profonde). UV MONDE, comme le
+			//     couronnement des murs — le motif de pierre reste en phase.
+			{
+				const FVector3f Q[4] = { V3(BL, zHaut), V3(BR, zHaut), V3(FR, zHaut), V3(FL, zHaut) };
+				const FVector2f UV[4] = { WorldUV(Q[0]), WorldUV(Q[1]), WorldUV(Q[2]), WorldUV(Q[3]) };
+				QM.AddPoly(Group, Q, 4, Up, UV, Tint);
+				++OutQuads;
+			}
+			// (c) LES DEUX LIMONS : de la marche jusqu'au sol RENDU, enterres.
+			//     Sans eux la volee montre son dessous des qu'on la regarde d'en bas —
+			//     c'est-a-dire depuis le fleuve, la pose de reference du lot.
+			{
+				const float ZsolB = FMath::Min(RGZ.At(BL.X, BL.Y), zBas) - GStairSinkCm;
+				const float ZsolF = FMath::Min(RGZ.At(FL.X, FL.Y), zHaut) - GStairSinkCm;
+				const FVector3f LG[4] = { V3(BL, zHaut), V3(FL, zHaut), V3(FL, ZsolF), V3(BL, ZsolB) };
+				const FVector2f UVL[4] = {
+					FVector2f(0.f, 0.f), FVector2f((sFin - sBas) * 0.01f, 0.f),
+					FVector2f((sFin - sBas) * 0.01f, (zHaut - ZsolF) * 0.01f),
+					FVector2f(0.f, (zHaut - ZsolB) * 0.01f) };
+				QM.AddPoly(Group, LG, 4, FVector3f(-(float)NB.X, -(float)NB.Y, 0.f).GetSafeNormal(), UVL, Tint);
+				const float ZsolBR = FMath::Min(RGZ.At(BR.X, BR.Y), zBas) - GStairSinkCm;
+				const float ZsolFR = FMath::Min(RGZ.At(FR.X, FR.Y), zHaut) - GStairSinkCm;
+				const FVector3f LD[4] = { V3(FR, zHaut), V3(BR, zHaut), V3(BR, ZsolBR), V3(FR, ZsolFR) };
+				const FVector2f UVR[4] = {
+					FVector2f(0.f, 0.f), FVector2f((sFin - sBas) * 0.01f, 0.f),
+					FVector2f((sFin - sBas) * 0.01f, (zHaut - ZsolBR) * 0.01f),
+					FVector2f(0.f, (zHaut - ZsolFR) * 0.01f) };
+				QM.AddPoly(Group, LD, 4, FVector3f((float)NB.X, (float)NB.Y, 0.f).GetSafeNormal(), UVR, Tint);
+				OutQuads += 2;
+			}
+
+			sCur = sFin;
+			zCur = zHaut;
+			++Marches;
+		}
+
+		// (d) BOUCHONS : la volee est une piece fermee. En PIED, le flanc vertical
+		//     sous la premiere contremarche ; en TETE, le dos de la derniere marche.
+		if (Marches > 0)
+		{
+			const FVector2D P0 = PointAt(SAt(0.f));
+			const FVector2D D0 = DirAt(SAt(0.f));
+			const FVector2D N0(-D0.Y, D0.X);
+			const FVector2D L0 = P0 - N0 * (double)HalfW, R0 = P0 + N0 * (double)HalfW;
+			const float Z0 = FMath::Min(FMath::Min(RGZ.At(L0.X, L0.Y), RGZ.At(R0.X, R0.Y)), ZLo) - GStairSinkCm;
+			const FVector2D VersBas0 = bMonteAvecS ? -D0 : D0;
+			const FVector3f Pied[4] = { V3(L0, ZLo), V3(R0, ZLo), V3(R0, Z0), V3(L0, Z0) };
+			const FVector2f CapUV[4] = {
+				FVector2f(0.f, 0.f), FVector2f(1.f, 0.f), FVector2f(1.f, 1.f), FVector2f(0.f, 1.f) };
+			QM.AddPoly(Group, Pied, 4,
+				FVector3f((float)VersBas0.X, (float)VersBas0.Y, 0.f).GetSafeNormal(), CapUV, Tint);
+
+			const FVector2D P1 = PointAt(SAt(1.f));
+			const FVector2D D1 = DirAt(SAt(1.f));
+			const FVector2D N1(-D1.Y, D1.X);
+			const FVector2D L1 = P1 - N1 * (double)HalfW, R1 = P1 + N1 * (double)HalfW;
+			const float Z1 = FMath::Min(FMath::Min(RGZ.At(L1.X, L1.Y), RGZ.At(R1.X, R1.Y)), ZHi) - GStairSinkCm;
+			const FVector2D VersHaut = bMonteAvecS ? D1 : -D1;
+			const FVector3f Tete[4] = { V3(R1, ZHi), V3(L1, ZHi), V3(L1, Z1), V3(R1, Z1) };
+			QM.AddPoly(Group, Tete, 4,
+				FVector3f((float)VersHaut.X, (float)VersHaut.Y, 0.f).GetSafeNormal(), CapUV, Tint);
+			OutQuads += 2;
+		}
+
+		return Marches;
 	}
 
 	// TIRET de ligne axiale : un quad de 15 cm de large. Le debitage (3 m plein /
@@ -8663,14 +9160,20 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			const FIntPoint CelluleMur(FCString::Atoi(*Sx), FCString::Atoi(*Sy));
 			for (const FRetainingWall& W : Walls)
 			{
+				int32 Tiers = 0;
 				const int32 Q = BuildRetainingWall(
 					GetInKey(GroundCells, CleSol(W.PtsCm[0], CelluleMur),
 						bLinearColors, bWorldUVs),
-					W, WallRGZ, WallSurf, WallTint, QuadCm);
+					W, WallRGZ, WallSurf, WallTint, QuadCm, Gen.bQuayTiers, Tiers);
 				if (Q > 0)
 				{
 					Summary.RetainingWallQuads += Q;
 					++Summary.RetainingWalls;
+					if (Tiers >= 2)
+					{
+						++Summary.QuayTierWalls;
+						Summary.QuayTiers += Tiers;
+					}
 				}
 				else
 				{
@@ -8682,6 +9185,10 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			TEXT("Murs de soutenement : %d cellules, %d murs poses (%d quads), %d ecartes (aucune rampe a masquer) — dossier '%s'."),
 			CellsWithWalls, Summary.RetainingWalls, Summary.RetainingWallQuads,
 			Summary.RetainingWallsSkipped, *WallDir);
+		UE_LOG(LogCityImport, Display,
+			TEXT("QUAIS V4 gradins : %d murs de quai rendus en gradins (%d gradins au total) — %s."),
+			Summary.QuayTierWalls, Summary.QuayTiers,
+			Gen.bQuayTiers ? TEXT("profil actif") : TEXT("PROFIL DESACTIVE (bQuayTiers=false)"));
 		if (CellsWrongSize > 0)
 		{
 			// UNE ligne pour toute la passe, en Display : le side-car trouve n'est pas
@@ -8689,6 +9196,83 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			UE_LOG(LogCityImport, Display,
 				TEXT("Murs de soutenement : %d cellules IGNOREES — leur side-car est cuit pour des cellules de %.0f m et cet import travaille a %.0f m."),
 				CellsWrongSize, BakedCellM, CellSizeM);
+		}
+	}
+
+	// --- QUAIS V2 : LES ESCALIERS.
+	// Meme place et meme dependance que les murs (elle exige le DRAPE : sans
+	// relief il n'y a aucun denivele a franchir) et meme hote : la volee vit dans
+	// la cellule de RUBANS (SM_Ground_*), a cote du mur qu'elle dessert.
+	if (Gen.bStairs && Drape.IsActive())
+	{
+		const FString StDir = StairsDir(Gen);
+		TArray<FString> Files;
+		IFileManager::Get().FindFiles(Files, *(StDir / TEXT("escaliers_*.json")), true, false);
+		// Meme materiau que les murs et les bordures : aucun materiau nouveau, une
+		// seule grammaire minerale. La teinte est celle du mur — un escalier de quai
+		// est taille dans la meme pierre que le quai.
+		const FResolvedSurface* StSurf = Surfaces.Resolve(&GSurfCurb);
+		if (!StSurf)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("Escaliers demandes mais bSurfaceMaterials est faux : aucun escalier pose."));
+		}
+		const FVector3f StTint(0.85f, 0.85f, 0.80f);
+		FRenderedGroundZ StRGZ;
+		StRGZ.Init(Drape, Gen.GroundGridN, Cell);
+		int32 CellsWithStairs = 0;
+		int32 StCellsWrongSize = 0;
+		double StBakedCellM = 0.0;
+		int32 StairQuads = 0;
+		for (const FString& File : Files)
+		{
+			FString Rest = FPaths::GetBaseFilename(File);
+			Rest.RemoveFromStart(TEXT("escaliers_"));
+			FString Sx, Sy;
+			if (!Rest.Split(TEXT("_"), &Sx, &Sy, ESearchCase::CaseSensitive, ESearchDir::FromEnd))
+			{
+				continue;
+			}
+			if (!CelluleVisee(FIntPoint(FCString::Atoi(*Sx), FCString::Atoi(*Sy))))
+			{
+				continue;
+			}
+			TArray<FCityStairs> Flights;
+			if (!LoadStairsCell(StDir, FCString::Atoi(*Sx), FCString::Atoi(*Sy),
+				CellSizeM, Flights, StCellsWrongSize, StBakedCellM) || Flights.Num() == 0)
+			{
+				continue;
+			}
+			++CellsWithStairs;
+			const FIntPoint CelluleEsc(FCString::Atoi(*Sx), FCString::Atoi(*Sy));
+			for (const FCityStairs& St : Flights)
+			{
+				int32 Q = 0;
+				const int32 M = BuildStairs(
+					GetInKey(GroundCells, CleSol(St.PtsCm[0], CelluleEsc),
+						bLinearColors, bWorldUVs),
+					St, StRGZ, StSurf, StTint, Q);
+				if (M > 0)
+				{
+					Summary.StairSteps += M;
+					StairQuads += Q;
+					++Summary.Stairs;
+				}
+				else
+				{
+					++Summary.StairsSkipped;
+				}
+			}
+		}
+		UE_LOG(LogCityImport, Display,
+			TEXT("QUAIS V2 escaliers : %d cellules, %d volees posees (%d marches, %d quads), %d ecartees (pas de denivele exploitable) — dossier '%s'."),
+			CellsWithStairs, Summary.Stairs, Summary.StairSteps, StairQuads,
+			Summary.StairsSkipped, *StDir);
+		if (StCellsWrongSize > 0)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("QUAIS V2 escaliers : %d cellules IGNOREES — leur side-car est cuit pour des cellules de %.0f m et cet import travaille a %.0f m."),
+				StCellsWrongSize, StBakedCellM, CellSizeM);
 		}
 	}
 

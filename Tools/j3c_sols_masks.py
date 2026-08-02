@@ -79,6 +79,23 @@ OSM_PATH = os.path.join(SRC, "toulouse10.json")
 # SOLVERT : polygones vegetaux OCS GE CS2.* deja convertis en repere local (metres,
 # x = est, y = sud). Produit par work/SOLVERT/solvert_prep.py depuis les GeoJSON MVT.
 OCSGE_PATH = os.path.join(SRC, "ocsge_verts.json")
+# --- LOT QUAIS V3 : LA PROMENADE DE BERGE ------------------------------------
+# CE QUE LA MESURE A CHANGE AU PLAN. Le brief prevoyait de peindre la berge basse
+# avec la classe pietonne du bake ; sonde en lecture seule sur 126 points de
+# promenade des cellules -2_0 et -1_0 : ils sont DEJA en classe 1 (trottoir) a
+# 96,0 %, parce que le corridor vaut « cellule - parcelles - eau » et qu'une berge
+# non cadastree y tombe par construction. Repeindre serait un no-op — et c'est
+# justement le grief : la berge n'a pas moins d'identite que le reste, elle a la
+# MEME, celle de toute surface residuelle.
+# LA REGLE RETENUE, NATIONALE : « un chemin qui longe le pied d'un mur de classe
+# quai, mesure du cote BAS, est une PROMENADE DE BERGE : une bande stabilisee ».
+# Elle se rend avec la classe EXISTANTE `gravier`, celle a laquelle BD TOPO fait
+# deja correspondre ses natures etroites (chemin, route empierree) : aucune classe
+# nouvelle, aucun materiau nouveau, une seule grammaire minerale.
+# Le side-car est produit par work/QUAIS/q3_promenade.py. Dossier absent ou cellule
+# sans fichier = aucune promenade, sans erreur (comme les murs).
+PROMENADE_DIR = os.path.join(SRC, "Promenade")
+PROMENADE_ON = True        # False = rollback complet, sans re-cuire le side-car
 # FINITION_SOL : noeuds OSM `highway=crossing` deja filtres et convertis en repere
 # local par Tools/fetch_osm_crossings.py (cache disque : zero fetch reseau en lot).
 CROSSINGS_PATH = os.path.join(SRC, "Reseau", "osm_crossings_carre10.json")
@@ -533,6 +550,35 @@ def charger_routes_bdtopo(fen):
         "mesurees %d / replis %d"
         % (len(out), stats["gardes"], stats["pont"], stats["souterrain"], stats["nature"],
            stats["autre"], stats["mesure"], stats["repli"]))
+    return out
+
+
+def charger_promenade(cx, cy):
+    """QUAIS V3 : les polylignes de promenade de berge d'une cellule.
+
+    Meme contrat que les side-cars de murs et d'escaliers : dossier absent ou
+    cellule sans fichier = AUCUNE promenade, sans erreur (cuisson partielle,
+    emprise hors zone cuite). Rend [{'pts': [(x,y)...], 'largeur': m}]."""
+    path = os.path.join(PROMENADE_DIR, "promenade_%d_%d.json" % (cx, cy))
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as ex:  # noqa: BLE001
+        log("ATTENTION : promenade_%d_%d.json illisible (%s) — ignoree" % (cx, cy, ex))
+        return []
+    if abs(float(data.get("cellSizeM", CELL_M)) - CELL_M) > 0.01:
+        log("ATTENTION : promenade_%d_%d.json cuit pour des cellules de %.0f m "
+            "(bake a %.0f m) — ignoree" % (cx, cy, data.get("cellSizeM", 0), CELL_M))
+        return []
+    defaut = float(data.get("largeur_defaut_m", 4.0))
+    out = []
+    for s in data.get("promenade", []):
+        pts = [(float(a), float(b)) for a, b in s.get("pts", [])]
+        if len(pts) < 2:
+            continue
+        out.append({"pts": pts, "largeur": float(s.get("largeur_m", defaut))})
     return out
 
 
@@ -1428,6 +1474,37 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
     corridor, chaussee, privee, gravier, u_bati = classes_de_cellule(
         zone, loc_parc, loc_eau, loc_routes, loc_bati)
 
+    # --- QUAIS V3 : LA PROMENADE DE BERGE, versee dans la classe GRAVIER.
+    # Elle vient APRES classes_de_cellule et n'en change aucune regle : c'est une
+    # bande de plus dans une classe qui existe deja. On la soustrait de la chaussee
+    # et du bati (une promenade ne passe ni sur la rue ni sous un immeuble) mais PAS
+    # de l'eau : le quai de la Daurade descend jusqu'au fil de l'eau, et c'est le
+    # polygone d'eau qui doit ceder au bord, pas la promenade. La soustraction du
+    # corridor n'a pas lieu d'etre non plus : la promenade EST du corridor, elle en
+    # est simplement la part identifiee.
+    aire_prom = 0.0
+    if PROMENADE_ON:
+        bandes = []
+        for pr in charger_promenade(cx, cy):
+            ligne = LineString(pr["pts"])
+            if ligne.length <= 0.0:
+                continue
+            bandes.append(ligne.buffer(pr["largeur"] / 2.0, cap_style=2, join_style=2,
+                                       mitre_limit=3.0))
+        if bandes:
+            bande = C.valide(unary_union(bandes).intersection(zone))
+            bande = C.valide(bande.difference(chaussee))
+            if u_bati is not None:
+                bande = C.valide(bande.difference(u_bati))
+            if not bande.is_empty:
+                aire_prom = bande.intersection(cell_box).area
+                gravier = C.valide(gravier.union(bande))
+                # La voirie PRIVEE est calculee sur la zone entiere : sans ce
+                # retrait, un morceau de promenade tombe dans une parcelle
+                # ressortirait peint en privee par-dessus (meme raison que le
+                # retrait du bati dans classes_de_cellule).
+                privee = C.valide(privee.difference(bande))
+
     # --- SOLVERT : la couche HERBE, complement de la voirie peinte.
     # herbe = union(OCS GE CS2.*) - chaussee - privee - gravier - bati - eau, puis
     # ouverture morphologique vectorielle de HERBE_OUVERTURE_M. La soustraction se
@@ -1565,6 +1642,10 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
         "crossings": crossings,
         "axial": dashes,
         "areasM2": aires,
+        # QUAIS V3 : la part de la classe `gravier` qui vient de la promenade de
+        # berge. C'est LE discriminant de la passe : a 0, la promenade n'a rien
+        # peint et la capture ne peut rien montrer.
+        "promenadeM2": round(aire_prom, 1),
     }
     js = os.path.join(OUT_DIR, "sols_%d_%d.json" % (cx, cy))
     with open(js, "w", encoding="utf-8") as f:
@@ -1602,6 +1683,7 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
             "curbLenM": round(sum(LineString(l).length for l in curbs if len(l) > 1), 1),
             "pngBytes": os.path.getsize(png), "jsonBytes": os.path.getsize(js),
             "areasM2": aires, "herbeRasterM2": round(aire_herbe_png, 1),
+            "promenadeM2": round(aire_prom, 1),
             "herbeEcartPc": round(ecart_pc, 3),
             "herbeReleveM2": round(aire_releve, 1),
             "herbeRegulM2": round(aire_regul - aire_releve, 1),
@@ -2395,6 +2477,9 @@ def main():
     log("TOTAL %.1f s | %d cellules | masques %.1f Mo (%.2f Mo/cellule) | json %.2f Mo"
         % (time.time() - t0, len(resume), tot_png / 1048576.0,
            tot_png / 1048576.0 / max(len(resume), 1), tot_js / 1048576.0))
+    log("QUAIS V3 : %d m2 de PROMENADE DE BERGE dans la classe gravier, sur %d cellules"
+        % (sum(r.get("promenadeM2", 0.0) for r in resume),
+           sum(1 for r in resume if r.get("promenadeM2", 0.0) > 0.0)))
     log("PEINT   : %d m2 de chaussee, %d m2 de voirie privee, %d m2 de gravier, "
         "%d m2 d'HERBE (ecart raster max %.2f %%)"
         % (sum(r["areasM2"]["chaussee"] for r in resume),

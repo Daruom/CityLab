@@ -211,6 +211,49 @@ struct FCityGenProfile
 	UPROPERTY() FString RetainingWallClasses;
 
 	/**
+	 * LOT QUAIS (V2) — LES ESCALIERS.
+	 *
+	 * Un mur de quai sans escalier est un decor : dans la realite on descend sur la
+	 * berge. Cette passe pose, le long des polylignes cuites dans
+	 * SourceData/Escaliers (escaliers_<x>_<y>.json, derive des troncons BD TOPO
+	 * `nature = 'Escalier'` et du complement OSM `highway = steps`), une VOLEE de
+	 * marches procedurales : contremarche verticale + giron horizontal par marche,
+	 * plus deux limons pleins qui l'asseyent dans la pente.
+	 *
+	 * Le side-car ne porte AUCUN Z (ni BD TOPO ni OSM ne codent l'altitude de ces
+	 * troncons — verifie sur les 36 troncons de l'emprise) : le denivele est LU SUR
+	 * LA SURFACE RENDUE aux deux extremites, doctrine du sol rendu (Playbook §6).
+	 * Le nombre de marches en decoule (contremarche standard francaise ~16,5 cm),
+	 * le giron se deduit de la longueur en plan, et des PALIERS absorbent ce qui
+	 * reste quand la volee est plus longue que ses marches — ce qui est justement
+	 * le cas des grands escaliers de quai (mesure aux deux escaliers du Pont
+	 * Saint-Pierre : 7,8 m de denivele pour 31,9 m de trace en plan).
+	 *
+	 * Materiau : celui des bordures et des murs (aucun materiau nouveau).
+	 * Cellule sans fichier = aucun escalier pour elle, sans erreur.
+	 */
+	UPROPERTY() bool bStairs = true;
+
+	/** Dossier des escaliers cuits (escaliers_<x>_<y>.json). Vide = <projet>/SourceData/Escaliers. */
+	UPROPERTY() FString StairsPath;
+
+	/**
+	 * LOT QUAIS (V4) — LES GRADINS.
+	 *
+	 * Regle NATIONALE : la ou un mur de classe « quai » borde une zone PIETONNE
+	 * BASSE (le side-car le mesure au prep et pose le drapeau `borde_pieton`), la
+	 * face lisse se rend en GRADINS — la volee de larges marches sur laquelle on
+	 * s'assoit au bord de l'eau. Sans zone pietonne en contrebas, un quai reste une
+	 * face lisse : un gradin qui donne sur rien n'a aucun sens.
+	 *
+	 * Ne s'applique qu'au-dessus d'une hauteur MESUREE plancher (un mur trop bas
+	 * n'a pas la place d'en porter deux). Les dimensions sont des constantes du
+	 * .cpp (a tourner en boucle B). false = tous les murs restent lisses : c'est le
+	 * rollback, sans re-cuire le side-car ni rebuilder.
+	 */
+	UPROPERTY() bool bQuayTiers = true;
+
+	/**
 	 * LOT VELOCITE — MODE DISTRICT : « ne regenere QUE ces cellules ».
 	 *
 	 * Liste de cellules « x_y » separees par des virgules, ex. "-2_0,-2_1,-1_0".
@@ -355,6 +398,25 @@ struct FCityStreamedSummary
 
 	/** C1 : polylignes ECARTEES — la surface rendue n'y presente aucune rampe a masquer. */
 	UPROPERTY() int32 RetainingWallsSkipped = 0;
+
+	/** QUAIS V2 : volees d'escalier effectivement posees (au moins une marche). */
+	UPROPERTY() int32 Stairs = 0;
+
+	/** QUAIS V2 : marches posees, toutes volees confondues. Le discriminant de la passe. */
+	UPROPERTY() int32 StairSteps = 0;
+
+	/**
+	 * QUAIS V2 : volees ECARTEES — la surface rendue n'y presente pas de denivele
+	 * exploitable (moins d'une marche), ou la geometrie qui en decoulerait ne serait
+	 * pas un escalier (giron impossible). Compte, jamais tu en silence.
+	 */
+	UPROPERTY() int32 StairsSkipped = 0;
+
+	/** QUAIS V4 : murs de quai rendus en GRADINS au lieu d'une face lisse. */
+	UPROPERTY() int32 QuayTierWalls = 0;
+
+	/** QUAIS V4 : gradins poses, tous murs confondus. */
+	UPROPERTY() int32 QuayTiers = 0;
 };
 
 /** Counts of what GenerateBuildingCollisionCell produced for one cell. */

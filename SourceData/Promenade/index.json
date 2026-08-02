@@ -1,0 +1,177 @@
+{
+ "genere": "2026-08-02T17:19:19",
+ "cellSizeM": 500.0,
+ "emprise": [
+  -1500.0,
+  -1500.0,
+  1500.0,
+  1500.0
+ ],
+ "recette": {
+  "regle": "un chemin qui longe (<25 m) le PIED d'un mur de classe quai, mesure du cote BAS au MNT, est une promenade de berge",
+  "sources": [
+   "BD TOPO nature Sentier/Chemin",
+   "OSM footway/path/pedestrian"
+  ],
+  "largeur_m": 4.0,
+  "longueur_min_m": 15.0,
+  "classe_de_rendu": "gravier (CLS_GRAVIER=4) — classe EXISTANTE du bake, celle des natures etroites BD TOPO ; aucun materiau nouveau",
+  "gradins": {
+   "portee_m": 20.0,
+   "couverture_min": 0.35
+  }
+ },
+ "totaux": {
+  "troncons": 60,
+  "longueur_m": 4910.1,
+  "murs_quai": 111,
+  "murs_borde_pieton": 31,
+  "morceaux": 69
+ },
+ "cellules": {
+  "-3_-3": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "-3_-2": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "-3_-1": {
+   "troncons": 2,
+   "longueur_m": 80.8
+  },
+  "-3_0": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "-3_1": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "-3_2": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "-2_-3": {
+   "troncons": 2,
+   "longueur_m": 232.5
+  },
+  "-2_-2": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "-2_-1": {
+   "troncons": 1,
+   "longueur_m": 3.6
+  },
+  "-2_0": {
+   "troncons": 14,
+   "longueur_m": 998.0
+  },
+  "-2_1": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "-2_2": {
+   "troncons": 5,
+   "longueur_m": 400.5
+  },
+  "-1_-3": {
+   "troncons": 1,
+   "longueur_m": 68.3
+  },
+  "-1_-2": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "-1_-1": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "-1_0": {
+   "troncons": 7,
+   "longueur_m": 730.0
+  },
+  "-1_1": {
+   "troncons": 8,
+   "longueur_m": 928.1
+  },
+  "-1_2": {
+   "troncons": 13,
+   "longueur_m": 653.6
+  },
+  "0_-3": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "0_-2": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "0_-1": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "0_0": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "0_1": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "0_2": {
+   "troncons": 2,
+   "longueur_m": 89.5
+  },
+  "1_-3": {
+   "troncons": 1,
+   "longueur_m": 28.2
+  },
+  "1_-2": {
+   "troncons": 2,
+   "longueur_m": 108.7
+  },
+  "1_-1": {
+   "troncons": 2,
+   "longueur_m": 37.7
+  },
+  "1_0": {
+   "troncons": 1,
+   "longueur_m": 33.4
+  },
+  "1_1": {
+   "troncons": 1,
+   "longueur_m": 52.7
+  },
+  "1_2": {
+   "troncons": 3,
+   "longueur_m": 155.2
+  },
+  "2_-3": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "2_-2": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "2_-1": {
+   "troncons": 2,
+   "longueur_m": 47.3
+  },
+  "2_0": {
+   "troncons": 2,
+   "longueur_m": 64.7
+  },
+  "2_1": {
+   "troncons": 0,
+   "longueur_m": 0
+  },
+  "2_2": {
+   "troncons": 0,
+   "longueur_m": 0
+  }
+ }
+}

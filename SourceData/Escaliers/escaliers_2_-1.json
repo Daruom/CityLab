@@ -1,0 +1,1 @@
+{"cell":[2,-1],"cellSizeM":500.0,"origin":[1000.0,-500.0],"crs":"local_citylab_equirect_capitole","axes":"x = est (m), y = sud (m) ; NORD = -Y","source":"BD TOPO nature=Escalier + OSM highway=steps (dedoublonne)","note":"aucun Z : le denivele se lit au SOL RENDU aux extremites","escaliers":[]}

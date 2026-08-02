@@ -2618,4 +2618,318 @@ void FCityImportToolsSpec::Define()
 				S.RetainingWallsSkipped, 0);
 		});
 	});
+
+	// =====================================================================
+	// LOT QUAIS — V2 (escaliers) et V4 (gradins).
+	// Meme methode que C1 : un MNT FABRIQUE dont on connait la reponse, et des
+	// mesures GEOMETRIQUES sur le maillage produit (aires orientees, bornes) —
+	// jamais un simple compte, qui serait aveugle a une volee construite a
+	// l'envers, enterree, ou trouee.
+	Describe("QUAIS escaliers et gradins", [this]()
+	{
+		auto WriteMnt = [this](const FString& Dir, float CliffXm, float LowM,
+			float HighM) -> bool
+		{
+			constexpr int32 N = 200;
+			TArray<uint16> Alt;
+			Alt.SetNumUninitialized(N * N);
+			for (int32 Row = 0; Row < N; ++Row)
+			{
+				for (int32 Col = 0; Col < N; ++Col)
+				{
+					const double Xm = -100.0 + Col + 0.5;
+					Alt[Row * N + Col] = (uint16)FMath::RoundToInt(
+						((Xm < CliffXm) ? HighM : LowM) * 100.0);
+				}
+			}
+			IImageWrapperModule& Mod =
+				FModuleManager::LoadModuleChecked<IImageWrapperModule>(FName("ImageWrapper"));
+			const TSharedPtr<IImageWrapper> Wrapper = Mod.CreateImageWrapper(EImageFormat::PNG);
+			if (!Wrapper.IsValid() ||
+				!Wrapper->SetRaw(Alt.GetData(), (int64)Alt.Num() * sizeof(uint16), N, N,
+					ERGBFormat::Gray, 16))
+			{
+				return false;
+			}
+			const TArray64<uint8>& Png = Wrapper->GetCompressed(100);
+			if (!FFileHelper::SaveArrayToFile(Png, *FPaths::Combine(Dir, TEXT("mnt.png"))))
+			{
+				return false;
+			}
+			const FString Json = TEXT(R"({"grid":{"width_px":200,"height_px":200,)")
+				TEXT(R"("pixel_size_m":1.0,"coin_nw_unreal_cm":{"x":-10000,"y":-10000}}})");
+			return FFileHelper::SaveStringToFile(Json, *FPaths::Combine(Dir, TEXT("mnt.json")));
+		};
+
+		// MEME convention d'enroulement que FCityMeshBuilder::AddPoly : la normale
+		// RENDUE est cross(V2 - V0, V1 - V0). La calculer dans l'autre sens
+		// inverserait le test — et il passerait sur une geometrie retournee.
+		auto Oriented = [](UStaticMesh* Mesh, const FVector3f& Dir, float MinDot,
+			float& OutAreaM2, FBox& OutBounds) -> bool
+		{
+			OutAreaM2 = 0.f;
+			OutBounds.Init();
+			FMeshDescription* MD = Mesh ? Mesh->GetMeshDescription(0) : nullptr;
+			if (!MD || MD->Triangles().Num() == 0)
+			{
+				return false;
+			}
+			TVertexAttributesRef<FVector3f> Pos = FStaticMeshAttributes(*MD).GetVertexPositions();
+			for (const FTriangleID T : MD->Triangles().GetElementIDs())
+			{
+				TArrayView<const FVertexID> V = MD->GetTriangleVertices(T);
+				const FVector3f A = Pos[V[0]], B = Pos[V[1]], C = Pos[V[2]];
+				const FVector3f Cross = FVector3f::CrossProduct(C - A, B - A);
+				const float Area = 0.5f * Cross.Size();
+				if (Area <= KINDA_SMALL_NUMBER ||
+					FVector3f::DotProduct(Cross.GetSafeNormal(), Dir) < MinDot)
+				{
+					continue;
+				}
+				OutAreaM2 += Area * 1e-4f;
+				for (int32 k = 0; k < 3; ++k)
+				{
+					OutBounds += FVector(Pos[V[k]].X, Pos[V[k]].Y, Pos[V[k]].Z);
+				}
+			}
+			return true;
+		};
+
+		It("volee synthetique de 3 m : 18 marches, les girons PAVENT la longueur, "
+			"aucune marche sous le sol",
+			[this, WriteMnt, Oriented]()
+		{
+			const FString Dir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/QuaisEsc"));
+			IFileManager::Get().DeleteDirectory(*Dir, false, true);
+			IFileManager::Get().MakeDirectory(*Dir, true);
+			// Terrasse haute 103 m a l'ouest de x = -20, terrasse basse 100 m a l'est :
+			// 3 m de denivele EXACTEMENT, la grandeur que la volee doit franchir.
+			if (!TestTrue(TEXT("MNT synthetique ecrit"), WriteMnt(Dir, -20.f, 100.f, 103.f)))
+			{
+				return;
+			}
+			const FString EscDir = FPaths::Combine(Dir, TEXT("Escaliers"));
+			IFileManager::Get().MakeDirectory(*EscDir, true);
+			// La volee TRAVERSE la falaise : de x = -30 (haut) a x = -10 (bas), a
+			// y = 50. 20 m en plan, largeur 2,5 m. Les deux bouts sont a plus d'un
+			// quad de drape de la rupture : le sol RENDU y vaut bien 103 et 100.
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"cell":[-1,0],"cellSizeM":100.0,"escaliers":[{"source":"test",)")
+				TEXT(R"("id":"E1","largeur_m":2.5,"pts":[[-30,50],[-10,50]]}]})"),
+				*FPaths::Combine(EscDir, TEXT("escaliers_-1_0.json")));
+			// TEMOIN : la MEME volee posee en pleine terrasse PLATE. Elle doit etre
+			// ECARTEE — sans lui, le test passerait meme si la passe posait un
+			// escalier partout ou on lui en demande un.
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"cell":[0,0],"cellSizeM":100.0,"escaliers":[{"source":"test",)")
+				TEXT(R"("id":"E2","largeur_m":2.5,"pts":[[30,50],[50,50]]}]})"),
+				*FPaths::Combine(EscDir, TEXT("escaliers_0_0.json")));
+
+			const FString City = FPaths::Combine(Dir, TEXT("city.json"));
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"buildings":[],"roads":[{"pts":[[10,-50],[60,-50]],"t":"residential","w":6}],"trees":[]})"),
+				*City);
+
+			FCityGenProfile P;
+			P.bDrapeToTerrain = true;
+			P.bSurfaceMaterials = true;
+			P.bRetainingWalls = false;      // on ne mesure QUE l'escalier
+			P.bStairs = true;
+			P.TerrainPngPath = FPaths::Combine(Dir, TEXT("mnt.png"));
+			P.TerrainJsonPath = FPaths::Combine(Dir, TEXT("mnt.json"));
+			P.StairsPath = EscDir;
+
+			const FCityStreamedSummary S = UCityImportTools::ImportCityStreamed(
+				City, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, P);
+
+			TestEqual(TEXT("Une seule volee posee"), S.Stairs, 1);
+			TestEqual(TEXT("La volee temoin, en terrasse plate, est ECARTEE"),
+				S.StairsSkipped, 1);
+			// 3 m / 16,5 cm = 18,18 -> 18 marches ; contremarche reelle 16,67 cm,
+			// dans la fourchette d'usage [13 ; 19] : aucun rattrapage.
+			TestEqual(TEXT("18 marches (3,00 m / 16,5 cm arrondi)"), S.StairSteps, 18);
+
+			UStaticMesh* Ground = LoadTestMesh(TEXT("SM_Ground_-1_0"));
+			if (!TestNotNull(TEXT("SM_Ground_-1_0 genere"), Ground))
+			{
+				return;
+			}
+			FStaticMeshCompilingManager::Get().FinishAllCompilation();
+
+			// --- LES GIRONS (faces horizontales vers le haut). Leur aire totale vaut
+			//     largeur x longueur EN PLAN = 2,5 x 20 = 50 m2 EXACTEMENT, et ce
+			//     n'est pas une coincidence : les girons et les paliers PAVENT la
+			//     longueur de la volee. Un jour entre deux marches, un recouvrement,
+			//     ou des paliers mal repartis feraient tomber ce chiffre.
+			float AreaTread = 0.f;
+			FBox BTread(ForceInit);
+			Oriented(Ground, FVector3f(0.f, 0.f, 1.f), 0.99f, AreaTread, BTread);
+			AddInfo(FString::Printf(
+				TEXT("QUAIS escalier : girons %.2f m2, bbox X [%.0f ; %.0f] Y [%.0f ; %.0f] Z [%.0f ; %.0f] cm"),
+				AreaTread, BTread.Min.X, BTread.Max.X, BTread.Min.Y, BTread.Max.Y,
+				BTread.Min.Z, BTread.Max.Z));
+			TestTrue(FString::Printf(TEXT("Aire des girons %.2f m2 ~ 50 m2 (2,5 m x 20 m)"), AreaTread),
+				FMath::Abs(AreaTread - 50.f) <= 1.5f);
+
+			// --- LES CONTREMARCHES. Leur aire totale vaut largeur x denivele =
+			//     2,5 x 3,0 = 7,5 m2, quelle que soit la repartition : c'est la
+			//     mesure qui verrait une volee qui ne monte pas jusqu'en haut.
+			float AreaRiseE = 0.f, AreaRiseW = 0.f;
+			FBox BR1(ForceInit), BR2(ForceInit);
+			Oriented(Ground, FVector3f(1.f, 0.f, 0.f), 0.99f, AreaRiseE, BR1);
+			Oriented(Ground, FVector3f(-1.f, 0.f, 0.f), 0.99f, AreaRiseW, BR2);
+			// La volee descend vers l'EST (le bas est a x = -10) : les contremarches
+			// regardent donc vers l'est. Le bouchon de tete regarde a l'ouest.
+			AddInfo(FString::Printf(TEXT("QUAIS escalier : contremarches +X %.2f m2, -X %.2f m2"),
+				AreaRiseE, AreaRiseW));
+			TestTrue(FString::Printf(TEXT("Contremarches %.2f m2 ~ 7,5 m2 (2,5 m x 3,0 m)"), AreaRiseE),
+				FMath::Abs(AreaRiseE - 7.5f) <= 1.2f);
+
+			// --- BORNES. Aucun giron sous la terrasse basse (Z = 0) : « aucune marche
+			//     sous le sol ». Rien hors du trace ni hors de la largeur demandee.
+			TestTrue(FString::Printf(TEXT("Aucun giron sous le sol (min Z %.1f cm >= 0)"), BTread.Min.Z),
+				BTread.Min.Z >= -1.f);
+			TestTrue(FString::Printf(TEXT("La volee monte a la terrasse haute (max Z %.0f cm ~ 300)"), BTread.Max.Z),
+				BTread.Max.Z >= 295.f && BTread.Max.Z <= 305.f);
+			TestTrue(FString::Printf(TEXT("X dans [-30 ; -10] m (%.0f .. %.0f cm)"), BTread.Min.X, BTread.Max.X),
+				BTread.Min.X >= -3001.f && BTread.Max.X <= -999.f);
+			TestTrue(FString::Printf(TEXT("Largeur 2,5 m centree sur y = 50 m (%.0f .. %.0f cm)"),
+				BTread.Min.Y, BTread.Max.Y),
+				BTread.Min.Y >= 4874.f && BTread.Max.Y <= 5126.f);
+		});
+
+		It("bStairs false : le side-car des escaliers est ignore (rollback par le flag)",
+			[this, WriteMnt]()
+		{
+			const FString Dir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Tests/QuaisEscOff"));
+			IFileManager::Get().DeleteDirectory(*Dir, false, true);
+			IFileManager::Get().MakeDirectory(*Dir, true);
+			if (!TestTrue(TEXT("MNT synthetique ecrit"), WriteMnt(Dir, -20.f, 100.f, 103.f)))
+			{
+				return;
+			}
+			const FString EscDir = FPaths::Combine(Dir, TEXT("Escaliers"));
+			IFileManager::Get().MakeDirectory(*EscDir, true);
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"cell":[-1,0],"cellSizeM":100.0,"escaliers":[{"source":"test",)")
+				TEXT(R"("id":"E1","largeur_m":2.5,"pts":[[-30,50],[-10,50]]}]})"),
+				*FPaths::Combine(EscDir, TEXT("escaliers_-1_0.json")));
+			const FString City = FPaths::Combine(Dir, TEXT("city.json"));
+			FFileHelper::SaveStringToFile(
+				TEXT(R"({"buildings":[],"roads":[{"pts":[[10,-50],[60,-50]],"t":"residential","w":6}],"trees":[]})"),
+				*City);
+			FCityGenProfile P;
+			P.bDrapeToTerrain = true;
+			P.bSurfaceMaterials = true;
+			P.bRetainingWalls = false;
+			P.bStairs = false;
+			P.TerrainPngPath = FPaths::Combine(Dir, TEXT("mnt.png"));
+			P.TerrainJsonPath = FPaths::Combine(Dir, TEXT("mnt.json"));
+			P.StairsPath = EscDir;
+			const FCityStreamedSummary S = UCityImportTools::ImportCityStreamed(
+				City, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+				FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, P);
+			TestEqual(TEXT("Aucune volee"), S.Stairs, 0);
+			TestEqual(TEXT("Aucune marche"), S.StairSteps, 0);
+			TestEqual(TEXT("Aucune volee ecartee non plus (la passe n'a pas tourne)"),
+				S.StairsSkipped, 0);
+		});
+
+		It("gradins : poses SEULEMENT si le side-car a mesure une promenade en contrebas",
+			[this, WriteMnt, Oriented]()
+		{
+			auto Cuire = [&](bool bBordePieton, bool bProfilActif, FCityStreamedSummary& Out,
+				const TCHAR* Tag) -> bool
+			{
+				const FString Dir = FPaths::Combine(FPaths::ProjectSavedDir(),
+					FString(TEXT("Tests/QuaisGradins")) + Tag);
+				IFileManager::Get().DeleteDirectory(*Dir, false, true);
+				IFileManager::Get().MakeDirectory(*Dir, true);
+				if (!WriteMnt(Dir, -20.f, 100.f, 105.f))
+				{
+					return false;
+				}
+				const FString MursDir = FPaths::Combine(Dir, TEXT("Murs"));
+				IFileManager::Get().MakeDirectory(*MursDir, true);
+				const FString Flag = bBordePieton ? TEXT("true") : TEXT("false");
+				FFileHelper::SaveStringToFile(
+					FString(TEXT(R"({"cell":[-1,0],"cellSizeM":100.0,"murs":[{"classe":"quai",)"))
+					+ TEXT(R"("cote_bas":-1,"h_med":5.0,"longueur_m":80.0,"borde_pieton":)") + Flag
+					+ TEXT(R"(,"pts":[[-20,10],[-20,90]],)")
+					+ TEXT(R"("profil":[[-20,10,105,100],[-20,90,105,100]]}]})"),
+					*FPaths::Combine(MursDir, TEXT("murs_-1_0.json")));
+				const FString City = FPaths::Combine(Dir, TEXT("city.json"));
+				FFileHelper::SaveStringToFile(
+					TEXT(R"({"buildings":[],"roads":[{"pts":[[10,-50],[60,-50]],"t":"residential","w":6}],"trees":[]})"),
+					*City);
+				FCityGenProfile P;
+				P.bDrapeToTerrain = true;
+				P.bSurfaceMaterials = true;
+				P.bRetainingWalls = true;
+				P.bStairs = false;
+				P.bQuayTiers = bProfilActif;
+				P.TerrainPngPath = FPaths::Combine(Dir, TEXT("mnt.png"));
+				P.TerrainJsonPath = FPaths::Combine(Dir, TEXT("mnt.json"));
+				P.RetainingWallsPath = MursDir;
+				Out = UCityImportTools::ImportCityStreamed(
+					City, FString(), TEXT("/Game/Dev/Test/City"), TEXT("/Game/Dev/Test/Blocks"),
+					FString(), FString(), 100.f, 200.f, 400.f, FVector::ZeroVector, P);
+				return true;
+			};
+
+			// (1) LE CAS NOMINAL : mur de quai de 5 m bordant une promenade basse.
+			FCityStreamedSummary A;
+			if (!TestTrue(TEXT("cuisson (gradins) reussie"), Cuire(true, true, A, TEXT("On"))))
+			{
+				return;
+			}
+			TestEqual(TEXT("Le mur est pose"), A.RetainingWalls, 1);
+			TestEqual(TEXT("Un mur rendu en gradins"), A.QuayTierWalls, 1);
+			AddInfo(FString::Printf(TEXT("QUAIS gradins : %d gradins, %d quads de mur"),
+				A.QuayTiers, A.RetainingWallQuads));
+			TestTrue(FString::Printf(TEXT("Au moins 2 gradins (%d)"), A.QuayTiers), A.QuayTiers >= 2);
+			TestTrue(FString::Printf(TEXT("Au plus 24 gradins (%d)"), A.QuayTiers), A.QuayTiers <= 24);
+			// Comptabilite EXACTE : par segment, 2 quads par gradin + couronnement +
+			// dos ; plus 2 bouchons pour la polyligne. Un seul segment ici.
+			TestEqual(TEXT("Quads = 2 x gradins + 2 (couronnement, dos) + 2 bouchons"),
+				A.RetainingWallQuads, 2 * A.QuayTiers + 4);
+
+			// La geometrie : les ASSISES sont des faces horizontales, la face lisse
+			// n'en a aucune (seul le couronnement l'est). Leur aire totale doit donc
+			// depasser franchement celle du cas lisse.
+			UStaticMesh* G = LoadTestMesh(TEXT("SM_Ground_-1_0"));
+			float AireHautA = 0.f;
+			FBox BA(ForceInit);
+			if (G)
+			{
+				FStaticMeshCompilingManager::Get().FinishAllCompilation();
+				Oriented(G, FVector3f(0.f, 0.f, 1.f), 0.99f, AireHautA, BA);
+				AddInfo(FString::Printf(TEXT("QUAIS gradins : faces horizontales %.1f m2, Z [%.0f ; %.0f] cm"),
+					AireHautA, BA.Min.Z, BA.Max.Z));
+				TestTrue(FString::Printf(TEXT("Les assises restent entre le pied et la crete (Z %.0f..%.0f)"),
+					BA.Min.Z, BA.Max.Z), BA.Min.Z >= -1.f && BA.Max.Z <= 501.f);
+			}
+
+			// (2) LE DISCRIMINANT : le MEME mur, sans promenade en contrebas. Sans
+			//     lui, le test passerait aussi si la passe mettait des gradins partout.
+			FCityStreamedSummary B;
+			if (TestTrue(TEXT("cuisson (sans promenade) reussie"), Cuire(false, true, B, TEXT("NoProm"))))
+			{
+				TestEqual(TEXT("Le mur est pose"), B.RetainingWalls, 1);
+				TestEqual(TEXT("AUCUN gradin sans promenade en contrebas"), B.QuayTierWalls, 0);
+				TestEqual(TEXT("... et aucun gradin compte"), B.QuayTiers, 0);
+				TestEqual(TEXT("La face redevient lisse : 5 quads, comme C1"),
+					B.RetainingWallQuads, 5);
+			}
+
+			// (3) LE ROLLBACK : promenade presente, mais profil desactive.
+			FCityStreamedSummary C;
+			if (TestTrue(TEXT("cuisson (profil off) reussie"), Cuire(true, false, C, TEXT("Off"))))
+			{
+				TestEqual(TEXT("bQuayTiers=false : aucun gradin"), C.QuayTierWalls, 0);
+				TestEqual(TEXT("La face lisse revient : 5 quads"), C.RetainingWallQuads, 5);
+			}
+		});
+	});
 }

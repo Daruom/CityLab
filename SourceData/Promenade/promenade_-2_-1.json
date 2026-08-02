@@ -1,0 +1,1 @@
+{"cell":[-2,-1],"cellSizeM":500.0,"origin":[-1000.0,-500.0],"crs":"local_citylab_equirect_capitole","axes":"x = est (m), y = sud (m) ; NORD = -Y","classe":"gravier","largeur_defaut_m":4.0,"promenade":[{"source":"osm","id":"123645140","nature":"footway","nom":"","largeur_m":4.0,"long_basse_m":127.4,"pts":[[-941.15,-1.98],[-938.15,-0.0]]}]}
