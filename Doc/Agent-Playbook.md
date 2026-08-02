@@ -401,3 +401,79 @@ non visée**. Résultat : 4 `SM_Ground_` en double et **l'asset du voisin écras
 débordé. Garde posée dans `CityImportTools.cpp` (`CleSol` : en mode district, la géométrie va
 dans sa cellule **propriétaire**) + un compteur de sortie « cellules hors filtre écartées » qui
 **doit valoir 0**.
+
+---
+
+## 12. ⭐ TESTER EN VOL AU QUOTIDIEN — « Play » et « Stop » (lot PIE, 02/08)
+
+> **Le Play est redevenu instantané.** Avant ce lot : démarrage 10,3 s et **arrêt 604,5 s**
+> (l'utilisateur tuait l'éditeur au gestionnaire des tâches — ce kill a cassé deux sessions).
+> Après : **démarrage 2,1 s, arrêt 2,0 s.** Zéro kill.
+
+### 12.1 La procédure quotidienne
+1. **Démarrer** : `Play` dans le hublot sélectionné (ou `Alt+P`). Attendu : **~2 s**.
+   En script : `unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_begin_play()`.
+2. **Voler**, puis **`Échap`** (ou `editor_request_end_play()`). Attendu : **~2 s**, éditeur vivant.
+3. **Si ça dépasse 30 s : NE PAS TUER L'ÉDITEUR.** C'est une régression connue et elle a une
+   seule cause (§12.3) : la collision de la végétation est revenue. Diagnostic en 2 s avec
+   `work/PIE/py/p3_verrou_collision.py`. L'éditeur ressort TOUJOURS seul (mesuré 604 s et 617 s).
+4. Chrono automatique d'un cycle complet :
+   `work/PIE/pie_cycle.ps1 -Tag XXX -SejourS 20 -SansFocus` (écrit `chronos.log` + l'extrait de log).
+
+### 12.2 Le banc des options, mesuré (proto 3×3, 1,25 M d'instances)
+| option | démarrage | arrêt | l'éditeur gèle ? |
+|---|---:|---:|---|
+| **Play in editor** (état du lot PIE) | **2,1 s** | **2,0 s** | non |
+| Play in editor (avant le lot) | 10,3 s | **604,5 s** | **oui, 10 min** |
+| **Standalone Game** (processus séparé) | 18,2 s de chargement | fenêtre fermée en 3 s | jamais |
+
+**Standalone Game** reste utile pour juger le jeu **hors éditeur** (vrai plein écran, pas de
+surcoût d'outillage) : `UnrealEditor.exe "<uproject>" <map> -game -windowed` — une seule chaîne
+d'arguments (piège §5). Outil prêt : `work/PIE/p2_standalone.ps1`. Ce n'est PAS la boucle par
+défaut : 18 s de chargement contre 2 s, et il ne partage pas l'état non sauvegardé de l'éditeur.
+
+### 12.3 ⛔ LE PIÈGE, ET IL EST STRUCTUREL : **un ISM crée UN CORPS PHYSIQUE PAR INSTANCE**
+Et comme nos HISM sont `Movable`, le moteur les crée **UN PAR UN**
+(`FBodyInstance::InitBody`, `InstancedMeshComponentBodies.cpp` l. 111) au lieu du chemin par lot
+`InitStaticBodies` réservé au statique. Sur le proto : **1 253 686 corps Chaos** créés à chaque
+Play et détruits à chaque Stop.
+
+**Le profil, mesuré** (`gc.DumpAnalyticsToLog 1` + `log LogGarbage Verbose`) :
+```
+GC purged 862 objects (75587 -> 74725) in 602392.732 ms      <- AVANT
+GC purged 862 objects (75587 -> 74725) in      5.233 ms      <- APRÈS
+```
+**Mêmes 862 objets, mêmes totaux** : seuls les corps changent. `DestroyGarbage` = **99,97 %**
+du temps d'arrêt. Le GC lui-même n'a jamais été en cause (reachability 51 ms) — **aucun réglage
+`gc.*` n'aurait aidé**, et la duplication du monde PIE ne coûte que **0,4 s**
+(`StaticDuplicateObject`), pas les 10 s qu'on lui prêtait.
+
+**La règle posée, et elle est lue dans la donnée** : un mesh de végétation **sans aucune
+primitive de collision SIMPLE** (`AggGeom` vide) n'a pas de collision voulue — son
+`CTF_USE_DEFAULT` retombe sur la collision **COMPLEXE**, donc sur le repli décimé du Nanite.
+`CityImportTools.cpp` pose donc `NoCollision` sur ces composants-là, **avant
+`RegisterComponent()`** (doctrine « propriétés à la CRÉATION »). Les meshes qui portent un vrai
+volume (érables, hêtres : 2-3 convexes) **gardent leur collision** — aucun arbitrage de gameplay
+n'a été demandé. Rollback **sans rebuild** : `FCityGenProfile::bVegCollisionHistorique=true`.
+
+### 12.4 Corollaires mesurés, à ne pas re-déboguer
+* **Ne bascule JAMAIS la collision d'un HISM sur une map déjà chargée** : `SetCollisionEnabled`
+  appelle `MarkRenderStateDirty` → les 1,25 M d'instances sont ré-uploadées et les 31 arbres
+  spatiaux rebâtis. **611 s mesurés**, éditeur muet, `Responding=False`. Signature à ne pas
+  confondre avec un hang : le thread chaud est le **RENDER thread** (pas le principal) et la RAM
+  est **plate**. Le correctif C++ (à la création) ne paie jamais ça.
+* **HISM par bloc : écarté PAR LA MESURE** *pour le Play*. Le coût du Play est strictement **par
+  INSTANCE**, pas par composant : à composants identiques (31) et objets identiques (862),
+  retirer les corps divise l'arrêt par **302**. Découper 12 composants en ~192 ne changerait
+  aucun des 1,18 M de corps. Il lui reste **un seul terrain**, celui du point suivant.
+* ⚠️ **CE QUE LE REMÈDE NE RÈGLE PAS : le changement de MAP.** Basculer de la map lourde vers
+  une map jetable coûte toujours **650,9 s** (mesuré après le correctif ; référence C1 : 605 s).
+  Ce teardown-là n'est pas la physique mais la **libération des données d'instance / GPUScene**
+  des 1,25 M d'instances (render thread chaud, RAM plate). **La règle du §5 tient donc
+  toujours : lancer la spec d'automation depuis une session DÉMARRÉE sur une map légère**, pas
+  par bascule depuis la production. C'est là — et seulement là — que « HISM par bloc » ou le
+  streaming ont encore quelque chose à prouver.
+* Le **streaming par distance** reste la cible AGGLO, **avec HLOD** pour le lointain (sans lui,
+  les blocs lointains disparaissent en vol haut). Ce que le lot PIE lui apprend : le budget de
+  streaming se compte en **instances physiques**, pas en acteurs ni en sous-niveaux — 16
+  sous-niveaux chargés en permanence ne coûtent rien par eux-mêmes.

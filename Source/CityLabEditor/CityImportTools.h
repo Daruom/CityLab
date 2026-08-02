@@ -250,8 +250,39 @@ struct FCityGenProfile
 	 * n'a pas la place d'en porter deux). Les dimensions sont des constantes du
 	 * .cpp (a tourner en boucle B). false = tous les murs restent lisses : c'est le
 	 * rollback, sans re-cuire le side-car ni rebuilder.
+	 *
+	 * ITERATION UTILISATEUR 1 (02/08) — le couple A/B a ete TRANCHE par
+	 * l'utilisateur : c'est la FACE LISSE. Le defaut passe donc a `false` ; la dette
+	 * (« basculer le defaut au prochain build ») est soldee au lot PIE.
 	 */
-	UPROPERTY() bool bQuayTiers = true;
+	UPROPERTY() bool bQuayTiers = false;
+
+	/**
+	 * ⭐ LOT PIE (02/08) — LA COLLISION DE LA VEGETATION, ET POURQUOI ELLE PART.
+	 *
+	 * MESURE, pas opinion. Un `UInstancedStaticMeshComponent` cree **un corps
+	 * physique par instance**, et — nos HISM etant `Movable` — il les cree UN PAR UN
+	 * (`FBodyInstance::InitBody`, moteur `InstancedMeshComponentBodies.cpp` l. 111)
+	 * au lieu du chemin par lot `InitStaticBodies`. Sur le proto 3x3 cela fait
+	 * **1 253 686 corps Chaos** crees a chaque « Play » et detruits a chaque « Stop ».
+	 * Cout mesure du cycle PIE AVANT : demarrage **10,3 s** (dont 8,83 s de
+	 * `InitializeActorsForPlay`) et arret **604,5 s**, dont **602,4 s = 99,97 %**
+	 * dans `DestroyGarbage` (destruction de 862 objets) — le gel que l'utilisateur
+	 * reglait au gestionnaire des taches.
+	 *
+	 * LA REGLE EST LUE DANS LA DONNEE, elle n'est pas choisie : un mesh de
+	 * vegetation **sans aucune primitive de collision SIMPLE** (`AggGeom` vide) n'a
+	 * pas de collision voulue — son `CTF_USE_DEFAULT` retombe sur la collision
+	 * COMPLEXE, c'est-a-dire le repli decime du Nanite : ni voulue, ni utilisable, et
+	 * payee 1,2 million de fois. Mesure du catalogue du proto : les 12 herbes
+	 * (1 180 237 touffes), les fosses carrees et rondes (25 054) et les sureaux
+	 * portent **0 primitive** ; les erables et les hetres en portent **2 a 3
+	 * convexes** — ceux-la GARDENT leur collision, aucun arbitrage n'est demande.
+	 *
+	 * `true` = comportement historique (tout collisionne). C'est le rollback, et il
+	 * ne demande PAS de rebuild.
+	 */
+	UPROPERTY() bool bVegCollisionHistorique = false;
 
 	/**
 	 * LOT VELOCITE — MODE DISTRICT : « ne regenere QUE ces cellules ».

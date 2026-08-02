@@ -14,6 +14,7 @@
 #include "Engine/StaticMeshActor.h"
 #include "Engine/HitResult.h"
 #include "CollisionQueryParams.h"
+#include "Engine/CollisionProfile.h"
 #include "Engine/TextRenderActor.h"
 #include "Components/TextRenderComponent.h"
 #include "IImageWrapper.h"
@@ -1169,6 +1170,19 @@ namespace
 	// Pied ENTERRE : meme raison que le mur — la dalle rendue et la volee divergent
 	// de quelques centimetres entre deux sommets de la grille du drape.
 	constexpr float GStairSinkCm = 30.f;
+	// PENTE MINIMALE — contre les BISEAUX (iteration utilisateur 2 du 02/08, promue
+	// ici depuis le corps de `BuildStairs` au build de consolidation du lot PIE).
+	// Grief : des « lames anguleuses » sur la place. Cause MESUREE : une volee BD TOPO
+	// longue posee sur du terrain presque plat garde assez de denivele pour passer le
+	// plancher de 33 cm, mais son giron theorique explose ; le surplus part en paliers
+	// et la piece devient un biseau de 20 a 40 m couche au sol (21,6 m pour 74,7 cm de
+	// denivele, soit 90 % de palier). Le critere qui SEPARE n'est ni le denivele ni le
+	// nombre de marches — les deux se recouvrent — c'est la PENTE. Distribution des
+	// 36 volees de l'emprise 3x3 : un VIDE FRANC entre 9,1 % et 12,7 %. Le seuil est
+	// pose au MILIEU de ce vide ; aucune valeur mesuree n'est a moins de 1,7 point de
+	// lui. Les deux volees du Pont Saint-Pierre sont a 23,4 et 23,6 %, la volee raide
+	// de la Daurade a 33,5 % : un escalier reel tient tres largement au-dessus.
+	constexpr float GStairMinSlopePct = 11.0f;
 
 	// Une volee, telle qu'elle sort du side-car (deja decoupee a la cellule).
 	struct FCityStairs
@@ -2719,10 +2733,10 @@ namespace
 		const FRenderedGroundZ& RGZ, const FResolvedSurface* Surf, const FVector3f& Tint,
 		int32& OutQuads)
 	{
-		// Constante de recette locale au corps (patch Live Coding : rien hors fonction).
-		// A promouvoir aupres des autres GStair* au prochain vrai build.
-		constexpr float StairMinSlopePct = 11.0f;
-
+		// (La pente minimale a ete PROMUE en `GStairMinSlopePct` aupres des autres
+		//  constantes de recette au build de consolidation du lot PIE — elle etait
+		//  locale au corps parce qu'elle etait arrivee par un patch Live Coding, qui
+		//  interdit de toucher a ce qui est hors fonction.)
 		OutQuads = 0;
 		if (!Surf || St.PtsCm.Num() < 2)
 		{
@@ -2801,11 +2815,11 @@ namespace
 		// pour etre un escalier. Voir l'en-tete de la fonction pour la distribution
 		// mesuree et le vide ou ce seuil est pose.
 		const float SlopePct = 100.f * DropCm / RunCm;
-		if (SlopePct < StairMinSlopePct)
+		if (SlopePct < GStairMinSlopePct)
 		{
 			UE_LOG(LogCityImport, Display,
 				TEXT("QUAIS V2 escalier ECARTE id=%s cause=BISEAU_PENTE_TROP_FAIBLE pente=%.1f %% (< %.1f) drop=%.1f cm run=%.0f cm."),
-				*St.Id, SlopePct, StairMinSlopePct, DropCm, RunCm);
+				*St.Id, SlopePct, GStairMinSlopePct, DropCm, RunCm);
 			return 0;
 		}
 
@@ -3776,6 +3790,71 @@ FCityGenProfile FCityGenProfile::Resolved() const
 	return Out;
 }
 
+// ============================================================================
+// ⭐ LOT PIE (02/08) — LA COLLISION DE LA VEGETATION EST LE PRIX DU « PLAY ».
+//
+// LE FAIT MESURE. Un `UInstancedStaticMeshComponent` cree UN CORPS PHYSIQUE PAR
+// INSTANCE ; et comme nos HISM sont `Movable`, le moteur les cree UN PAR UN
+// (`FBodyInstance::InitBody`, `InstancedMeshComponentBodies.cpp` l. 111) au lieu du
+// chemin par lot `InitStaticBodies` reserve aux composants statiques. Sur le proto
+// 3x3 : **1 253 686 corps Chaos** a chaque « Play » et a chaque « Stop ».
+// Cycle PIE mesure AVANT ce correctif : demarrage 10,3 s (dont 8,83 s de
+// `InitializeActorsForPlay`), arret **604,5 s** dont **602 392 ms (99,97 %)** dans
+// `DestroyGarbage` pour 862 objets (analytics `gc.DumpAnalyticsToLog`). C'est le gel
+// que l'utilisateur reglait au gestionnaire des taches.
+//
+// LA REGLE N'EST PAS CHOISIE, ELLE EST LUE DANS LA DONNEE. Un mesh sans AUCUNE
+// primitive de collision SIMPLE (`AggGeom` vide) n'a pas de collision voulue : son
+// `CTF_USE_DEFAULT` retombe sur la collision COMPLEXE, donc sur le repli decime du
+// Nanite — ni voulue, ni utilisable, et payee 1,2 million de fois. Catalogue mesure
+// du proto : 12 herbes (1 180 237 touffes), fosses carrees et rondes (25 054) et
+// sureaux = **0 primitive** ; erables et hetres = **2 a 3 convexes**, ils GARDENT
+// leur collision (aucun arbitrage de gameplay n'est demande ici).
+//
+// Et rien de la generation n'en depend : la passe de vegetation IGNORE deja les
+// acteurs `CityVeg` dans ses traces (voir `TraceParams.AddIgnoredActor` plus bas) —
+// la collision des touffes n'a jamais servi qu'a se faire detruire.
+//
+// `FCityGenProfile::bVegCollisionHistorique = true` restitue l'ancien comportement
+// SANS rebuild.
+// ============================================================================
+namespace
+{
+	bool VegSansCollisionVoulue(const UStaticMesh* Mesh)
+	{
+		if (!Mesh)
+		{
+			return true;
+		}
+		const UBodySetup* BS = Mesh->GetBodySetup();
+		if (!BS)
+		{
+			return true;
+		}
+		return BS->AggGeom.GetElementCount() == 0;
+	}
+
+	// A APPELER AVANT `RegisterComponent()` : posee a la creation, la propriete ne
+	// peut pas etre perdue par une regeneration ni par une sauvegarde faite avant
+	// elle (doctrine du 01/08, lot V5). Posee apres, aucun corps n'aurait ete evite.
+	void PoserCollisionVegetation(UHierarchicalInstancedStaticMeshComponent* Hism,
+		const FCityGenProfile& Gen, int32& OutSansCollision)
+	{
+		if (!Hism || Gen.bVegCollisionHistorique)
+		{
+			return;
+		}
+		if (!VegSansCollisionVoulue(Hism->GetStaticMesh()))
+		{
+			return;   // vrai volume de collision (arbres) : on ne touche a rien.
+		}
+		Hism->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+		Hism->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Hism->SetGenerateOverlapEvents(false);
+		++OutSansCollision;
+	}
+}
+
 FCityImportSummary UCityImportTools::ImportCityDistrict(const FString& JsonFilePath, const FString& AssetFolder,
 	const FString& WallMaterialPath, const FString& GlassMaterialPath, float CellSizeM, FVector Location)
 {
@@ -4621,9 +4700,15 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 		UHierarchicalInstancedStaticMeshComponent* Hism =
 			NewObject<UHierarchicalInstancedStaticMeshComponent>(TreeActor, TEXT("Trees"), RF_Transactional);
 		Hism->SetStaticMesh(TreeMesh);
+		// LOT PIE : AVANT RegisterComponent — sinon les corps sont deja crees.
+		int32 NbVegSansCollision = 0;
+		PoserCollisionVegetation(Hism, Gen, NbVegSansCollision);
 		Hism->SetupAttachment(Root2);
 		TreeActor->AddInstanceComponent(Hism);
 		Hism->RegisterComponent();
+		UE_LOG(LogCityImport, Display,
+			TEXT("LOT PIE : arbres disperses — %d composant(s) pose(s) SANS COLLISION."),
+			NbVegSansCollision);
 		// LOT VELOCITE (L3) : un seul AddInstances (un seul arbre spatial construit).
 		Hism->AddInstances(ScatterXf, /*bShouldReturnIndices=*/false, /*bWorldSpace=*/false);
 		TreeActor->SetActorLabel(TEXT("CitySurfaceTrees"));
@@ -4644,6 +4729,11 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 	const FString& AssetFolder, FVector Location, const FCityGenProfile& Profile)
 {
 	FCityVegSummary Summary;
+
+	// LOT PIE : compteur de sortie — combien de composants sont poses SANS COLLISION
+	// (meshes sans primitive simple). Doit valoir 15 sur le proto (12 herbes + sureaux
+	// + 2 acteurs de fosses) et JAMAIS 0 tant que `bVegCollisionHistorique` est false.
+	int32 NbVegSansCollision = 0;
 
 	// Profil effectif + MNT charge une fois : GroundZ identique a la pose des batiments.
 	const FCityGenProfile Gen = Profile.Resolved();
@@ -5571,6 +5661,8 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 			Root2->SetWorldLocation(Location);
 			Hism = NewObject<UHierarchicalInstancedStaticMeshComponent>(VegActor, TEXT("Veg"), RF_Transactional);
 			Hism->SetStaticMesh(Mesh);
+			// LOT PIE : AVANT RegisterComponent — sinon les corps sont deja crees.
+			PoserCollisionVegetation(Hism, Gen, NbVegSansCollision);
 			Hism->SetupAttachment(Root2);
 			VegActor->AddInstanceComponent(Hism);
 			Hism->RegisterComponent();
@@ -6238,6 +6330,8 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 				PitHism = NewObject<UHierarchicalInstancedStaticMeshComponent>(PitActor, TEXT("Pits"),
 					RF_Transactional);
 				PitHism->SetStaticMesh(PitMesh);
+				// LOT PIE : AVANT RegisterComponent — sinon les corps sont deja crees.
+				PoserCollisionVegetation(PitHism, Gen, NbVegSansCollision);
 				PitHism->SetupAttachment(PitRoot);
 				PitActor->AddInstanceComponent(PitHism);
 				PitHism->RegisterComponent();
@@ -6342,6 +6436,8 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 					SPHism = NewObject<UHierarchicalInstancedStaticMeshComponent>(SPActor,
 						TEXT("ShrubPits"), RF_Transactional);
 					SPHism->SetStaticMesh(ShrubMesh);
+					// LOT PIE : AVANT RegisterComponent — sinon les corps sont deja crees.
+					PoserCollisionVegetation(SPHism, Gen, NbVegSansCollision);
 					SPHism->SetupAttachment(SPRoot);
 					SPActor->AddInstanceComponent(SPHism);
 					SPHism->RegisterComponent();
@@ -6573,6 +6669,13 @@ FCityVegSummary UCityImportTools::ImportVegetation(const FString& VegJsonPath,
 		MaskSampler.NumCellsLoaded(), TraceProxies.Num(),
 		NumFosseGagnee, NumFossePerdue,
 		MaskSampler.HasNoise() ? TEXT("CHARGE") : TEXT("ABSENT"), CurbSegs.Num());
+	// LOT PIE — le compteur qui PROUVE que la collision de vegetation est bien tombee
+	// a la creation. 0 avec `bVegCollisionHistorique=false` serait une regression.
+	UE_LOG(LogCityImport, Display,
+		TEXT("LOT PIE : %d composant(s) de vegetation pose(s) SANS COLLISION (mesh sans ")
+		TEXT("primitive simple) ; les meshes qui portent un vrai volume (arbres) gardent ")
+		TEXT("la leur. bVegCollisionHistorique=%s."),
+		NbVegSansCollision, Gen.bVegCollisionHistorique ? TEXT("true") : TEXT("false"));
 	if (bCellFilter)
 	{
 		// En mode district les compteurs ci-dessus portent sur les CELLULES VISEES,
@@ -9751,9 +9854,15 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		UHierarchicalInstancedStaticMeshComponent* Hism =
 			NewObject<UHierarchicalInstancedStaticMeshComponent>(TreeActor, TEXT("Trees"), RF_Transactional);
 		Hism->SetStaticMesh(TreeMesh);
+		// LOT PIE : AVANT RegisterComponent — sinon les corps sont deja crees.
+		int32 NbVegSansCollision = 0;
+		PoserCollisionVegetation(Hism, Gen, NbVegSansCollision);
 		Hism->SetupAttachment(Root2);
 		TreeActor->AddInstanceComponent(Hism);
 		Hism->RegisterComponent();
+		UE_LOG(LogCityImport, Display,
+			TEXT("LOT PIE : arbres residents — %d composant(s) pose(s) SANS COLLISION."),
+			NbVegSansCollision);
 		int32 Index = 0;
 		// LOT VELOCITE (L3) : les transforms sont accumulees puis posees en UN SEUL
 		// AddInstances. Voir le commentaire de fond dans ImportVegetation : un
