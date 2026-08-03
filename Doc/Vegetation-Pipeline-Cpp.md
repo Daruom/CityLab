@@ -1,5 +1,14 @@
 # Pipeline végétation — placement en C++ (anti-flottement)
 
+> **⚠️ AMENDEMENTS 2026-08-02 (lots V6/VÉLOCITÉ/PIE — ce doc reste valable pour la POSE,
+> mais le régime de rendu/physique a changé)** : les touffes sont désormais **Nanite,
+> SANS cull de distance** (l'ancien fondu 45-60 m est SUPPRIMÉ — constante à zéro à la
+> création), toujours sans ombre, et **SANS collision** (règle data-driven : mesh sans
+> primitive simple = NoCollision à la création ; les arbres gardent la leur). Le semis
+> utilise **`AddInstances` par lots** (passe 3×3 : ~30-42 s pour 1,23 M d'instances).
+> ⚠️ Le VENT ne souffle plus (WPO non branché — à rebrancher avec re-mesure VSM).
+> Détails : `Doc/Reprise-Etat-Projet.md` §3 et Playbook §11-12.
+
 > Écrit le 2026-07-30. **Raison d'être : tuer définitivement le flottement des arbres/haies/touffes.**
 > Le placement de la végé passe désormais par le **générateur C++**, exactement comme les
 > bâtiments (qui, eux, n'ont jamais flotté). La logique *data* (où va la végé) reste en prep JSON.
