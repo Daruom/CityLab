@@ -1,0 +1,23 @@
+2026-08-03 13:48:56  BD TOPO : 25 polygones retenus, 0 ecartes (-)
+2026-08-03 13:49:21  champ de cote : pas 5 m, rayon 40 m, 28673 points d'eau
+2026-08-03 13:49:55  BD TOPO : 25 polygones retenus, 0 ecartes (-)
+2026-08-03 13:50:20  champ de cote : pas 5 m, rayon 40 m, 28673 points d'eau
+2026-08-03 13:50:20  side-car ecrit : 36 cellules (27 non vides), 47 objets, 632788 m2, 1136 sommets
+2026-08-03 13:50:20  ATTENTION : 2 trou(s) interieur(s) ignore(s), 10815 m2 (le C++ triangule des anneaux SIMPLES)
+2026-08-03 13:50:20  chrono de cuisson : 25.9 s
+2026-08-03 13:51:02  BD TOPO : 25 polygones retenus, 0 ecartes (-)
+2026-08-03 13:51:28  champ de cote : pas 5 m, rayon 40 m, 28673 points d'eau
+2026-08-03 13:51:28  side-car ecrit : 36 cellules (27 non vides), 52 objets, 632788 m2, 1228 sommets
+2026-08-03 13:51:28  chrono de cuisson : 26.0 s
+2026-08-03 13:52:37  BD TOPO : 25 polygones retenus, 0 ecartes (-)
+2026-08-03 13:53:03  champ de cote : pas 5 m, rayon 40 m, 28673 points d'eau
+2026-08-03 13:53:03  side-car ecrit : 36 cellules (27 non vides), 52 objets, 632788 m2, 1228 sommets
+2026-08-03 13:53:03  chrono de cuisson : 26.0 s
+2026-08-03 13:53:22  BD TOPO : 25 polygones retenus, 0 ecartes (-)
+2026-08-03 13:53:48  champ de cote : pas 5 m, rayon 40 m, 28673 points d'eau
+2026-08-03 13:53:48  side-car ecrit : 36 cellules (27 non vides), 52 objets, 632788 m2, 1228 sommets
+2026-08-03 13:53:48  chrono de cuisson : 25.9 s
+2026-08-03 14:17:41  BD TOPO : 25 polygones retenus, 0 ecartes (-)
+2026-08-03 14:18:10  champ de cote : pas 5 m, rayon 40 m, 28673 points d'eau
+2026-08-03 14:18:10  side-car ecrit : 36 cellules (27 non vides), 52 objets, 632788 m2, 1228 sommets
+2026-08-03 14:18:10  chrono de cuisson : 28.9 s

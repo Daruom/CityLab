@@ -318,6 +318,45 @@ struct FCityGenProfile
 	UPROPERTY() bool bQuayTiers = true;
 
 	/**
+	 * ⭐ LOT EAU (03/08) — LA SURFACE EN EAU, A SA COTE MESUREE.
+	 *
+	 * Regle NATIONALE, zero cas particulier :
+	 *   EMPRISE = BD TOPO `surface_hydrographique` (en service, hors souterrain),
+	 *             decoupee par cellule dans le side-car `SourceData/Eau`.
+	 *   COTE    = le MNT LiDAR LUI-MEME, PAR SOMMET du contour. Le LiDAR ne penetre
+	 *             pas l'eau : ses retours SONT la surface du plan d'eau (mesure sur
+	 *             le proto : mode 132,50 m NGF, 68 % des echantillons a +-6 cm).
+	 *             Le side-car porte donc une ALTITUDE NGF par sommet ; le rebase sur
+	 *             l'origine Unreal se fait ICI (AltCapCm), comme pour les ponts.
+	 *
+	 * CE QUE CA CORRIGE, mesure : le film d'eau historique posait UN plan par
+	 * polygone au p10 du MNT du polygone ENTIER. Le polygone de la Garonne traverse
+	 * la chaussee du Bazacle (6 m de chute) : son p10 valait la cote AVAL, soit
+	 * ~6 m SOUS le lit toulousain — le plan etait enterre et la Garonne A SEC sous
+	 * tous les ponts du proto. Une cote PAR SOMMET suit la realite (biefs plats,
+	 * chute au barrage) sans aucune liste d'ouvrages.
+	 *
+	 * Materiau : `WaterMaterialPath` — le shading model SINGLE LAYER WATER du
+	 * moteur (celui-la meme que le plugin Water emploie pour ses surfaces).
+	 * AUCUNE collision (comme les autres films de surface).
+	 * false = aucune surface en eau ; les films teintes historiques reviennent.
+	 */
+	UPROPERTY() bool bWater = true;
+
+	/** Dossier des surfaces en eau cuites (eau_<x>_<y>.json). Vide = <projet>/SourceData/Eau. */
+	UPROPERTY() FString WaterPath;
+
+	/** Materiau de la surface en eau. Vide = /Game/Dev/MI_CityWater.MI_CityWater. */
+	UPROPERTY() FString WaterMaterialPath;
+
+	/**
+	 * LOT EAU : ROLLBACK. true restitue EN PLUS les films d'eau teintes historiques
+	 * (le placeholder p10) par-dessus la vraie surface — sert a refaire l'A/B sans
+	 * toucher a autre chose. Quand `bWater` est faux, ils reviennent de toute facon.
+	 */
+	UPROPERTY() bool bWaterFilmsHistorique = false;
+
+	/**
 	 * ⭐ LOT PIE (02/08) — LA COLLISION DE LA VEGETATION, ET POURQUOI ELLE PART.
 	 *
 	 * MESURE, pas opinion. Un `UInstancedStaticMeshComponent` cree **un corps
@@ -598,6 +637,21 @@ struct FCitySurfacesSummary
 
 	/** Static mesh assets created (one per grid cell). */
 	UPROPERTY() int32 Meshes = 0;
+
+	/** LOT EAU : surfaces en eau posees depuis le side-car (une par piece de cellule). */
+	UPROPERTY() int32 WaterBodies = 0;
+
+	/** LOT EAU : triangles poses par la passe eau. */
+	UPROPERTY() int32 WaterTris = 0;
+
+	/** LOT EAU : aire en eau posee, en m2 (entier : c'est un ordre de grandeur). */
+	UPROPERTY() int32 WaterAreaM2 = 0;
+
+	/** LOT EAU : pieces ecartees (moins de 3 sommets, ou cote absente). */
+	UPROPERTY() int32 WaterSkipped = 0;
+
+	/** LOT EAU : cellules du side-car effectivement lues. */
+	UPROPERTY() int32 WaterCells = 0;
 };
 
 /** Counts of what ImportVegetation placed. */

@@ -1,0 +1,107 @@
+{
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y",
+ "cell": [
+  2,
+  0
+ ],
+ "cellSizeM": 500.0,
+ "cote_source": "MNT LiDAR, moyenne sur disque R=40 m RESTREINTE au masque d'eau, marge 25 cm",
+ "crs": "local_citylab_equirect_capitole",
+ "eau": [
+  {
+   "aire_m2": 5964.8,
+   "cleabs": "SURF_EAU0000002005121318",
+   "nature": "Canal",
+   "pts": [
+    [
+     1011.51,
+     322.18,
+     146.23
+    ],
+    [
+     1023.95,
+     269.31,
+     146.14
+    ],
+    [
+     1027.18,
+     245.67,
+     146.17
+    ],
+    [
+     1030.0,
+     206.22,
+     146.35
+    ],
+    [
+     1032.77,
+     102.91,
+     146.17
+    ],
+    [
+     1033.19,
+     93.85,
+     146.15
+    ],
+    [
+     1033.23,
+     90.86,
+     146.14
+    ],
+    [
+     1036.2,
+     0.0,
+     146.29
+    ],
+    [
+     1017.51,
+     0.0,
+     146.28
+    ],
+    [
+     1015.1,
+     88.03,
+     146.14
+    ],
+    [
+     1014.91,
+     93.61,
+     146.15
+    ],
+    [
+     1014.66,
+     101.07,
+     146.17
+    ],
+    [
+     1011.4,
+     214.54,
+     146.31
+    ],
+    [
+     1004.68,
+     279.33,
+     146.15
+    ],
+    [
+     1000.0,
+     302.89,
+     146.23
+    ],
+    [
+     1000.0,
+     354.16,
+     145.75
+    ]
+   ],
+   "z_max_ngf_m": 146.35,
+   "z_min_ngf_m": 145.75
+  }
+ ],
+ "millesime": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0) pour l'emprise ; MNT LiDAR HD (SourceData/toulouse10_mnt.png) pour la cote",
+ "origin": [
+  1000.0,
+  0.0
+ ],
+ "z": "pts = [x_m, y_m, z_NGF_m] ; le rebase sur l'origine Unreal se fait cote C++ (AltCapCm) \u2014 seul endroit qui connaisse les deux reperes. MNT au Capitole mesure ici : 142.390 m NGF"
+}

@@ -1,0 +1,52 @@
+{
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y",
+ "cell": [
+  -1,
+  0
+ ],
+ "cellSizeM": 500.0,
+ "cote_source": "MNT LiDAR, moyenne sur disque R=40 m RESTREINTE au masque d'eau, marge 25 cm",
+ "crs": "local_citylab_equirect_capitole",
+ "eau": [
+  {
+   "aire_m2": 15484.7,
+   "cleabs": "SURF_EAU0000000073052165",
+   "nature": "Ecoulement naturel",
+   "pts": [
+    [
+     -388.08,
+     439.52,
+     133.4
+    ],
+    [
+     -476.91,
+     334.63,
+     133.19
+    ],
+    [
+     -500.0,
+     317.03,
+     132.91
+    ],
+    [
+     -500.0,
+     500.0,
+     133.42
+    ],
+    [
+     -340.73,
+     500.0,
+     132.92
+    ]
+   ],
+   "z_max_ngf_m": 133.42,
+   "z_min_ngf_m": 132.91
+  }
+ ],
+ "millesime": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0) pour l'emprise ; MNT LiDAR HD (SourceData/toulouse10_mnt.png) pour la cote",
+ "origin": [
+  -500.0,
+  0.0
+ ],
+ "z": "pts = [x_m, y_m, z_NGF_m] ; le rebase sur l'origine Unreal se fait cote C++ (AltCapCm) \u2014 seul endroit qui connaisse les deux reperes. MNT au Capitole mesure ici : 142.390 m NGF"
+}

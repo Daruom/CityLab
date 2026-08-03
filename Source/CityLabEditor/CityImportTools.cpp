@@ -798,6 +798,11 @@ namespace
 	// deux bords du passage. AcrossM/bFullWidth/ZClassCm ne servent pas : les UV du
 	// passage sont calculees a la main dans BuildCrossing.
 	const FSurfaceClass GSurfCrossing{ TEXT("pedestrian_crossing_lines_veggecd"), 4.f, false, false, 0.f, false };
+	// LOT EAU — L'EAU. Ce n'est PAS une classe de sol : c'est une surface a part,
+	// dont le materiau ne vient pas du dossier des revetements mais du profil
+	// (`WaterMaterialPath`), parce que ce n'est pas un scan mais le shading model
+	// SINGLE LAYER WATER du moteur. Le slug ne sert qu'a nommer le slot du mesh.
+	const FSurfaceClass GSurfWater{ TEXT("water"), 2.f, false, false, 0.f, false };
 	constexpr float GCrossingHalfLenCm = 200.f; // 4 m dans l'axe de la rue
 	constexpr float GCrossingLiftCm = 9.f;      // au-dessus de la chaussee et du patch, sous le chant (12)
 
@@ -1525,6 +1530,96 @@ namespace
 				B.bFreeEnd = (*Libres)[1]->AsBool();
 			}
 			Out.Add(MoveTemp(B));
+		}
+		return true;
+	}
+
+	// -----------------------------------------------------------------------------
+	// LOT EAU — LES SURFACES EN EAU. Meme grammaire de side-car que Ponts/, Murs/,
+	// Escaliers/ et Promenade/ : une cellule par fichier, `cellSizeM` verifie a la
+	// lecture, et une ALTITUDE NGF par sommet — le rebase sur l'origine Unreal se
+	// fait ICI, au seul endroit qui connaisse les deux reperes.
+	// -----------------------------------------------------------------------------
+	struct FCityWaterBody
+	{
+		TArray<FVector2D> PtsCm;   // contour, repere Unreal cm
+		TArray<float> ZCm;         // cote de CHAQUE sommet, Z Unreal cm
+		FString Cleabs;
+		FString Nature;
+		double AreaM2 = 0.0;
+	};
+
+	FString WaterDir(const FCityGenProfile& Gen)
+	{
+		return Gen.WaterPath.IsEmpty()
+			? FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/Eau"))
+			: Gen.WaterPath;
+	}
+
+	bool LoadWaterCell(const FString& Dir, int32 CellX, int32 CellY, float CellSizeM,
+		float AltCapCm, TArray<FCityWaterBody>& Out, int32& OutTailleKo, double& OutTailleCuiteM)
+	{
+		const FString Path = FPaths::Combine(Dir, FString::Printf(TEXT("eau_%d_%d.json"), CellX, CellY));
+		FString Text;
+		if (!FFileHelper::LoadFileToString(Text, *Path))
+		{
+			return false;
+		}
+		TSharedPtr<FJsonObject> Root;
+		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid())
+		{
+			RaiseError(FString::Printf(TEXT("Water file '%s' is not valid JSON."), *Path));
+			return false;
+		}
+		double BakedCellM = 0.0;
+		if (Root->TryGetNumberField(TEXT("cellSizeM"), BakedCellM) &&
+			!FMath::IsNearlyEqual((float)BakedCellM, CellSizeM, 0.01f))
+		{
+			++OutTailleKo;
+			OutTailleCuiteM = BakedCellM;
+			return false;
+		}
+		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+		if (!Root->TryGetArrayField(TEXT("eau"), Arr))
+		{
+			return true;
+		}
+		for (const TSharedPtr<FJsonValue>& V : *Arr)
+		{
+			const TSharedPtr<FJsonObject>& O = V->AsObject();
+			if (!O.IsValid())
+			{
+				continue;
+			}
+			const TArray<TSharedPtr<FJsonValue>>* P = nullptr;
+			if (!O->TryGetArrayField(TEXT("pts"), P))
+			{
+				continue;
+			}
+			FCityWaterBody W;
+			bool bAllZ = true;
+			for (const TSharedPtr<FJsonValue>& PV : *P)
+			{
+				const TArray<TSharedPtr<FJsonValue>>& C = PV->AsArray();
+				if (C.Num() < 3 || !C[2].IsValid() || C[2]->Type != EJson::Number)
+				{
+					bAllZ = false;
+					continue;
+				}
+				W.PtsCm.Add(FVector2D(C[0]->AsNumber() * 100.0, C[1]->AsNumber() * 100.0));
+				W.ZCm.Add((float)(C[2]->AsNumber() * 100.0) - AltCapCm);
+			}
+			// « Pas de cote, pas d'objet » : une surface en eau sans altitude n'a
+			// aucun repli acceptable — le plan enterre est justement le defaut qu'on
+			// corrige. On la garde a part pour que la passe la journalise.
+			O->TryGetStringField(TEXT("cleabs"), W.Cleabs);
+			O->TryGetStringField(TEXT("nature"), W.Nature);
+			O->TryGetNumberField(TEXT("aire_m2"), W.AreaM2);
+			if (!bAllZ)
+			{
+				W.ZCm.Empty();
+			}
+			Out.Add(MoveTemp(W));
 		}
 		return true;
 	}
@@ -5052,15 +5147,18 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 			FIntPoint(FMath::FloorToInt(P.X / Cell), FMath::FloorToInt(P.Y / Cell)));
 	};
 	TMap<FIntPoint, TUniquePtr<FCityMeshBuilder>> Cells;
-	auto GetCell = [&](const FVector2D& P) -> FCityMeshBuilder&
+	auto GetCellKey = [&Cells](const FIntPoint& Key) -> FCityMeshBuilder&
 	{
-		const FIntPoint Key(FMath::FloorToInt(P.X / Cell), FMath::FloorToInt(P.Y / Cell));
 		TUniquePtr<FCityMeshBuilder>& B = Cells.FindOrAdd(Key);
 		if (!B)
 		{
 			B = MakeUnique<FCityMeshBuilder>();
 		}
 		return *B;
+	};
+	auto GetCell = [&](const FVector2D& P) -> FCityMeshBuilder&
+	{
+		return GetCellKey(FIntPoint(FMath::FloorToInt(P.X / Cell), FMath::FloorToInt(P.Y / Cell)));
 	};
 	auto ReadPts = [](const TArray<TSharedPtr<FJsonValue>>& In, TArray<FVector2D>& Out)
 	{
@@ -5092,8 +5190,13 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 	FSurfaceLibrary Surfaces;
 	Surfaces.Init(Gen.bSurfaceMaterials, Gen.SurfacesFolder);
 
+	// LOT EAU : quand la vraie surface en eau est active, le FILM teinte historique
+	// n'est plus construit — c'est la surface a sa cote mesuree qui le remplace, et
+	// deux plans a la meme place, c'est du z-fight garanti. `bWaterFilmsHistorique`
+	// les restitue pour refaire l'A/B ; `bWater=false` aussi (rollback total).
+	const bool bFilmsEauHistoriques = (!Gen.bWater) || Gen.bWaterFilmsHistorique;
 	const TArray<TSharedPtr<FJsonValue>>* WaterJson = nullptr;
-	if (Root->TryGetArrayField(TEXT("water"), WaterJson))
+	if (bFilmsEauHistoriques && Root->TryGetArrayField(TEXT("water"), WaterJson))
 	{
 		for (const TSharedPtr<FJsonValue>& V : *WaterJson)
 		{
@@ -5254,6 +5357,112 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 			BuildRail(GetCell(Pts[0]), *RailPts, 400.f, Index, TerrainZPtr);
 			++Summary.Rails;
 			++Index;
+		}
+	}
+
+	// -----------------------------------------------------------------------------
+	// LOT EAU — LA SURFACE EN EAU, A SA COTE MESUREE (side-car SourceData/Eau).
+	//
+	// Le side-car porte, PAR SOMMET, l'altitude NGF de la surface, mesuree sur le
+	// MNT LiDAR (qui ne penetre pas l'eau : ses retours SONT la surface). Un plan
+	// UNIQUE par polygone ne peut pas marcher — mesure du proto : le polygone de la
+	// Garonne traverse la chaussee du Bazacle, 6 m de chute, et son p10 posait le
+	// plan 6 m SOUS le lit toulousain (fleuve a sec sous tous les ponts).
+	//
+	// La geometrie va dans la cellule PROPRIETAIRE (celle du fichier), jamais dans
+	// celle du centroide : c'est la garde du Playbook S11.6 contre la fuite de
+	// geometrie vers la cellule voisine en mode district.
+	// AUCUNE collision : comme tous les films de surface, le mesh est cree sans.
+	// -----------------------------------------------------------------------------
+	if (Gen.bWater)
+	{
+		const FString EauDir = WaterDir(Gen);
+		TArray<FString> Fichiers;
+		IFileManager::Get().FindFiles(Fichiers, *(EauDir / TEXT("eau_*.json")), true, false);
+		const FString MatEau = Gen.WaterMaterialPath.IsEmpty()
+			? FString(TEXT("/Game/Dev/MI_CityWater.MI_CityWater")) : Gen.WaterMaterialPath;
+		FResolvedSurface SurfEau;
+		SurfEau.Class = &GSurfWater;
+		SurfEau.Material = LoadObject<UMaterialInterface>(nullptr, *MatEau, nullptr,
+			LOAD_NoWarn | LOAD_Quiet);
+		if (!SurfEau.Material)
+		{
+			// Display et NON Warning (l'automation eleve les warnings en erreurs) :
+			// sans materiau la surface est quand meme posee, avec le repli du mesh.
+			UE_LOG(LogCityImport, Display,
+				TEXT("LOT EAU : materiau '%s' introuvable — la surface en eau prend le materiau de repli du mesh."),
+				*MatEau);
+		}
+		const FVector3f TeinteEau(1.f, 1.f, 1.f);   // le materiau d'eau ne lit pas la VertexColor
+		int32 CellulesEau = 0, EauTailleKo = 0;
+		double EauTailleCuiteM = 0.0, AireEau = 0.0;
+		for (const FString& Fichier : Fichiers)
+		{
+			FString Reste = FPaths::GetBaseFilename(Fichier);
+			Reste.RemoveFromStart(TEXT("eau_"));
+			FString Sx, Sy;
+			if (!Reste.Split(TEXT("_"), &Sx, &Sy, ESearchCase::CaseSensitive, ESearchDir::FromEnd))
+			{
+				continue;
+			}
+			const FIntPoint CelluleEau(FCString::Atoi(*Sx), FCString::Atoi(*Sy));
+			if (bCellFilter && !CellSet.Contains(CelluleEau))
+			{
+				continue;
+			}
+			TArray<FCityWaterBody> Corps;
+			if (!LoadWaterCell(EauDir, CelluleEau.X, CelluleEau.Y, CellSizeM,
+				Drape.IsActive() ? Drape.AltCapCm : 0.f, Corps, EauTailleKo, EauTailleCuiteM) ||
+				Corps.Num() == 0)
+			{
+				continue;
+			}
+			++CellulesEau;
+			for (FCityWaterBody& W : Corps)
+			{
+				if (W.ZCm.Num() != W.PtsCm.Num() || W.PtsCm.Num() < 3)
+				{
+					++Summary.WaterSkipped;
+					UE_LOG(LogCityImport, Display,
+						TEXT("LOT EAU : piece ECARTEE cellule %d_%d, cleabs=%s, %.0f m2 — cote absente sur au moins un sommet."),
+						CelluleEau.X, CelluleEau.Y, *W.Cleabs, W.AreaM2);
+					continue;
+				}
+				if (SignedArea(W.PtsCm) < 0)
+				{
+					Algo::Reverse(W.PtsCm);
+					Algo::Reverse(W.ZCm);
+				}
+				FCityMeshBuilder& B = GetCellKey(CelluleEau);
+				const int32 Avant = B.MeshDesc.Triangles().Num();
+				BuildFlatPolygon(B, W.PtsCm, 0.f, TeinteEau, &W.ZCm,
+					SurfEau.Material ? &SurfEau : nullptr);
+				const int32 Tris = B.MeshDesc.Triangles().Num() - Avant;
+				if (Tris <= 0)
+				{
+					++Summary.WaterSkipped;
+					UE_LOG(LogCityImport, Display,
+						TEXT("LOT EAU : piece ECARTEE cellule %d_%d, cleabs=%s, %.0f m2 — triangulation vide."),
+						CelluleEau.X, CelluleEau.Y, *W.Cleabs, W.AreaM2);
+					continue;
+				}
+				++Summary.WaterBodies;
+				Summary.WaterTris += Tris;
+				AireEau += W.AreaM2;
+			}
+		}
+		Summary.WaterCells = CellulesEau;
+		Summary.WaterAreaM2 = FMath::RoundToInt(AireEau);
+		UE_LOG(LogCityImport, Display,
+			TEXT("LOT EAU : %d cellules lues, %d surfaces posees (%d m2, %d triangles), %d ecartees ; materiau '%s' %s — dossier '%s'."),
+			CellulesEau, Summary.WaterBodies, Summary.WaterAreaM2, Summary.WaterTris,
+			Summary.WaterSkipped, *MatEau, SurfEau.Material ? TEXT("charge") : TEXT("ABSENT"),
+			*EauDir);
+		if (EauTailleKo > 0)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("LOT EAU : %d cellules IGNOREES — side-car cuit pour des cellules de %.0f m, import a %.0f m."),
+				EauTailleKo, EauTailleCuiteM, CellSizeM);
 		}
 	}
 

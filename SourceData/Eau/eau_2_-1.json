@@ -1,0 +1,142 @@
+{
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y",
+ "cell": [
+  2,
+  -1
+ ],
+ "cellSizeM": 500.0,
+ "cote_source": "MNT LiDAR, moyenne sur disque R=40 m RESTREINTE au masque d'eau, marge 25 cm",
+ "crs": "local_citylab_equirect_capitole",
+ "eau": [
+  {
+   "aire_m2": 2141.3,
+   "cleabs": "SURF_EAU0000002005121318",
+   "nature": "Canal",
+   "pts": [
+    [
+     1036.35,
+     -4.5,
+     146.29
+    ],
+    [
+     1033.56,
+     -50.01,
+     146.17
+    ],
+    [
+     1032.4,
+     -53.27,
+     146.16
+    ],
+    [
+     1028.25,
+     -55.87,
+     146.16
+    ],
+    [
+     1026.79,
+     -59.03,
+     146.16
+    ],
+    [
+     1025.99,
+     -64.58,
+     146.16
+    ],
+    [
+     1024.48,
+     -70.02,
+     146.17
+    ],
+    [
+     1024.13,
+     -72.51,
+     146.18
+    ],
+    [
+     1026.96,
+     -76.24,
+     146.2
+    ],
+    [
+     1027.86,
+     -81.03,
+     146.22
+    ],
+    [
+     1000.0,
+     -152.35,
+     146.34
+    ],
+    [
+     1000.0,
+     -106.4,
+     146.23
+    ],
+    [
+     1009.48,
+     -76.6,
+     146.21
+    ],
+    [
+     1011.54,
+     -73.35,
+     146.2
+    ],
+    [
+     1015.97,
+     -71.45,
+     146.19
+    ],
+    [
+     1018.11,
+     -69.01,
+     146.18
+    ],
+    [
+     1018.93,
+     -62.95,
+     146.17
+    ],
+    [
+     1020.19,
+     -54.82,
+     146.18
+    ],
+    [
+     1016.4,
+     -49.67,
+     146.15
+    ],
+    [
+     1016.14,
+     -47.38,
+     146.15
+    ],
+    [
+     1017.66,
+     -5.63,
+     146.26
+    ],
+    [
+     1017.51,
+     0.0,
+     146.28
+    ],
+    [
+     1036.2,
+     0.0,
+     146.29
+    ]
+   ],
+   "z_max_ngf_m": 146.34,
+   "z_min_ngf_m": 146.15
+  }
+ ],
+ "millesime": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0) pour l'emprise ; MNT LiDAR HD (SourceData/toulouse10_mnt.png) pour la cote",
+ "origin": [
+  1000.0,
+  -500.0
+ ],
+ "z": "pts = [x_m, y_m, z_NGF_m] ; le rebase sur l'origine Unreal se fait cote C++ (AltCapCm) \u2014 seul endroit qui connaisse les deux reperes. MNT au Capitole mesure ici : 142.390 m NGF"
+}
