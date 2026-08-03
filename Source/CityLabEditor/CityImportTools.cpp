@@ -895,6 +895,41 @@ namespace
 	// largeur du couronnement se lit comme une esplanade), l'option v2 est le
 	// re-maillage local de la dalle le long de la breakline — a decider sur capture,
 	// pas a improviser.
+	//
+	// =========================================================================
+	// LOT BERGES (03/08) — v1 bis : LE COURONNEMENT S'ARRETE AU PALIER REEL.
+	//
+	// LA MESURE QUI L'IMPOSE (work/BERGES/b3_decision.py, 239 murs poses) :
+	//   largeur de la MARCHE, lue sur la DONNEE D'ALTITUDE ... p50  3,50 m
+	//   largeur de l'EMPRISE posee, lue sur le drape ........ p50 12,00 m
+	//   ... et 14,00 m sur la zone des captures utilisateur — soit 3,4 fois la
+	//   marche. 2 185 arbres du proto (969 sous des quais) tombent sous cette
+	//   emprise, couronnement compris : c'est le grief « les murs prennent trop de
+	//   place, ils avalent l'allee et les arbres », et le symptome nomme par
+	//   l'utilisateur (« une fosse d'arbre chevauchee par la dalle de crete »).
+	//
+	// LA CAUSE, EN UNE PHRASE : le sondage marche sur la surface RENDUE, et la
+	// surface rendue ETALE la marche sur +-1 quad (7,81 m). Le sondage suit donc
+	// l'etalement jusqu'a son bout et le couronnement recouvre TOUT — y compris
+	// plusieurs metres de terrasse haute qui, elle, est REELLE et plate.
+	//
+	// LE CORRECTIF, MINIMAL ET NATIONAL : le cote CRETE est BORNE par le palier de
+	// la marche, lu sur la DONNEE D'ALTITUDE (RGZ.RawZ = le MNT), qui connait la
+	// marche. Le PIED, lui, NE BOUGE PAS : la mesure dit qu'il est deja a 0,95 m
+	// (p50) de la ligne d'eau BD TOPO, et l'axe du mur a 0,25 m (p50 signe) de la
+	// ligne `Quai`/`Mur de soutenement` de BD TOPO — il EST sur la donnee, le
+	// deplacer serait une regression.
+	//
+	// CE QUE CA NE CASSE PAS. L'invariant « la piece se referme EXACTEMENT sur le
+	// sol » tient : ZCrest reste lu SUR LA SURFACE RENDUE, au point borne. Il n'y a
+	// donc ni jour ni couronnement flottant — l'objection de la v1 (« un couronnement
+	// de 40 cm flotterait ») visait une largeur FIXE, pas un arret sur palier mesure.
+	// Ce que le mur rend au sol est une berme de pente mesuree ~0,3 m/m qui porte
+	// les materiaux du sol (UV0 en metres MONDE : etirement 4,5 %), au lieu d'une
+	// dalle de pierre posee sur les fosses d'arbres.
+	//
+	// Rollback SANS rebuild : `FCityGenProfile::bWallCrestOnPlateau = false`.
+	// =========================================================================
 	// -----------------------------------------------------------------------------
 	// Pied ENTERRE, meme raison que la bordure (la dalle rendue et le mur divergent de
 	// quelques centimetres entre deux sommets de grille) — mais a l'echelle d'un mur.
@@ -911,6 +946,16 @@ namespace
 	// Garde-fou : la hauteur mesuree ne peut pas depasser trois fois celle qu'annonce
 	// le side-car (une lecture qui part dans le decor plutot qu'une vraie falaise).
 	constexpr float GWallHeightGuard = 3.0f;
+	// LOT BERGES — le PALIER de la marche, sur la DONNEE D'ALTITUDE.
+	// Pente au-dessous de laquelle la donnee dit « palier » (une allee, un quai, une
+	// berme). 0,12 m/m : au-dessus du bruit du MNT reechantillonne (plateaux de
+	// ~3,5 m) et TRES au-dessous du seuil qui a servi a detecter les murs
+	// (0,50 m/m). Mesuree sur la base 2 m, comme la detection (work/DISCONT).
+	constexpr float GWallPlateauSlope = 0.12f;
+	constexpr float GWallPlateauBaseCm = 100.f;   // demi-base de la pente : +-1 m
+	// Un mur garde toujours une pierre de couronnement : le bornage ne peut pas
+	// reduire le cote crete a rien (sinon la face n'aurait plus de dessus).
+	constexpr float GWallCrestMinCm = 100.f;
 
 	// Une breakline, telle qu'elle sort du side-car (deja decoupee a la cellule).
 	struct FRetainingWall
@@ -922,6 +967,10 @@ namespace
 		// QUAIS V4 : le prep a MESURE qu'une zone pietonne basse borde ce mur du
 		// cote bas. C'est la condition NATIONALE des gradins (voir GTier* plus bas).
 		bool bBordePieton = false;
+		// BERGES : ce bout est-il un VRAI bout de mur, ou une coupe de cellule ?
+		// Defaut true = comportement historique (un bouchon a chaque bout).
+		bool bBoutDebut = true;
+		bool bBoutFin = true;
 	};
 
 	// =========================================================================
@@ -1240,6 +1289,10 @@ namespace
 			W.HMedCm = (float)(HMed * 100.0);
 			// QUAIS V4 : absent d'un side-car anterieur au lot = faux, donc face lisse.
 			O->TryGetBoolField(TEXT("borde_pieton"), W.bBordePieton);
+			// BERGES : les VRAIS bouts. Absents d'un side-car anterieur = true des
+			// deux cotes, c'est-a-dire le comportement historique (bouchon partout).
+			O->TryGetBoolField(TEXT("bout_debut"), W.bBoutDebut);
+			O->TryGetBoolField(TEXT("bout_fin"), W.bBoutFin);
 			Out.Add(MoveTemp(W));
 		}
 		return true;
@@ -1544,6 +1597,14 @@ namespace
 	{
 		TArray<FVector2D> PtsCm;   // contour, repere Unreal cm
 		TArray<float> ZCm;         // cote de CHAQUE sommet, Z Unreal cm
+		// LOT BERGES — L'ECOULEMENT, PAR SOMMET, LU DANS LA DONNEE.
+		// Direction unitaire (x, y) de l'ecoulement AVAL, cuite dans le side-car
+		// depuis les troncons hydrographiques BD TOPO (qui portent le sens). Elle
+		// voyage jusqu'au materiau dans la COULEUR DE SOMMET (R = 0,5 + 0,5 dx,
+		// G = 0,5 + 0,5 dy) : le canal etait libre — le materiau d'eau ne lisait pas
+		// la VertexColor — et c'est le seul moyen d'avoir un ecoulement qui suit le
+		// fleuve au lieu d'une constante globale, qui serait un cas particulier.
+		TArray<FVector2D> Flux;
 		FString Cleabs;
 		FString Nature;
 		double AreaM2 = 0.0;
@@ -1615,6 +1676,19 @@ namespace
 			O->TryGetStringField(TEXT("cleabs"), W.Cleabs);
 			O->TryGetStringField(TEXT("nature"), W.Nature);
 			O->TryGetNumberField(TEXT("aire_m2"), W.AreaM2);
+			// BERGES : l'ecoulement par sommet. Absent d'un side-car anterieur =
+			// aucun flux, et le materiau retombe sur son defaut (pas de derive).
+			const TArray<TSharedPtr<FJsonValue>>* FluxArr = nullptr;
+			if (O->TryGetArrayField(TEXT("flux"), FluxArr) && FluxArr->Num() == W.PtsCm.Num())
+			{
+				for (const TSharedPtr<FJsonValue>& FV : *FluxArr)
+				{
+					const TArray<TSharedPtr<FJsonValue>>& C = FV->AsArray();
+					W.Flux.Add(C.Num() >= 2
+						? FVector2D(C[0]->AsNumber(), C[1]->AsNumber())
+						: FVector2D::ZeroVector);
+				}
+			}
 			if (!bAllZ)
 			{
 				W.ZCm.Empty();
@@ -2727,12 +2801,65 @@ namespace
 		bool bValide = false;
 	};
 
+	/**
+	 * LOT BERGES — LA GEOMETRIE RETENUE, RENDUE AU LOG, MUR PAR MUR.
+	 * « Les murs prennent trop de place » est un grief de GEOMETRIE : il ne se juge
+	 * ni sur un compte de murs, ni sur un compte de quads. Sans cette sortie
+	 * nominative, la seule facon de connaitre l'emprise reelle d'un mur pose etait
+	 * de la re-simuler hors moteur. Une ligne par mur, en Display.
+	 */
+	struct FWallGeom
+	{
+		float OffFootCm = 0.f;
+		float OffCrestCm = 0.f;
+		float HMedCm = 0.f;
+		float LenM = 0.f;
+	};
+
+	/**
+	 * LOT BERGES — jusqu'ou la MARCHE monte, sur la DONNEE D'ALTITUDE.
+	 *
+	 * On avance le long de -NormLow (vers le haut) et on rend la distance du PREMIER
+	 * PALIER du MNT : |dZ| sur une base de 2 m < GWallPlateauSlope. C'est la largeur
+	 * REELLE du cote haut de la marche — celle que le drape etale ensuite sur un quad.
+	 * Rend MaxCm si aucun palier n'est trouve (on ne borne alors rien).
+	 */
+	float CrestPlateauDistCm(const FVector2D& PCm, const FVector2D& NormLow,
+		const FRenderedGroundZ& RGZ, float MaxCm)
+	{
+		if (!RGZ.Drape || !RGZ.Drape->IsActive())
+		{
+			return MaxCm;
+		}
+		const FVector2D Up = -NormLow;
+		const int32 Steps = FMath::Max(1, FMath::CeilToInt32(MaxCm / GWallProbeStepCm));
+		for (int32 i = 1; i <= Steps; ++i)
+		{
+			const float D = (float)i * GWallProbeStepCm;
+			const FVector2D Q = PCm + Up * (double)D;
+			const FVector2D A = Q - Up * (double)GWallPlateauBaseCm;
+			const FVector2D B = Q + Up * (double)GWallPlateauBaseCm;
+			const float Pente = FMath::Abs(RGZ.RawZ(B.X, B.Y) - RGZ.RawZ(A.X, A.Y))
+				/ (2.f * GWallPlateauBaseCm);
+			if (Pente < GWallPlateauSlope)
+			{
+				return FMath::Min(D, MaxCm);
+			}
+		}
+		return MaxCm;
+	}
+
 	FWallSection MeasureWallSection(const FVector2D& PCm, const FVector2D& NormLow,
-		const FRenderedGroundZ& RGZ, float QuadCm, float GuardCm)
+		const FRenderedGroundZ& RGZ, float QuadCm, float GuardCm, bool bCrestOnPlateau)
 	{
 		FWallSection S;
 		const float Span = FMath::Max(QuadCm * GWallProbeSpanQuads, GWallProbeStepCm);
 		const int32 Steps = FMath::Max(1, FMath::CeilToInt32(Span / GWallProbeStepCm));
+		// BERGES : borne du cote crete, lue sur la DONNEE D'ALTITUDE. Le pied n'est
+		// PAS borne (mesure : il est deja sur la ligne d'eau).
+		const float CrestMaxCm = bCrestOnPlateau
+			? FMath::Max(GWallCrestMinCm, CrestPlateauDistCm(PCm, NormLow, RGZ, Span))
+			: Span;
 
 		// PIED : on descend tant que ca descend.
 		S.Pied = PCm;
@@ -2748,12 +2875,19 @@ namespace
 			S.Pied = Q;
 			S.ZPied = Z;
 		}
-		// CRETE : on monte tant que ca monte.
+		// CRETE : on monte tant que ca monte — sans jamais depasser le palier de la
+		// MARCHE REELLE (BERGES). Au-dela, c'est la terrasse haute : elle appartient
+		// au SOL, pas au couronnement.
 		S.Crete = PCm;
 		S.ZCrete = RGZ.At(PCm.X, PCm.Y);
 		for (int32 i = 1; i <= Steps; ++i)
 		{
-			const FVector2D Q = PCm - NormLow * (double)(i * GWallProbeStepCm);
+			const float D = (float)i * GWallProbeStepCm;
+			if (D > CrestMaxCm)
+			{
+				break;
+			}
+			const FVector2D Q = PCm - NormLow * (double)D;
 			const float Z = RGZ.At(Q.X, Q.Y);
 			if (Z < S.ZCrete + GWallLevelTolCm)
 			{
@@ -2788,7 +2922,10 @@ namespace
 	int32 BuildRetainingWall(FCityMeshBuilder& QM, const FRetainingWall& Wall,
 		const FRenderedGroundZ& RGZ, const FResolvedSurface* Surf, const FVector3f& Tint,
 		float QuadCm, bool bTiers, int32& OutTiers,
-		const TArray<FGradinEmprise>* Emprises = nullptr, float* OutTierM = nullptr)
+		const TArray<FGradinEmprise>* Emprises = nullptr, float* OutTierM = nullptr,
+		bool bCrestOnPlateau = true, FWallGeom* OutGeom = nullptr,
+		bool bNoFlip = true, bool bCapsRealEndsOnly = true, int32* OutCaps = nullptr,
+		int32* OutFlipsFixed = nullptr)
 	{
 		OutTiers = 0;
 		if (!Surf || Wall.PtsCm.Num() < 2)
@@ -2871,7 +3008,8 @@ namespace
 		DCrest.Reserve(N);
 		for (int32 i = 0; i < N; ++i)
 		{
-			const FWallSection S = MeasureWallSection(Pts[i], Norm[i], RGZ, QuadCm, Wall.HMedCm);
+			const FWallSection S = MeasureWallSection(Pts[i], Norm[i], RGZ, QuadCm,
+				Wall.HMedCm, bCrestOnPlateau);
 			DFoot.Add((float)(S.Pied - Pts[i]).Size());
 			DCrest.Add((float)(S.Crete - Pts[i]).Size());
 		}
@@ -2895,11 +3033,83 @@ namespace
 		{
 			PFoot[i] = Pts[i] + Norm[i] * (double)OffFoot;
 			PCrest[i] = Pts[i] - Norm[i] * (double)OffCrest;
+		}
+		// --- 3 bis. BERGES : ANTI-RETOURNEMENT ----------------------------------
+		// Un decalage MEDIAN constant applique a des normales de SOMMET se CROISE
+		// des que la ligne tourne serre : le quad s'inverse, sa normale part a
+		// l'envers, et un backface ne recoit aucune lumiere — c'est le « mur vide,
+		// on voit l'interieur sombre » des captures 4-6 (mesure : 73 murs sur 239,
+		// 142 quads, recul jusqu'a 9,80 m). On RABOTE le decalage aux seuls sommets
+		// fautifs jusqu'a ce que la ligne decalee avance partout. La convergence est
+		// acquise : a decalage nul la ligne decalee EST l'axe, qui avance toujours.
+		int32 FlipsFixed = 0;
+		if (bNoFlip && N >= 2)
+		{
+			auto Deretourne = [&](TArray<FVector2D>& Off, float BaseOff, double Signe)
+			{
+				if (BaseOff <= 0.f)
+				{
+					return;
+				}
+				TArray<float> Echelle;
+				Echelle.Init(1.f, N);
+				for (int32 Iter = 0; Iter < 10; ++Iter)
+				{
+					bool bPropre = true;
+					for (int32 i = 0; i + 1 < N; ++i)
+					{
+						FVector2D A = Pts[i + 1] - Pts[i];
+						if (A.IsNearlyZero())
+						{
+							continue;
+						}
+						A.Normalize();
+						if (FVector2D::DotProduct(Off[i + 1] - Off[i], A) >= 0.0)
+						{
+							continue;
+						}
+						bPropre = false;
+						for (int32 k : { i, i + 1 })
+						{
+							Echelle[k] *= 0.5f;
+							Off[k] = Pts[k] + Norm[k] * (Signe * (double)(BaseOff * Echelle[k]));
+						}
+					}
+					if (bPropre)
+					{
+						break;
+					}
+				}
+				for (int32 i = 0; i < N; ++i)
+				{
+					if (Echelle[i] < 1.f)
+					{
+						++FlipsFixed;
+					}
+				}
+			};
+			Deretourne(PFoot, OffFoot, 1.0);
+			Deretourne(PCrest, OffCrest, -1.0);
+		}
+		for (int32 i = 0; i < N; ++i)
+		{
 			ZFoot[i] = RGZ.At(PFoot[i].X, PFoot[i].Y);
 			ZCrest[i] = FMath::Max(RGZ.At(PCrest[i].X, PCrest[i].Y), ZFoot[i]);
 			Hauteurs.Add(ZCrest[i] - ZFoot[i]);
 		}
 		const float HMed = Mediane(Hauteurs);
+		if (OutGeom)
+		{
+			double LongCm = 0.0;
+			for (int32 k = 0; k + 1 < Wall.PtsCm.Num(); ++k)
+			{
+				LongCm += (Wall.PtsCm[k + 1] - Wall.PtsCm[k]).Size();
+			}
+			OutGeom->OffFootCm = OffFoot;
+			OutGeom->OffCrestCm = OffCrest;
+			OutGeom->HMedCm = HMed;
+			OutGeom->LenM = (float)(LongCm * 0.01);
+		}
 		if (HMed < GWallMinHeightCm ||
 			(Wall.HMedCm > 0.f && HMed > Wall.HMedCm * GWallHeightGuard))
 		{
@@ -3084,10 +3294,20 @@ namespace
 			// compte leurs 2 x NTiers quads dans la boucle.
 			Quads += bSegTiers ? 2 : 3;
 		}
+		if (OutFlipsFixed)
+		{
+			*OutFlipsFixed += FlipsFixed;
+		}
 		if (Quads > 0)
 		{
 			// BOUCHONS de fin : une piece OUVERTE laisse voir son interieur par ses
 			// deux bouts (meme raison que pour les bordures).
+			// BERGES : ils ne ferment plus que les VRAIS bouts. Un mur continu que la
+			// decoupe A LA CELLULE separe en deux recevait quatre bouchons, dont deux
+			// dos a dos au milieu du mur (mesure : 31 paires de bouts jointifs a
+			// 0,00 m et 0,0 degre, dont le mur Saint-Pierre -> Daurade lui-meme).
+			const bool bCapA = Wall.bBoutDebut || !bCapsRealEndsOnly;
+			const bool bCapB = Wall.bBoutFin || !bCapsRealEndsOnly;
 			const FVector2D D0 = (Pts[1] - Pts[0]).GetSafeNormal();
 			const FVector2D D1 = (Pts[N - 1] - Pts[N - 2]).GetSafeNormal();
 			// M4 : les bouchons descendent au MEME niveau que le dos (le pied enterre),
@@ -3106,11 +3326,22 @@ namespace
 				V3(PCrest[N - 1], ZCapB) };
 			const FVector2f CapUV[4] = {
 				FVector2f(0.f, 0.f), FVector2f(1.f, 0.f), FVector2f(1.f, 1.f), FVector2f(0.f, 1.f) };
-			QM.AddPoly(Group, CapA, 4,
-				FVector3f(-(float)D0.X, -(float)D0.Y, 0.f).GetSafeNormal(), CapUV, Tint);
-			QM.AddPoly(Group, CapB, 4,
-				FVector3f((float)D1.X, (float)D1.Y, 0.f).GetSafeNormal(), CapUV, Tint);
-			Quads += 2;
+			if (bCapA)
+			{
+				QM.AddPoly(Group, CapA, 4,
+					FVector3f(-(float)D0.X, -(float)D0.Y, 0.f).GetSafeNormal(), CapUV, Tint);
+				++Quads;
+			}
+			if (bCapB)
+			{
+				QM.AddPoly(Group, CapB, 4,
+					FVector3f((float)D1.X, (float)D1.Y, 0.f).GetSafeNormal(), CapUV, Tint);
+				++Quads;
+			}
+			if (OutCaps)
+			{
+				*OutCaps += (bCapA ? 1 : 0) + (bCapB ? 1 : 0);
+			}
 		}
 		if (TierM > 0.f)
 		{
@@ -4959,7 +5190,8 @@ namespace
 	// groupe dedie avec une UV0 MONDE EN METRES (pelouses, bois). Nul = historique.
 	void BuildFlatPolygon(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float Zcm,
 		const FVector3f& Tint, const TArray<float>* TerrainZ = nullptr,
-		const FResolvedSurface* Surf = nullptr)
+		const FResolvedSurface* Surf = nullptr,
+		const TArray<FVector3f>* VertexTints = nullptr)
 	{
 		TArray<int32> Tris;
 		TriangulateRing(PtsCm, Tris);
@@ -4990,6 +5222,16 @@ namespace
 				FVector2f(P[0].X * 0.01f, P[0].Y * 0.01f),
 				FVector2f(P[1].X * 0.01f, P[1].Y * 0.01f),
 				FVector2f(P[2].X * 0.01f, P[2].Y * 0.01f) };
+			if (VertexTints && VertexTints->Num() == PtsCm.Num())
+			{
+				// BERGES : la couleur de sommet PORTE UNE DONNEE (l'ecoulement),
+				// elle ne teinte rien — donc aucun Shade() ici, ce serait la falsifier.
+				const FVector3f Cols[3] = {
+					(*VertexTints)[Tris[t]], (*VertexTints)[Tris[t + 1]],
+					(*VertexTints)[Tris[t + 2]] };
+				QM.AddPolyPerVertexColors(Group, P, 3, FVector3f(0, 0, 1), UV, Cols);
+				continue;
+			}
 			QM.AddPoly(Group, P, 3, FVector3f(0, 0, 1), UV, Shaded);
 		}
 	}
@@ -5393,8 +5635,11 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 				TEXT("LOT EAU : materiau '%s' introuvable — la surface en eau prend le materiau de repli du mesh."),
 				*MatEau);
 		}
-		const FVector3f TeinteEau(1.f, 1.f, 1.f);   // le materiau d'eau ne lit pas la VertexColor
-		int32 CellulesEau = 0, EauTailleKo = 0;
+		// Repli quand le side-car ne porte pas d'ecoulement : (0,5 ; 0,5) = derive
+		// nulle. Ce n'est plus « le materiau ne lit pas la VertexColor » : il la lit
+		// desormais, et elle porte la DIRECTION DE L'ECOULEMENT (cf. FCityWaterBody).
+		const FVector3f TeinteEau(0.5f, 0.5f, 1.f);
+		int32 CellulesEau = 0, EauTailleKo = 0, WaterFlowBodies = 0;
 		double EauTailleCuiteM = 0.0, AireEau = 0.0;
 		for (const FString& Fichier : Fichiers)
 		{
@@ -5432,11 +5677,31 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 				{
 					Algo::Reverse(W.PtsCm);
 					Algo::Reverse(W.ZCm);
+					if (W.Flux.Num() == W.PtsCm.Num())
+					{
+						Algo::Reverse(W.Flux);
+					}
+				}
+				// BERGES : l'ecoulement voyage dans la COULEUR DE SOMMET
+				// (R = 0,5 + 0,5 dx, G = 0,5 + 0,5 dy, B = 1). Sans donnee de flux,
+				// on n'invente rien : (0,5 ; 0,5) = derive nulle, et le materiau
+				// retombe sur son ondulation sur place.
+				TArray<FVector3f> Couleurs;
+				if (W.Flux.Num() == W.PtsCm.Num())
+				{
+					Couleurs.Reserve(W.Flux.Num());
+					for (const FVector2D& F : W.Flux)
+					{
+						Couleurs.Add(FVector3f(0.5f + 0.5f * (float)F.X,
+							0.5f + 0.5f * (float)F.Y, 1.f));
+					}
+					++WaterFlowBodies;
 				}
 				FCityMeshBuilder& B = GetCellKey(CelluleEau);
 				const int32 Avant = B.MeshDesc.Triangles().Num();
 				BuildFlatPolygon(B, W.PtsCm, 0.f, TeinteEau, &W.ZCm,
-					SurfEau.Material ? &SurfEau : nullptr);
+					SurfEau.Material ? &SurfEau : nullptr,
+					Couleurs.Num() ? &Couleurs : nullptr);
 				const int32 Tris = B.MeshDesc.Triangles().Num() - Avant;
 				if (Tris <= 0)
 				{
@@ -5453,6 +5718,9 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 		}
 		Summary.WaterCells = CellulesEau;
 		Summary.WaterAreaM2 = FMath::RoundToInt(AireEau);
+		UE_LOG(LogCityImport, Display,
+			TEXT("BERGES eau : %d surfaces sur %d portent un ECOULEMENT lu dans la donnee (couleur de sommet)."),
+			WaterFlowBodies, Summary.WaterBodies);
 		UE_LOG(LogCityImport, Display,
 			TEXT("LOT EAU : %d cellules lues, %d surfaces posees (%d m2, %d triangles), %d ecartees ; materiau '%s' %s — dossier '%s'."),
 			CellulesEau, Summary.WaterBodies, Summary.WaterAreaM2, Summary.WaterTris,
@@ -10168,14 +10436,46 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			Summary.QuayTierEmprises += Emprises.Num();
 			for (const FRetainingWall& W : Walls)
 			{
+				// BERGES — PLANCHER DE LONGUEUR, ecarte AVEC CAUSE (jamais en silence).
+				// Defaut 0 : la mesure dit que le side-car n'a aucun mur sous son
+				// propre plancher de detection (min 12,04 m pour un plancher de 12 m).
+				if (Gen.WallMinLengthM > 0.f)
+				{
+					double LongCm = 0.0;
+					for (int32 k = 0; k + 1 < W.PtsCm.Num(); ++k)
+					{
+						LongCm += (W.PtsCm[k + 1] - W.PtsCm[k]).Size();
+					}
+					if (LongCm * 0.01 < (double)Gen.WallMinLengthM)
+					{
+						++Summary.RetainingWallsTooShort;
+						UE_LOG(LogCityImport, Display,
+							TEXT("MUR ECARTE cellule=%d_%d classe=%s longueur=%.2f m — sous le plancher de %.2f m."),
+							CelluleMur.X, CelluleMur.Y, *W.Classe,
+							(float)(LongCm * 0.01), Gen.WallMinLengthM);
+						continue;
+					}
+				}
 				int32 Tiers = 0;
 				float TierM = 0.f;
+				FWallGeom Geom;
 				const int32 Q = BuildRetainingWall(
 					GetInKey(GroundCells, CleSol(W.PtsCm[0], CelluleMur),
 						bLinearColors, bWorldUVs),
 					W, WallRGZ, WallSurf, WallTint, QuadCm, Gen.bQuayTiers, Tiers,
-					&Emprises, &TierM);
+					&Emprises, &TierM, Gen.bWallCrestOnPlateau, &Geom,
+					Gen.bWallNoFlip, Gen.bWallCapsOnRealEndsOnly,
+					&Summary.RetainingWallCaps, &Summary.RetainingWallFlipsFixed);
 				Summary.QuayTierDm += FMath::RoundToInt32(TierM * 10.0f);
+				// BERGES — LA LIGNE NOMINATIVE DE GEOMETRIE (cf. FWallGeom).
+				UE_LOG(LogCityImport, Display,
+					TEXT("MUR GEOM cellule=%d_%d classe=%s longueur=%.1f m pied=%.2f m crete=%.2f m emprise=%.2f m h=%.2f m pose=%d"),
+					CelluleMur.X, CelluleMur.Y, *W.Classe, Geom.LenM,
+					Geom.OffFootCm * 0.01f, Geom.OffCrestCm * 0.01f,
+					(Geom.OffFootCm + Geom.OffCrestCm) * 0.01f, Geom.HMedCm * 0.01f,
+					Q > 0 ? 1 : 0);
+				Summary.RetainingWallSpanDm +=
+					(Q > 0) ? FMath::RoundToInt32((Geom.OffFootCm + Geom.OffCrestCm) * 0.1f) : 0;
 				if (Q > 0)
 				{
 					Summary.RetainingWallQuads += Q;
@@ -10205,6 +10505,12 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				}
 			}
 		}
+		UE_LOG(LogCityImport, Display,
+			TEXT("BERGES murs : emprise cumulee %.1f m (somme pied+crete), %d bouchons, %d sommets deretournes, %d ecartes trop courts ; crete_sur_palier=%d anti_retournement=%d bouchons_vrais_bouts=%d."),
+			Summary.RetainingWallSpanDm * 0.1f, Summary.RetainingWallCaps,
+			Summary.RetainingWallFlipsFixed, Summary.RetainingWallsTooShort,
+			Gen.bWallCrestOnPlateau ? 1 : 0, Gen.bWallNoFlip ? 1 : 0,
+			Gen.bWallCapsOnRealEndsOnly ? 1 : 0);
 		UE_LOG(LogCityImport, Display,
 			TEXT("Murs de soutenement : %d cellules, %d murs poses (%d quads), %d ecartes (aucune rampe a masquer) — dossier '%s'."),
 			CellsWithWalls, Summary.RetainingWalls, Summary.RetainingWallQuads,

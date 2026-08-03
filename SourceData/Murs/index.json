@@ -1,5 +1,5 @@
 {
- "genere": "2026-08-02T16:55:13",
+ "genere": "2026-08-03T16:00:20",
  "cellSizeM": 500.0,
  "emprise": [
   -1500.0,
@@ -75,23 +75,30 @@
    },
    "ecart_max_m": 1.747,
    "ecart_median_m": 1.34
+  },
+  "hygiene_berges": {
+   "fusion": true,
+   "fusion_dist_m": 3.0,
+   "fusion_angle_max_deg": 25.0,
+   "fusions": 11,
+   "bouts": "bout_debut / bout_fin : true = VRAI bout (bouchonne), false = coupe de cellule"
   }
  },
  "totaux": {
-  "polylignes": 249,
-  "km": 17.182,
+  "polylignes": 238,
+  "km": 17.212,
   "par_classe": {
    "talus": {
-    "n": 85,
-    "km": 4.677
+    "n": 81,
+    "km": 4.687
    },
    "tranchee": {
-    "n": 49,
-    "km": 4.371
+    "n": 48,
+    "km": 4.373
    },
    "quai": {
-    "n": 115,
-    "km": 8.135
+    "n": 109,
+    "km": 8.152
    }
   }
  },
@@ -124,12 +131,12 @@
    }
   },
   "-3_0": {
-   "murs": 37,
-   "longueur_m": 1317.1,
+   "murs": 35,
+   "longueur_m": 1323.1,
    "par_classe": {
-    "quai": 26,
+    "quai": 25,
     "tranchee": 5,
-    "talus": 6
+    "talus": 5
    }
   },
   "-3_1": {
@@ -151,10 +158,10 @@
    }
   },
   "-2_-3": {
-   "murs": 10,
-   "longueur_m": 234.0,
+   "murs": 8,
+   "longueur_m": 239.2,
    "par_classe": {
-    "quai": 10,
+    "quai": 8,
     "tranchee": 0,
     "talus": 0
    }
@@ -241,19 +248,19 @@
    }
   },
   "-1_1": {
-   "murs": 9,
-   "longueur_m": 965.6,
+   "murs": 8,
+   "longueur_m": 967.9,
    "par_classe": {
     "quai": 2,
-    "tranchee": 4,
+    "tranchee": 3,
     "talus": 3
    }
   },
   "-1_2": {
-   "murs": 24,
-   "longueur_m": 1469.2,
+   "murs": 23,
+   "longueur_m": 1472.2,
    "par_classe": {
-    "quai": 16,
+    "quai": 15,
     "tranchee": 5,
     "talus": 3
    }
@@ -313,19 +320,19 @@
    }
   },
   "1_-3": {
-   "murs": 8,
-   "longueur_m": 607.3,
+   "murs": 7,
+   "longueur_m": 610.3,
    "par_classe": {
     "quai": 3,
     "tranchee": 0,
-    "talus": 5
+    "talus": 4
    }
   },
   "1_-2": {
-   "murs": 18,
-   "longueur_m": 918.5,
+   "murs": 17,
+   "longueur_m": 921.5,
    "par_classe": {
-    "quai": 11,
+    "quai": 10,
     "tranchee": 2,
     "talus": 5
    }
@@ -367,12 +374,12 @@
    }
   },
   "2_-3": {
-   "murs": 30,
-   "longueur_m": 978.3,
+   "murs": 29,
+   "longueur_m": 980.3,
    "par_classe": {
     "quai": 0,
     "tranchee": 13,
-    "talus": 17
+    "talus": 16
    }
   },
   "2_-2": {

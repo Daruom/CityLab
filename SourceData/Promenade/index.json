@@ -1,5 +1,5 @@
 {
- "genere": "2026-08-02T20:05:08",
+ "genere": "2026-08-03T16:00:24",
  "cellSizeM": 500.0,
  "emprise": [
   -1500.0,
@@ -25,9 +25,9 @@
  },
  "totaux": {
   "troncons": 110,
-  "longueur_m": 5594.8,
-  "murs_quai": 111,
-  "murs_borde_pieton": 46,
+  "longueur_m": 5599.9,
+  "murs_quai": 106,
+  "murs_borde_pieton": 43,
   "morceaux": 122
  },
  "cellules": {
@@ -101,7 +101,7 @@
   },
   "-1_2": {
    "troncons": 17,
-   "longueur_m": 550.0
+   "longueur_m": 555.1
   },
   "0_-3": {
    "troncons": 0,

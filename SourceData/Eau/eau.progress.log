@@ -21,3 +21,8 @@
 2026-08-03 14:18:10  champ de cote : pas 5 m, rayon 40 m, 28673 points d'eau
 2026-08-03 14:18:10  side-car ecrit : 36 cellules (27 non vides), 52 objets, 632788 m2, 1228 sommets
 2026-08-03 14:18:10  chrono de cuisson : 28.9 s
+2026-08-03 16:15:24  BD TOPO : 25 polygones retenus, 0 ecartes (-)
+2026-08-03 16:15:37  champ de cote : pas 5 m, rayon 40 m, 28673 points d'eau
+2026-08-03 16:16:35  side-car ecrit : 36 cellules (27 non vides), 280 objets, 480604 m2, 8660 sommets
+2026-08-03 16:16:35  ATTENTION : 10 trou(s) interieur(s) ignore(s), 175 m2 (le C++ triangule des anneaux SIMPLES)
+2026-08-03 16:16:35  chrono de cuisson : 71.8 s

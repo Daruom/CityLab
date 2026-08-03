@@ -211,6 +211,60 @@ struct FCityGenProfile
 	UPROPERTY() FString RetainingWallClasses;
 
 	/**
+	 * LOT BERGES (03/08) — LE COURONNEMENT S'ARRETE AU PALIER DE LA MARCHE REELLE.
+	 *
+	 * MESURE (work/BERGES/b3_decision.py, 239 murs poses) : la marche fait 3,50 m de
+	 * large sur la DONNEE D'ALTITUDE (p50) et l'emprise posee 12,00 m (14,00 m sur la
+	 * zone des captures utilisateur) — 3,4 fois trop. La cause est que le sondage
+	 * marche sur la surface RENDUE, qui etale la marche sur +-1 quad (7,81 m) : le
+	 * couronnement recouvre alors plusieurs metres de terrasse haute REELLE, avec ce
+	 * qu'elle porte (allee, fosses d'arbres, arbres). Grief utilisateur, captures 7-8.
+	 *
+	 * true (defaut) : le cote CRETE est borne par le premier PALIER du MNT (pente
+	 * < 0,12 m/m sur base 2 m). Le cote PIED n'est PAS borne — mesure : il est deja
+	 * a 0,95 m (p50) de la ligne d'eau BD TOPO, et l'axe du mur a 0,25 m (p50 signe)
+	 * de la ligne `Quai` / `Mur de soutenement` de BD TOPO.
+	 *
+	 * false : comportement C1 d'origine, bit pour bit. Rollback SANS re-cuisson.
+	 */
+	UPROPERTY() bool bWallCrestOnPlateau = true;
+
+	/**
+	 * LOT BERGES — HYGIENE : LES BOUCHONS NE FERMENT QUE LES VRAIS BOUTS.
+	 *
+	 * Un mur continu que la decoupe A LA CELLULE separe en deux fragments recevait
+	 * QUATRE bouchons au lieu de deux, dont deux dos a dos au beau milieu du mur
+	 * (mesure : 31 paires de bouts jointifs a 0,00 m et 0,0 degre de desalignement
+	 * sur le proto, dont le mur Saint-Pierre -> Daurade lui-meme, coupe en 266 + 149 m).
+	 * Le side-car marque desormais chaque bout (`bout_debut` / `bout_fin`) : true =
+	 * vrai bout du mur, false = coupe de cellule. true (defaut) = on respecte le
+	 * marquage ; false = comportement historique (bouchon aux deux bouts, toujours).
+	 */
+	UPROPERTY() bool bWallCapsOnRealEndsOnly = true;
+
+	/**
+	 * LOT BERGES — ANTI-RETOURNEMENT des polylignes decalees.
+	 *
+	 * MESURE : 73 murs sur 239 (30,5 %) portent au moins un quad RETOURNE (54 au
+	 * pied, 88 a la crete, recul jusqu'a 9,80 m). Un quad retourne montre son
+	 * BACKFACE : aucune lumiere ne l'atteint, et c'est le « mur vide, on voit
+	 * l'interieur sombre » des captures 4-6. Cause : un decalage MEDIAN constant
+	 * applique a des normales de SOMMET se croise des que la ligne tourne serre.
+	 * true (defaut) = le decalage est rabote aux sommets fautifs jusqu'a ce que la
+	 * ligne decalee avance partout. false = comportement historique.
+	 */
+	UPROPERTY() bool bWallNoFlip = true;
+
+	/**
+	 * LOT BERGES — longueur minimale, en metres, d'une polyligne de mur POSEE.
+	 * 0 (defaut) = aucun plancher C++ : la MESURE dit que le side-car n'a AUCUN mur
+	 * sous son propre plancher de detection (12 m ; min mesure 12,04 m), donc la
+	 * premisse « des fragments courts poses seuls » est fausse a la source. Le champ
+	 * reste pour ecarter, AVEC CAUSE LOGUEE, si une autre cuisson en produisait.
+	 */
+	UPROPERTY() float WallMinLengthM = 0.f;
+
+	/**
 	 * LOT QUAIS (V2) — LES ESCALIERS.
 	 *
 	 * Un mur de quai sans escalier est un decor : dans la realite on descend sur la
@@ -528,6 +582,24 @@ struct FCityStreamedSummary
 
 	/** C1 : polylignes ECARTEES — la surface rendue n'y presente aucune rampe a masquer. */
 	UPROPERTY() int32 RetainingWallsSkipped = 0;
+
+	/**
+	 * BERGES : SOMME DES EMPRISES EN PLAN des murs poses, en DECIMETRES (emprise =
+	 * pied + crete, la largeur que le couronnement recouvre). C'est LE compteur du
+	 * grief « les murs prennent trop de place » : ni le nombre de murs ni celui des
+	 * quads ne le voit — un couronnement deux fois plus large a exactement le meme
+	 * nombre de quads.
+	 */
+	UPROPERTY() int32 RetainingWallSpanDm = 0;
+
+	/** BERGES : BOUCHONS de flanc poses (2 par mur au maximum : un par VRAI bout). */
+	UPROPERTY() int32 RetainingWallCaps = 0;
+
+	/** BERGES : sommets dont le decalage a ete rabote pour ne pas RETOURNER un quad. */
+	UPROPERTY() int32 RetainingWallFlipsFixed = 0;
+
+	/** BERGES : fragments ECARTES sous le plancher de longueur (cause loguee). */
+	UPROPERTY() int32 RetainingWallsTooShort = 0;
 
 	/** QUAIS V2 : volees d'escalier effectivement posees (au moins une marche). */
 	UPROPERTY() int32 Stairs = 0;
