@@ -221,13 +221,54 @@ struct FCityGenProfile
 	 * qu'elle porte (allee, fosses d'arbres, arbres). Grief utilisateur, captures 7-8.
 	 *
 	 * true (defaut) : le cote CRETE est borne par le premier PALIER du MNT (pente
-	 * < 0,12 m/m sur base 2 m). Le cote PIED n'est PAS borne — mesure : il est deja
-	 * a 0,95 m (p50) de la ligne d'eau BD TOPO, et l'axe du mur a 0,25 m (p50 signe)
-	 * de la ligne `Quai` / `Mur de soutenement` de BD TOPO.
+	 * < 0,12 m/m sur base 2 m). ⚠️ Au lot BERGES, le cote PIED n'etait PAS borne —
+	 * c'etait une erreur d'appreciation : la FACE etait bien a 0,95 m (p50) de la
+	 * ligne d'eau BD TOPO, mais la JUPE qui y descend valait a elle seule 6,50 m
+	 * (p50). Le micro-lot MUR35 borne le pied a son tour (`bWallFootOnPlateau`).
 	 *
 	 * false : comportement C1 d'origine, bit pour bit. Rollback SANS re-cuisson.
 	 */
 	UPROPERTY() bool bWallCrestOnPlateau = true;
+
+	/**
+	 * MICRO-LOT MUR35 (03/08) — LE PIED S'ARRETE AU PALIER BAS DE LA MARCHE.
+	 *
+	 * Le lot BERGES n'a borne QUE la crete : le mur est passe de 12,85 a 8,98 m
+	 * d'emprise, et l'utilisateur le lit toujours 2,6 fois trop large. MESURE
+	 * (work/MUR35/m1_pied.py, 231 murs, modele hors moteur ligne a ligne) : la
+	 * jupe cote PIED vaut a elle seule p50 6,50 m (district des quais 7,00 m),
+	 * contre 2,00 m pour la crete. C'est le pied qui fait le mur large.
+	 *
+	 * true (DEFAUT depuis la consolidation MUR35) : le cote PIED est borne par le
+	 * premier PALIER du MNT rencontre en DESCENDANT (miroir exact de
+	 * CrestPlateauDistCm), avec un plancher `WallFootMinM`. L'emprise tombe alors
+	 * sur la MARCHE mesuree.
+	 * false : comportement du lot BERGES, bit pour bit. Rollback SANS re-cuisson.
+	 *
+	 * INVARIANT PRESERVE : ZPied reste lu SUR LA SURFACE RENDUE, au point borne —
+	 * la piece se referme sans jour. Ce que le mur ne couvre plus redevient du sol.
+	 *
+	 * CE QUI A ETE GRAVE, ET POURQUOI CE REGLAGE-LA (candidate C2, retenue par
+	 * l'utilisateur sur captures aux 3 poses du micro-lot) :
+	 *   plancher 1,0 m (C1) . 18 murs poses sur 23 dans le district, 5 ECARTES,
+	 *                         emprise 4,47 m/mur — et LES GRADINS TOMBENT (un seul
+	 *                         mur gradine au lieu de deux, 32,7 m au lieu de 66,8).
+	 *   plancher 3,0 m (C2) . 23 murs poses sur 23, 0 ecarte, emprise 4,91 m/mur
+	 *                         (8,98 m au lot BERGES, -45 %), GRADINS INTACTS
+	 *                         (2 murs / 66,8 m = la valeur de reference gelee).
+	 * Le plancher n'est donc pas un curseur esthetique : sous 3 m, le drape rabote
+	 * la hauteur MESUREE sous `GWallMinHeightCm` et des murs disparaissent.
+	 */
+	UPROPERTY() bool bWallFootOnPlateau = true;
+
+	/**
+	 * MICRO-LOT MUR35 — plancher, en metres, du bornage du pied (ci-dessus).
+	 * Sans plancher, un mur dont l'axe tombe deja sur le palier bas n'aurait plus
+	 * aucune epaisseur cote pied. Curseur du compromis largeur / hauteur retenue :
+	 * 3,0 m est le plus petit plancher mesure qui ne perde AUCUN mur ni AUCUN
+	 * gradin (cf. le tableau C1 / C2 ci-dessus).
+	 */
+	UPROPERTY() float WallFootMinM = 3.f;
 
 	/**
 	 * LOT BERGES — HYGIENE : LES BOUCHONS NE FERMENT QUE LES VRAIS BOUTS.

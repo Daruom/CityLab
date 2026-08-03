@@ -2825,13 +2825,15 @@ namespace
 	 * Rend MaxCm si aucun palier n'est trouve (on ne borne alors rien).
 	 */
 	float CrestPlateauDistCm(const FVector2D& PCm, const FVector2D& NormLow,
-		const FRenderedGroundZ& RGZ, float MaxCm)
+		const FRenderedGroundZ& RGZ, float MaxCm, bool bVersLeBas = false)
 	{
 		if (!RGZ.Drape || !RGZ.Drape->IsActive())
 		{
 			return MaxCm;
 		}
-		const FVector2D Up = -NormLow;
+		// MUR35 : le MEME sondage sert aux deux cotes — vers le haut (crete, lot
+		// BERGES) ou vers le BAS (pied). Une seule regle, un seul code.
+		const FVector2D Up = bVersLeBas ? NormLow : -NormLow;
 		const int32 Steps = FMath::Max(1, FMath::CeilToInt32(MaxCm / GWallProbeStepCm));
 		for (int32 i = 1; i <= Steps; ++i)
 		{
@@ -2850,23 +2852,33 @@ namespace
 	}
 
 	FWallSection MeasureWallSection(const FVector2D& PCm, const FVector2D& NormLow,
-		const FRenderedGroundZ& RGZ, float QuadCm, float GuardCm, bool bCrestOnPlateau)
+		const FRenderedGroundZ& RGZ, float QuadCm, float GuardCm, bool bCrestOnPlateau,
+		bool bFootOnPlateau = false, float FootMinCm = 100.f)
 	{
 		FWallSection S;
 		const float Span = FMath::Max(QuadCm * GWallProbeSpanQuads, GWallProbeStepCm);
 		const int32 Steps = FMath::Max(1, FMath::CeilToInt32(Span / GWallProbeStepCm));
-		// BERGES : borne du cote crete, lue sur la DONNEE D'ALTITUDE. Le pied n'est
-		// PAS borne (mesure : il est deja sur la ligne d'eau).
+		// BERGES : borne du cote crete, lue sur la DONNEE D'ALTITUDE.
 		const float CrestMaxCm = bCrestOnPlateau
 			? FMath::Max(GWallCrestMinCm, CrestPlateauDistCm(PCm, NormLow, RGZ, Span))
 			: Span;
+		// MUR35 : MEME borne du cote PIED — le palier BAS de la marche. Mesure :
+		// la jupe du pied vaut a elle seule p50 6,50 m contre 2,00 m pour la crete.
+		const float FootMaxCm = bFootOnPlateau
+			? FMath::Max(FootMinCm, CrestPlateauDistCm(PCm, NormLow, RGZ, Span, /*bVersLeBas*/ true))
+			: Span;
 
-		// PIED : on descend tant que ca descend.
+		// PIED : on descend tant que ca descend, sans depasser le palier BAS.
 		S.Pied = PCm;
 		S.ZPied = RGZ.At(PCm.X, PCm.Y);
 		for (int32 i = 1; i <= Steps; ++i)
 		{
-			const FVector2D Q = PCm + NormLow * (double)(i * GWallProbeStepCm);
+			const float D = (float)i * GWallProbeStepCm;
+			if (D > FootMaxCm)
+			{
+				break;
+			}
+			const FVector2D Q = PCm + NormLow * (double)D;
 			const float Z = RGZ.At(Q.X, Q.Y);
 			if (Z > S.ZPied - GWallLevelTolCm)
 			{
@@ -2925,7 +2937,8 @@ namespace
 		const TArray<FGradinEmprise>* Emprises = nullptr, float* OutTierM = nullptr,
 		bool bCrestOnPlateau = true, FWallGeom* OutGeom = nullptr,
 		bool bNoFlip = true, bool bCapsRealEndsOnly = true, int32* OutCaps = nullptr,
-		int32* OutFlipsFixed = nullptr)
+		int32* OutFlipsFixed = nullptr, bool bFootOnPlateau = false,
+		float FootMinCm = 100.f)
 	{
 		OutTiers = 0;
 		if (!Surf || Wall.PtsCm.Num() < 2)
@@ -3009,7 +3022,7 @@ namespace
 		for (int32 i = 0; i < N; ++i)
 		{
 			const FWallSection S = MeasureWallSection(Pts[i], Norm[i], RGZ, QuadCm,
-				Wall.HMedCm, bCrestOnPlateau);
+				Wall.HMedCm, bCrestOnPlateau, bFootOnPlateau, FootMinCm);
 			DFoot.Add((float)(S.Pied - Pts[i]).Size());
 			DCrest.Add((float)(S.Crete - Pts[i]).Size());
 		}
@@ -10465,7 +10478,8 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 					W, WallRGZ, WallSurf, WallTint, QuadCm, Gen.bQuayTiers, Tiers,
 					&Emprises, &TierM, Gen.bWallCrestOnPlateau, &Geom,
 					Gen.bWallNoFlip, Gen.bWallCapsOnRealEndsOnly,
-					&Summary.RetainingWallCaps, &Summary.RetainingWallFlipsFixed);
+					&Summary.RetainingWallCaps, &Summary.RetainingWallFlipsFixed,
+					Gen.bWallFootOnPlateau, Gen.WallFootMinM * 100.f);
 				Summary.QuayTierDm += FMath::RoundToInt32(TierM * 10.0f);
 				// BERGES — LA LIGNE NOMINATIVE DE GEOMETRIE (cf. FWallGeom).
 				UE_LOG(LogCityImport, Display,
@@ -10506,11 +10520,12 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			}
 		}
 		UE_LOG(LogCityImport, Display,
-			TEXT("BERGES murs : emprise cumulee %.1f m (somme pied+crete), %d bouchons, %d sommets deretournes, %d ecartes trop courts ; crete_sur_palier=%d anti_retournement=%d bouchons_vrais_bouts=%d."),
+			TEXT("BERGES murs : emprise cumulee %.1f m (somme pied+crete), %d bouchons, %d sommets deretournes, %d ecartes trop courts ; crete_sur_palier=%d anti_retournement=%d bouchons_vrais_bouts=%d | MUR35 pied_sur_palier=%d plancher_pied=%.2f m."),
 			Summary.RetainingWallSpanDm * 0.1f, Summary.RetainingWallCaps,
 			Summary.RetainingWallFlipsFixed, Summary.RetainingWallsTooShort,
 			Gen.bWallCrestOnPlateau ? 1 : 0, Gen.bWallNoFlip ? 1 : 0,
-			Gen.bWallCapsOnRealEndsOnly ? 1 : 0);
+			Gen.bWallCapsOnRealEndsOnly ? 1 : 0,
+			Gen.bWallFootOnPlateau ? 1 : 0, Gen.WallFootMinM);
 		UE_LOG(LogCityImport, Display,
 			TEXT("Murs de soutenement : %d cellules, %d murs poses (%d quads), %d ecartes (aucune rampe a masquer) — dossier '%s'."),
 			CellsWithWalls, Summary.RetainingWalls, Summary.RetainingWallQuads,
