@@ -948,6 +948,114 @@ namespace
 	}
 
 	// =========================================================================
+	// LOT FINITION QUAIS — LES EMPRISES DE GRADINS (OSM `leisure=bleachers`).
+	//
+	// REGLE NATIONALE : le mecanisme de gradins (`bQuayTiers`) ne s'applique qu'a
+	// la PORTION d'un mur de classe `quai` qui tombe DANS un polygone d'emprise.
+	// Hors emprise le mur reste lisse — ce qui etait le comportement par defaut,
+	// mais par DECISION ; il l'est desormais par ABSENCE DE DONNEE, ce qui est la
+	// seule justification acceptable (doctrine « pas de donnee -> pas d'objet »).
+	//
+	// L'emprise dit OU, et RIEN d'autre : le nombre de gradins, le giron et la
+	// contremarche restent produits par la regle, calee sur le denivele MESURE sur
+	// la surface rendue. AUCUN identifiant OSM ne circule ici : la verite locale
+	// vit dans le verrou nominatif (work/FINQUAIS/f_verrou_gradins.py).
+	//
+	// La regle est BORNEE PAR ELLE-MEME : sur le proto 3x3, trois emprises
+	// existent et une seule paire croise un mur de quai. « Des gradins sur tout le
+	// quai » est structurellement impossible.
+	// Side-car : Tools/fetch_osm_bleachers.py -> SourceData/Gradins/gradins_X_Y.json.
+	// Dossier absent ou cellule sans fichier = AUCUNE emprise, sans erreur.
+	struct FGradinEmprise
+	{
+		TArray<FVector2D> PtsCm;      // anneau FERME, en cm, repere local
+	};
+
+	FString GradinsDir(const FCityGenProfile& Gen)
+	{
+		return FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/Gradins"));
+	}
+
+	bool LoadGradinsCell(const FString& Dir, int32 CellX, int32 CellY, float CellSizeM,
+		TArray<FGradinEmprise>& Out, int32& OutTailleKo)
+	{
+		const FString Path = FPaths::Combine(Dir,
+			FString::Printf(TEXT("gradins_%d_%d.json"), CellX, CellY));
+		FString Text;
+		if (!FFileHelper::LoadFileToString(Text, *Path))
+		{
+			return false;
+		}
+		TSharedPtr<FJsonObject> Root;
+		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid())
+		{
+			RaiseError(FString::Printf(TEXT("Gradins file '%s' is not valid JSON."), *Path));
+			return false;
+		}
+		double BakedCellM = 0.0;
+		if (Root->TryGetNumberField(TEXT("cellSizeM"), BakedCellM) &&
+			!FMath::IsNearlyEqual((float)BakedCellM, CellSizeM, 0.01f))
+		{
+			++OutTailleKo;
+			return false;
+		}
+		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+		if (!Root->TryGetArrayField(TEXT("gradins"), Arr))
+		{
+			return true;
+		}
+		for (const TSharedPtr<FJsonValue>& V : *Arr)
+		{
+			const TSharedPtr<FJsonObject>& O = V->AsObject();
+			const TArray<TSharedPtr<FJsonValue>>* P = nullptr;
+			if (!O.IsValid() || !O->TryGetArrayField(TEXT("pts"), P))
+			{
+				continue;
+			}
+			FGradinEmprise E;
+			for (const TSharedPtr<FJsonValue>& PV : *P)
+			{
+				const TArray<TSharedPtr<FJsonValue>>& C = PV->AsArray();
+				if (C.Num() >= 2)
+				{
+					E.PtsCm.Add(FVector2D(C[0]->AsNumber() * 100.0, C[1]->AsNumber() * 100.0));
+				}
+			}
+			if (E.PtsCm.Num() >= 4)
+			{
+				Out.Add(MoveTemp(E));
+			}
+		}
+		return true;
+	}
+
+	// Appartenance d'un point a l'une des emprises (lancer de rayon pair/impair —
+	// l'anneau est ferme, donc le test est exact et sans dependance externe).
+	bool DansUneEmprise(const TArray<FGradinEmprise>& Emprises, const FVector2D& P)
+	{
+		for (const FGradinEmprise& E : Emprises)
+		{
+			bool bIn = false;
+			const int32 N = E.PtsCm.Num();
+			for (int32 i = 0, j = N - 1; i < N; j = i++)
+			{
+				const FVector2D& A = E.PtsCm[i];
+				const FVector2D& B = E.PtsCm[j];
+				if (((A.Y > P.Y) != (B.Y > P.Y)) &&
+					(P.X < (B.X - A.X) * (P.Y - A.Y) / (B.Y - A.Y) + A.X))
+				{
+					bIn = !bIn;
+				}
+			}
+			if (bIn)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// =========================================================================
 	// LOT VELOCITE — LE FILTRE DE CELLULES (« mode district »)
 	//
 	// Une regeneration complete du proto 3x3 coute ~35 min ; l'immense majorite
@@ -2584,7 +2692,8 @@ namespace
 	//      la ou la marche s'eteint, le mur se PINCE a hauteur nulle.
 	int32 BuildRetainingWall(FCityMeshBuilder& QM, const FRetainingWall& Wall,
 		const FRenderedGroundZ& RGZ, const FResolvedSurface* Surf, const FVector3f& Tint,
-		float QuadCm, bool bTiers, int32& OutTiers)
+		float QuadCm, bool bTiers, int32& OutTiers,
+		const TArray<FGradinEmprise>* Emprises = nullptr, float* OutTierM = nullptr)
 	{
 		OutTiers = 0;
 		if (!Surf || Wall.PtsCm.Num() < 2)
@@ -2595,6 +2704,52 @@ namespace
 		// sinon la face verticale coupe les facettes de la grille en biais.
 		TArray<FVector2D> Pts;
 		SubdivideOnRenderedGround(Wall.PtsCm, RGZ, GCurbSagToleranceCm, GCurbSagMaxDepth, Pts);
+		// FINITION QUAIS : LA FRONTIERE DE L'EMPRISE DOIT TOMBER SUR UN SOMMET.
+		// Sans cela l'etendue gradinee est quantifiee au pas de la subdivision (le
+		// quad de sol rendu, ~7,8 m) et deborde de l'emprise d'un DEMI-SEGMENT a
+		// chaque bout — mesure : 43,0 + 39,0 m poses pour 32,7 + 34,1 m d'emprise.
+		// On insere donc le point de traversee, trouve par dichotomie (14 iterations
+		// = moins d'un millimetre sur 8 m). Rien d'autre ne change : la face, le
+		// couronnement et le dos suivent la meme polyligne qu'avant, un sommet de
+		// plus par frontiere.
+		if (bTiers && Emprises && Emprises->Num() > 0 && Pts.Num() >= 2)
+		{
+			TArray<FVector2D> Fins;
+			Fins.Reserve(Pts.Num() + 4);
+			for (int32 i = 0; i + 1 < Pts.Num(); ++i)
+			{
+				Fins.Add(Pts[i]);
+				const bool bA = DansUneEmprise(*Emprises, Pts[i]);
+				const bool bB = DansUneEmprise(*Emprises, Pts[i + 1]);
+				if (bA == bB)
+				{
+					continue;
+				}
+				double Lo = 0.0, Hi = 1.0;
+				for (int32 k = 0; k < 14; ++k)
+				{
+					const double Mid = 0.5 * (Lo + Hi);
+					const FVector2D P = Pts[i] + (Pts[i + 1] - Pts[i]) * Mid;
+					if (DansUneEmprise(*Emprises, P) == bA)
+					{
+						Lo = Mid;
+					}
+					else
+					{
+						Hi = Mid;
+					}
+				}
+				const FVector2D Cut = Pts[i] + (Pts[i + 1] - Pts[i]) * (0.5 * (Lo + Hi));
+				// Deux sommets confondus ne serviraient a rien et feraient un segment
+				// degenere : on n'insere que si la coupe est franche des deux cotes.
+				if ((Cut - Pts[i]).Size() > 2.0 && (Pts[i + 1] - Cut).Size() > 2.0)
+				{
+					Fins.Add(Cut);
+				}
+			}
+			Fins.Add(Pts.Last());
+			Pts = MoveTemp(Fins);
+		}
 		const int32 N = Pts.Num();
 		if (N < 2)
 		{
@@ -2672,10 +2827,22 @@ namespace
 		// Le nombre de gradins est decide UNE FOIS pour toute la polyligne : un mur
 		// qui changerait de nombre de gradins d'un segment a l'autre serait un
 		// escalier casse, pas un quai.
+		//
+		// LOT FINITION QUAIS — QUATRIEME CONDITION, ET C'EST ELLE QUI BORNE TOUT :
+		//   (d) le SEGMENT doit tomber dans une EMPRISE de gradins (OSM
+		//       `leisure=bleachers`, side-car SourceData/Gradins). Sans emprise
+		//       lisible, AUCUN gradin nulle part — l'absence de donnee interdit
+		//       l'objet, elle ne l'autorise pas. Le nombre de gradins reste decide
+		//       une fois pour la polyligne (un quai ne change pas de profil au
+		//       milieu) ; seule l'ETENDUE est bornee par la donnee, segment par
+		//       segment, ce qui donne « quelques metres d'emmarchements au debouche
+		//       de la volee » et rien ailleurs.
 		const float SpanCm = OffFoot + OffCrest;
+		const bool bEmprisePossible = (Emprises != nullptr && Emprises->Num() > 0);
 		int32 NTiers = 0;
 		float TierRunCm = 0.f;
-		if (bTiers && Wall.bBordePieton && HMed >= GTierMinHeightCm && SpanCm > GTierRunCm)
+		if (bTiers && bEmprisePossible && Wall.bBordePieton
+			&& HMed >= GTierMinHeightCm && SpanCm > GTierRunCm)
 		{
 			const int32 ParHauteur = FMath::RoundToInt32(HMed / GTierRiseCm);
 			const int32 ParPlace = FMath::FloorToInt32(SpanCm / GTierRunCm);
@@ -2689,7 +2856,10 @@ namespace
 				TierRunCm = FMath::Min(GTierRunCm, SpanCm / (float)NTiers);
 			}
 		}
-		OutTiers = NTiers;
+		// OutTiers n'est renseigne QU'A LA FIN : avec l'emprise, un mur peut avoir
+		// un profil de gradins calcule et n'en poser AUCUN (aucun segment dedans).
+		// Compter le profil plutot que la pose ferait mentir le compteur.
+		float TierM = 0.f;
 
 		int32 Quads = 0;
 		float Arc = 0.f;
@@ -2704,6 +2874,15 @@ namespace
 			const float U0 = Arc * 0.01f;
 			const float U1 = (Arc + SegLen) * 0.01f;
 			Arc += SegLen;
+			// L'EMPRISE, segment par segment : on teste le MILIEU du segment, sur la
+			// polyligne d'axe (celle du side-car) — pas le pied ni la crete, qui
+			// dependent d'un decalage MEDIAN et sortiraient de l'emprise avant elle.
+			const bool bSegTiers = (NTiers >= 2) && DansUneEmprise(
+				*Emprises, (Pts[i] + Pts[i + 1]) * 0.5);
+			if (bSegTiers)
+			{
+				TierM += SegLen * 0.01f;
+			}
 			// V de l'UV : la hauteur REELLE a chaque extremite (un mur dont la hauteur
 			// varie ne doit pas etirer son motif de pierre).
 			const float VA = (ZCrest[i] - ZFoot[i] + GWallSinkCm) * 0.01f;
@@ -2719,7 +2898,7 @@ namespace
 			//    ENTERRE et arrive a l'altitude de la crete : la difference est le
 			//    chemin entre les deux.
 			float TFin = 0.f;    // fraction atteinte par la face — le couronnement prend la suite
-			if (NTiers >= 2)
+			if (bSegTiers)
 			{
 				// GRADINS : contremarche verticale + assise horizontale, NTiers fois.
 				// La premiere contremarche part du pied enterre, comme la face lisse.
@@ -2783,20 +2962,32 @@ namespace
 			QM.AddPoly(Group, C, 4, Up, CUV, Tint);
 
 			// 3. DOS, au droit de la crete : sans lui la piece est un plan sans envers
-			//    des qu'on la regarde depuis la terrasse haute. Il est enterre.
+			//    des qu'on la regarde depuis la terrasse haute.
+			//    LOT FINITION QUAIS (M4) — IL DESCEND JUSQU'AU PIED, plus jusqu'a un
+			//    bouchon de 40 cm. MESURE : `ZCrest = max(sol rendu en PCrest, ZFoot)`
+			//    remonte la crete des que le decalage MEDIAN de crete deborde sur une
+			//    contre-pente ; le dos de 40 cm flottait alors au-dessus du sol et on
+			//    voyait la FACE PAR DERRIERE — un backface ne recoit aucune lumiere,
+			//    d'ou les eclats NOIRS triangulaires vus du haut de quai (leur base
+			//    color est identique au dallage : c'est un defaut d'eclairage, donc de
+			//    normale, pas de matiere). Fermer la piece de bout en bout supprime la
+			//    cause a la racine, n'ajoute AUCUN quad, et ne peut rien ouvrir.
+			const float ZBackA = FMath::Min(ZFoot[i], ZCrest[i]) - GWallSinkCm;
+			const float ZBackB = FMath::Min(ZFoot[i + 1], ZCrest[i + 1]) - GWallSinkCm;
 			const FVector3f W[4] = {
 				V3(PCrest[i + 1], ZCrest[i + 1]),
 				V3(PCrest[i], ZCrest[i]),
-				V3(PCrest[i], ZCrest[i] - GWallSinkCm),
-				V3(PCrest[i + 1], ZCrest[i + 1] - GWallSinkCm) };
+				V3(PCrest[i], ZBackA),
+				V3(PCrest[i + 1], ZBackB) };
 			const FVector2f WUV[4] = {
 				FVector2f(U1, 0.f), FVector2f(U0, 0.f),
-				FVector2f(U0, GWallSinkCm * 0.01f), FVector2f(U1, GWallSinkCm * 0.01f) };
+				FVector2f(U0, (ZCrest[i] - ZBackA) * 0.01f),
+				FVector2f(U1, (ZCrest[i + 1] - ZBackB) * 0.01f) };
 			QM.AddPoly(Group, W, 4,
 				FVector3f(-(float)NLow.X, -(float)NLow.Y, 0.f).GetSafeNormal(), WUV, Tint);
 			// couronnement + dos ; la face lisse en ajoute un, les gradins ont deja
 			// compte leurs 2 x NTiers quads dans la boucle.
-			Quads += (NTiers >= 2) ? 2 : 3;
+			Quads += bSegTiers ? 2 : 3;
 		}
 		if (Quads > 0)
 		{
@@ -2804,16 +2995,20 @@ namespace
 			// deux bouts (meme raison que pour les bordures).
 			const FVector2D D0 = (Pts[1] - Pts[0]).GetSafeNormal();
 			const FVector2D D1 = (Pts[N - 1] - Pts[N - 2]).GetSafeNormal();
+			// M4 : les bouchons descendent au MEME niveau que le dos (le pied enterre),
+			// sinon ils rouvriraient par le bas ce que le dos vient de fermer.
+			const float ZCapA = FMath::Min(ZFoot[0], ZCrest[0]) - GWallSinkCm;
+			const float ZCapB = FMath::Min(ZFoot[N - 1], ZCrest[N - 1]) - GWallSinkCm;
 			const FVector3f CapA[4] = {
 				V3(PFoot[0], ZFoot[0] - GWallSinkCm),
-				V3(PCrest[0], ZCrest[0] - GWallSinkCm),
+				V3(PCrest[0], ZCapA),
 				V3(PCrest[0], ZCrest[0]),
 				V3(PFoot[0], ZCrest[0]) };
 			const FVector3f CapB[4] = {
 				V3(PFoot[N - 1], ZFoot[N - 1] - GWallSinkCm),
 				V3(PFoot[N - 1], ZCrest[N - 1]),
 				V3(PCrest[N - 1], ZCrest[N - 1]),
-				V3(PCrest[N - 1], ZCrest[N - 1] - GWallSinkCm) };
+				V3(PCrest[N - 1], ZCapB) };
 			const FVector2f CapUV[4] = {
 				FVector2f(0.f, 0.f), FVector2f(1.f, 0.f), FVector2f(1.f, 1.f), FVector2f(0.f, 1.f) };
 			QM.AddPoly(Group, CapA, 4,
@@ -2821,6 +3016,14 @@ namespace
 			QM.AddPoly(Group, CapB, 4,
 				FVector3f((float)D1.X, (float)D1.Y, 0.f).GetSafeNormal(), CapUV, Tint);
 			Quads += 2;
+		}
+		if (TierM > 0.f)
+		{
+			OutTiers = NTiers;
+			if (OutTierM)
+			{
+				*OutTierM += TierM;
+			}
 		}
 		return Quads;
 	}
@@ -9721,7 +9924,9 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		const float QuadCm = (Gen.GroundGridN > 0) ? Cell / (float)Gen.GroundGridN : Cell;
 		int32 CellsWithWalls = 0;
 		int32 CellsWrongSize = 0;
+		int32 GradinsWrongSize = 0;
 		double BakedCellM = 0.0;
+		const FString GradinDir = GradinsDir(Gen);
 		for (const FString& File : Files)
 		{
 			FString Rest = FPaths::GetBaseFilename(File);
@@ -9745,13 +9950,23 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			}
 			++CellsWithWalls;
 			const FIntPoint CelluleMur(FCString::Atoi(*Sx), FCString::Atoi(*Sy));
+			// FINITION QUAIS : les EMPRISES de gradins de CETTE cellule. Contrat des
+			// autres side-cars : dossier absent ou cellule sans fichier = aucune
+			// emprise, sans erreur — et alors pas un gradin nulle part.
+			TArray<FGradinEmprise> Emprises;
+			LoadGradinsCell(GradinDir, CelluleMur.X, CelluleMur.Y, CellSizeM,
+				Emprises, GradinsWrongSize);
+			Summary.QuayTierEmprises += Emprises.Num();
 			for (const FRetainingWall& W : Walls)
 			{
 				int32 Tiers = 0;
+				float TierM = 0.f;
 				const int32 Q = BuildRetainingWall(
 					GetInKey(GroundCells, CleSol(W.PtsCm[0], CelluleMur),
 						bLinearColors, bWorldUVs),
-					W, WallRGZ, WallSurf, WallTint, QuadCm, Gen.bQuayTiers, Tiers);
+					W, WallRGZ, WallSurf, WallTint, QuadCm, Gen.bQuayTiers, Tiers,
+					&Emprises, &TierM);
+				Summary.QuayTierDm += FMath::RoundToInt32(TierM * 10.0f);
 				if (Q > 0)
 				{
 					Summary.RetainingWallQuads += Q;
@@ -9760,6 +9975,19 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 					{
 						++Summary.QuayTierWalls;
 						Summary.QuayTiers += Tiers;
+						// NOMINATIF, une ligne par mur gradine : c'est ce que lit le
+						// verrou (work/FINQUAIS/f_verrou_gradins.py). Un compte agrege
+						// ne dirait pas QUEL mur, ni sur COMBIEN de metres.
+						double LongCm = 0.0;
+						for (int32 k = 0; k + 1 < W.PtsCm.Num(); ++k)
+						{
+							LongCm += (W.PtsCm[k + 1] - W.PtsCm[k]).Size();
+						}
+						UE_LOG(LogCityImport, Display,
+							TEXT("GRADIN POSE cellule=%d_%d classe=%s longueur_mur=%.1f m gradines=%.1f m gradins=%d h_med_side_car=%.2f m borde_pieton=%d"),
+							CelluleMur.X, CelluleMur.Y, *W.Classe,
+							(float)(LongCm * 0.01), TierM, Tiers,
+							W.HMedCm * 0.01f, W.bBordePieton ? 1 : 0);
 					}
 				}
 				else
@@ -9773,8 +10001,9 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			CellsWithWalls, Summary.RetainingWalls, Summary.RetainingWallQuads,
 			Summary.RetainingWallsSkipped, *WallDir);
 		UE_LOG(LogCityImport, Display,
-			TEXT("QUAIS V4 gradins : %d murs de quai rendus en gradins (%d gradins au total) — %s."),
-			Summary.QuayTierWalls, Summary.QuayTiers,
+			TEXT("Gradins de quai : %d emprises OSM lues dans '%s', %d murs gradines (%d gradins, %.1f m de mur) — %s. Hors emprise, AUCUN gradin : c'est la donnee qui borne, pas un reglage."),
+			Summary.QuayTierEmprises, *GradinDir, Summary.QuayTierWalls, Summary.QuayTiers,
+			Summary.QuayTierDm * 0.1f,
 			Gen.bQuayTiers ? TEXT("profil actif") : TEXT("PROFIL DESACTIVE (bQuayTiers=false)"));
 		if (CellsWrongSize > 0)
 		{

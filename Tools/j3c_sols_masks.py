@@ -96,6 +96,21 @@ OCSGE_PATH = os.path.join(SRC, "ocsge_verts.json")
 # sans fichier = aucune promenade, sans erreur (comme les murs).
 PROMENADE_DIR = os.path.join(SRC, "Promenade")
 PROMENADE_ON = True        # False = rollback complet, sans re-cuire le side-car
+# --- LOT FINITION QUAIS : UN OUVRAGE NE SE PEINT PAS SUR LE SOL ---------------
+# REGLE NATIONALE : un troncon de route qui appartient a un OUVRAGE (la chaine
+# connexe du side-car SourceData/Ponts, celle-la meme qui porte le tablier 3D du
+# C++) ne se peint PAS sur le sol — ni chaussee, ni ligne axiale, ni bordure : le
+# tablier les porte, plusieurs metres plus haut.
+# `position_par_rapport_au_sol > 0` ne suffit pas et ne suffira jamais : BD TOPO ne
+# code « pont » que la travee franchie, les RAMPES restent a `pos = 0` tout en
+# etant en l'air (mesure du lot PONTS : 44 des 98 troncons d'ouvrage du proto).
+# `routes_bdtopo.json` (WFS) n'a pas de `cleabs` : l'appariement se fait sur la
+# GEOMETRIE, et il separe sans ambiguite (mesure : 98 troncons a >= 99,9 % de
+# recouvrement, le suivant est a 47 % — cf. work/FINQUAIS/f2_appariement.json).
+PONTS_DIR = os.path.join(SRC, "Ponts")
+PONTS_ON = True            # False = rollback complet (les ouvrages redeviennent peints)
+PONT_APP_TOL_M = 1.0       # tolerance laterale de l'appariement geometrique
+PONT_APP_FRAC = 0.5        # part de la longueur du troncon a recouvrir pour apparier
 # FINITION_SOL : noeuds OSM `highway=crossing` deja filtres et convertis en repere
 # local par Tools/fetch_osm_crossings.py (cache disque : zero fetch reseau en lot).
 CROSSINGS_PATH = os.path.join(SRC, "Reseau", "osm_crossings_carre10.json")
@@ -494,6 +509,52 @@ def rasterize(geom, size, x0, y0, px_m):
 
 
 # --------------------------------------------------------------------- chargements
+_OUVRAGES_CACHE = {}
+
+
+def axes_ouvrages():
+    """Les AXES des ouvrages (side-car SourceData/Ponts), prepares une fois.
+
+    Meme contrat que les autres side-cars : dossier absent = aucun ouvrage, sans
+    erreur. Rend (geometrie preparee | None, longueur d'axe totale, nb troncons)."""
+    if "u" in _OUVRAGES_CACHE:
+        return _OUVRAGES_CACHE["u"], _OUVRAGES_CACHE["m"], _OUVRAGES_CACHE["n"]
+    bandes, tot = [], 0.0
+    if PONTS_ON and os.path.isdir(PONTS_DIR):
+        import glob as _glob
+        for p in sorted(_glob.glob(os.path.join(PONTS_DIR, "ponts_*.json"))):
+            try:
+                with open(p, encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception as ex:  # noqa: BLE001
+                log("ATTENTION : %s illisible (%s) — ignore" % (os.path.basename(p), ex))
+                continue
+            for o in data.get("ponts", []):
+                pts = [(c[0], c[1]) for c in (o.get("pts") or [])]
+                if len(pts) < 2:
+                    continue
+                ln = LineString(pts)
+                if ln.length <= 0.0:
+                    continue
+                tot += ln.length
+                bandes.append(ln.buffer(PONT_APP_TOL_M, cap_style=2, join_style=2))
+    u = prep(C.valide(unary_union(bandes))) if bandes else None
+    _OUVRAGES_CACHE.update({"u": u, "m": tot, "n": len(bandes),
+                            "g": C.valide(unary_union(bandes)) if bandes else None})
+    return u, tot, len(bandes)
+
+
+def est_ouvrage(line):
+    """Vrai si `line` est le troncon d'un OUVRAGE : au moins PONT_APP_FRAC de sa
+    longueur a moins de PONT_APP_TOL_M d'un axe du side-car Ponts."""
+    u, _, _ = axes_ouvrages()
+    if u is None or line.length <= 0.0:
+        return False
+    if not u.intersects(line):
+        return False
+    return line.intersection(_OUVRAGES_CACHE["g"]).length / line.length >= PONT_APP_FRAC
+
+
 def charger_routes_bdtopo(fen):
     """Tous les troncons BD TOPO de la fenetre, avec ce qu'il faut pour trancher :
     largeur mesuree, nature, position (pont), nombre de voies."""
@@ -501,7 +562,7 @@ def charger_routes_bdtopo(fen):
         data = json.load(f)
     out = []
     stats = {"lus": 0, "gardes": 0, "mesure": 0, "repli": 0, "pont": 0,
-             "souterrain": 0, "nature": 0, "autre": 0}
+             "souterrain": 0, "nature": 0, "autre": 0, "ouvrage": 0}
     for tr in data.get("troncons", []):
         pts = tr.get("pts") or []
         stats["lus"] += 1
@@ -522,11 +583,20 @@ def charger_routes_bdtopo(fen):
             stats["souterrain"] += 1
             continue
         largeur, source = C.largeur_de(tr)
+        ligne = LineString(pts)
+        # LOT FINITION QUAIS : un troncon d'OUVRAGE est un pont pour le bake, meme
+        # si BD TOPO le laisse a pos = 0 (les rampes). Un seul discriminant,
+        # `rec["pont"]`, et TOUT ce qui le lit suit : bandes peintes, bordures,
+        # bouts pendants, carrefours, tirets axiaux.
+        ouvrage = False
+        if pos <= 0 and est_ouvrage(ligne):
+            ouvrage = True
+            stats["ouvrage"] += 1
         rec = {
-            "line": LineString(pts),
+            "line": ligne,
             "largeur": largeur,
             "nature": nat,
-            "pont": pos > 0,
+            "pont": pos > 0 or ouvrage,
             "voies": C.as_int(tr.get("nombre_de_voies"), 0) or 0,
             "etroit": nat in C.NATURES_ETROITES,
             "sans_bordure": nat in NATURES_SANS_BORDURE,
@@ -545,11 +615,13 @@ def charger_routes_bdtopo(fen):
             stats["gardes"] += 1
             stats[source] += 1
         out.append(rec)
+    _, m_ouv, n_ouv = axes_ouvrages()
     log("routes BD TOPO : %d troncons dans la fenetre (%d au sol, %d ponts exclus du "
-        "masque, %d souterrains, %d natures pietonnes, %d hors service) ; largeurs "
-        "mesurees %d / replis %d"
-        % (len(out), stats["gardes"], stats["pont"], stats["souterrain"], stats["nature"],
-           stats["autre"], stats["mesure"], stats["repli"]))
+        "masque dont %d RAMPES d'ouvrage a pos <= 0, %d souterrains, %d natures "
+        "pietonnes, %d hors service) ; largeurs mesurees %d / replis %d ; side-car "
+        "Ponts : %d troncons / %.0f m d'axe"
+        % (len(out), stats["gardes"], stats["pont"], stats["ouvrage"], stats["souterrain"],
+           stats["nature"], stats["autre"], stats["mesure"], stats["repli"], n_ouv, m_ouv))
     return out
 
 
@@ -1802,6 +1874,37 @@ def selftest():
     # Le chemin de 3 m traverse tout : 100 m x 3 m, moins ce que la chaussee mange.
     check_bool("gravier present", gravier.area > 200.0, True)
     check_bool("gravier disjoint de la chaussee", gravier.intersection(chaussee).area < 0.5, True)
+
+    # 3 bis. FINITION QUAIS — l'APPARIEMENT geometrique des troncons d'OUVRAGE.
+    #        Le side-car est injecte en dur (hermetique, zero acces disque) : un
+    #        ouvrage de 100 m sur l'axe y = 60. On verifie que la RAMPE (meme axe,
+    #        pos = 0) est appariee, qu'une route qui passe DESSOUS en travers ne
+    #        l'est pas, et qu'une route PARALLELE a 6 m ne l'est pas non plus.
+    sauve = dict(_OUVRAGES_CACHE)
+    try:
+        _OUVRAGES_CACHE.clear()
+        axe_ouv = LineString([(0, 60), (100, 60)])
+        g_ouv = axe_ouv.buffer(PONT_APP_TOL_M, cap_style=2, join_style=2)
+        _OUVRAGES_CACHE.update({"u": prep(g_ouv), "g": g_ouv, "m": 100.0, "n": 1})
+        check_bool("ouvrage : la RAMPE sur l'axe est appariee",
+                   est_ouvrage(LineString([(10, 60), (60, 60)])), True)
+        check_bool("ouvrage : une route qui passe DESSOUS en travers n'est PAS appariee",
+                   est_ouvrage(LineString([(50, 0), (50, 100)])), False)
+        check_bool("ouvrage : une route PARALLELE a 6 m n'est PAS appariee",
+                   est_ouvrage(LineString([(0, 66), (100, 66)])), False)
+        check_bool("ouvrage : un troncon a moitie dedans (60 %) est apparie",
+                   est_ouvrage(LineString([(40, 60), (100, 60), (100, 100)])), True)
+        # Le meme troncon, mais avec seulement 40 % dedans : ecarte.
+        check_bool("ouvrage : un troncon a 40 % dedans est ECARTE",
+                   est_ouvrage(LineString([(60, 60), (100, 60), (100, 160)])), False)
+        # Et sans side-car (dossier absent) : personne n'est apparie.
+        _OUVRAGES_CACHE.clear()
+        _OUVRAGES_CACHE.update({"u": None, "g": None, "m": 0.0, "n": 0})
+        check_bool("ouvrage : side-car absent = aucun appariement",
+                   est_ouvrage(LineString([(10, 60), (60, 60)])), False)
+    finally:
+        _OUVRAGES_CACHE.clear()
+        _OUVRAGES_CACHE.update(sauve)
 
     # 4. Bordures : orientation (chaussee A GAUCHE) et exclusion de l'autoroutier.
     lignes = curb_lines(chaussee, zone, routes, [])

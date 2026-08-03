@@ -302,8 +302,20 @@ struct FCityGenProfile
 	 * ITERATION UTILISATEUR 1 (02/08) — le couple A/B a ete TRANCHE par
 	 * l'utilisateur : c'est la FACE LISSE. Le defaut passe donc a `false` ; la dette
 	 * (« basculer le defaut au prochain build ») est soldee au lot PIE.
+	 *
+	 * ⭐ LOT FINITION QUAIS (03/08) — LE DEFAUT REPASSE A `true`, ET LE SENS DU
+	 * DRAPEAU CHANGE. Ce que l'utilisateur avait rejete, ce n'etait pas le gradin
+	 * (« tres realiste ») : c'etait des gradins SUR TOUT LE QUAI, poses sur un
+	 * critere devine (`borde_pieton`), donc partout. Une DONNEE existe pour dire ou
+	 * ils sont vraiment : OSM `leisure=bleachers`, un vocabulaire mesure comme
+	 * NATIONAL (99 elements / 92 polygones sur 5 agglomerations). Depuis, les
+	 * gradins ne s'appliquent qu'a la PORTION de mur tombant dans une emprise du
+	 * side-car `SourceData/Gradins` — sans side-car, AUCUN gradin nulle part.
+	 * `true` signifie donc « suis la donnee », pas « mets-en partout », et la
+	 * regression « gradins sur tout le quai » est structurellement impossible.
+	 * `false` reste le rollback total, sans re-cuire ni rebuilder.
 	 */
-	UPROPERTY() bool bQuayTiers = false;
+	UPROPERTY() bool bQuayTiers = true;
 
 	/**
 	 * ⭐ LOT PIE (02/08) — LA COLLISION DE LA VEGETATION, ET POURQUOI ELLE PART.
@@ -496,6 +508,18 @@ struct FCityStreamedSummary
 
 	/** QUAIS V4 : gradins poses, tous murs confondus. */
 	UPROPERTY() int32 QuayTiers = 0;
+
+	/**
+	 * FINITION QUAIS : LONGUEUR de mur reellement rendue en gradins, en DECIMETRES.
+	 * C'est le seul compteur qui rende la regle verifiable : les gradins ne
+	 * s'appliquent qu'a la PORTION d'un mur de quai tombant dans une emprise OSM
+	 * `leisure=bleachers`, et « 0 m ailleurs » ne se prouve pas avec un compte de
+	 * murs. En decimetres pour rester entier dans le resume.
+	 */
+	UPROPERTY() int32 QuayTierDm = 0;
+
+	/** FINITION QUAIS : emprises de gradins lues dans le side-car (cellules visees). */
+	UPROPERTY() int32 QuayTierEmprises = 0;
 
 	/** C2 : tabliers de pont poses A LEUR COTE (un par troncon d'ouvrage). */
 	UPROPERTY() int32 Bridges = 0;

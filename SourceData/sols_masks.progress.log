@@ -3046,3 +3046,568 @@
 2026-08-02 20:07:43  PEINT   : 60563 m2 de chaussee, 5051 m2 de voirie privee, 7852 m2 de gravier, 85598 m2 d'HERBE (ecart raster max 1.50 %)
 2026-08-02 20:07:43  HERBE V3: releve 84661 m2 -> regularisation -1265 m2 (8566 -> 583 sommets) -> accostage+trous +2201 m2 | trous vus 8, combles 0 (0 m2) | miettes 6/48 retirees (2.8 m2)
 2026-08-02 20:07:43  MAILLE  : 267 polylignes de bordure (26991 m), 104 bordurettes d'herbe (4611 m sur 9281 m de contour, 5 m ecartes trop courts), 0 passages, 200 tirets
+2026-08-03 11:50:22  selftest SDF centre du disque (sature)      attendu    10.5000  obtenu    10.5000  OK
+2026-08-03 11:50:22  selftest SDF a 5 px du bord (dedans)        attendu     5.0000  obtenu     4.5990  OK
+2026-08-03 11:50:22  selftest SDF a 5 px du bord (dehors)        attendu    -5.0000  obtenu    -4.5000  OK
+2026-08-03 11:50:22  selftest SDF signe dedans                   attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest SDF signe dehors                   attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest encodage frontiere -> 128          attendu   128.0000  obtenu   127.0000  OK
+2026-08-03 11:50:22  selftest encodage -2 m -> plancher 1        attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:50:22  selftest encodage +2 m -> 255               attendu   255.0000  obtenu   255.0000  OK
+2026-08-03 11:50:22  selftest encodage sature en bas             attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:50:22  selftest encodage sature en haut            attendu   255.0000  obtenu   255.0000  OK
+2026-08-03 11:50:22  selftest sans bati : pas d'union batie      attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest corridor synthetique (m2)          attendu  1000.0000  obtenu  1000.0000  OK
+2026-08-03 11:50:22  selftest chaussee = corridor - pont         attendu   920.0000  obtenu   920.0000  OK
+2026-08-03 11:50:22  selftest le pont ne se peint pas            attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest voirie privee (m2)                 attendu   356.0000  obtenu   356.0000  OK
+2026-08-03 11:50:22  selftest gravier present                    attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest gravier disjoint de la chaussee    attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest bordures produites                 attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest bordures mal orientees             attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest bordures echantillonnees           attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest bordures sur autoroutier           attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest sites de passage                   attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:50:22  selftest passage : demi-largeur             attendu     5.0000  obtenu     5.0000  OK
+2026-08-03 11:50:22  selftest passage : |dy| (axe de rue)        attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:50:22  selftest passage : x du site (snappe sur l'axe) attendu    50.0000  obtenu    50.0000  OK
+2026-08-03 11:50:22  selftest passage : noeud sans axe rejete    attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest passage : noeud hors chaussee rejete attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest passage : dedoublonnage a 7 m      attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:50:22  selftest bordure coupee a la traversee      attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest tirets produits                    attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest longueur de tiret                  attendu     3.0000  obtenu     3.0000  OK
+2026-08-03 11:50:22  selftest tirets hors chaussee               attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest tirets dans un carrefour           attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest carrefour = moins de tirets        attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest rasterisation 50 x 50 (m2)         attendu  2500.0000  obtenu  2500.0000  OK
+2026-08-03 11:50:22  selftest largeur rendue d'une chaussee de 10 m attendu    10.0000  obtenu    10.0098  OK
+2026-08-03 11:50:22  selftest corridor sans bati (m2)            attendu  2000.0000  obtenu  2000.0000  OK
+2026-08-03 11:50:22  selftest union batie rendue                 attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest corridor - batiment (m2)           attendu    45.7255  obtenu    45.7255  OK
+2026-08-03 11:50:22  selftest corridor sous batiment (m2)        attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest chaussee sous batiment (m2)        attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest la chaussee perd bien du terrain   attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest privee sous batiment (m2)          attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest points de bordure dans le bati     attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest longueur de bordure dans le bati   attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest des bordures subsistent ailleurs   attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest le porche a de la surface          attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest chaussee conservee sous le porche  attendu   128.0000  obtenu   128.0000  OK
+2026-08-03 11:50:22  selftest le centre du porche est de la chaussee attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest corridor sous le porche hors bande attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest extremites pendantes               attendu     2.0000  obtenu     2.0000  OK
+2026-08-03 11:50:22  selftest largeur retenue au bout            attendu     8.0000  obtenu     8.0000  OK
+2026-08-03 11:50:22  selftest bordures d'impasse produites       attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest bout plat present dans la chaussee (10) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest bordure au bout pendant (10)       attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest bout plat present dans la chaussee (60) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest bordure au bout pendant (60)       attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest pendantes du T (le noeud exclu)    attendu     3.0000  obtenu     3.0000  OK
+2026-08-03 11:50:22  selftest le noeud du T n'est pas pendant    attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest CROSSINGS_ON coupe                 attendu      False  obtenu      False  OK
+2026-08-03 11:50:22  selftest crossing_sites appelee directement attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:50:22  selftest crossing_sites SANS noeud OSM (jamais invente) attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest site propose : demi-largeur        attendu     5.0000  obtenu     5.0000  OK
+2026-08-03 11:50:22  selftest site propose : dans l'axe de la rue attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:50:22  cellule +9999,+9999 : chaussee 2.0 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 2 bordures (1000 m) | 0 bordurettes (0 m) | 0 passages | 112 tirets | masque 0.00 Mo | json 0.01 Mo | 0.1 s
+2026-08-03 11:50:22     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-03 11:50:22     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-03 11:50:22  selftest passages ecrits par la cuisson (CROSSINGS_ON coupe) attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest la cuisson ecrit toujours ses bordures attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest la cuisson ecrit toujours ses tirets attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest bordure continue : au plus 2 rives sur une rue droite attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest marche de largeur : aucune bordure en travers attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest marche de largeur : les bordures longitudinales restent (231 m) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest depointage : pointe de 2 cm retiree attendu     4.0000  obtenu     4.0000  OK
+2026-08-03 11:50:22  selftest depointage : epingle de 3 m conservee attendu     6.0000  obtenu     6.0000  OK
+2026-08-03 11:50:22  selftest frontiere interne : rien de maille dans la chaussee attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  cellule +8888,+8888 : chaussee 2.0 % | herbe 13025 m2 (raster 13000 m2, ecart 0.16 %) | 2 bordures (1000 m) | 2 bordurettes (458 m) | 0 passages | 112 tirets | masque 0.00 Mo | json 0.01 Mo | 0.0 s
+2026-08-03 11:50:22     herbe v3 : releve 13198 m2 -> regularisation -281 m2 (138 -> 10 sommets) -> accostage+trous +108 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/2 retirees (0.0 m2) | contour 701 m -> bordurette 458 m
+2026-08-03 11:50:22     bordurette v4 : 4 extremites recalees sur une bordure de chaussee (1.60 m cumules) | peinture retractee de 0.10 m sous 2 pierres (-46.1 m2, soit 0.35 % de l'herbe)
+2026-08-03 11:50:22  selftest herbe : pelouse peinte             attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest herbe : complement de la chaussee  attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest canal R : coeur de pelouse >= 200  attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest canal R : chaussee <= 60           attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest canal R : languette EFFACEE        attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest canal R : hors tout vert <= 60     attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest herbe absente par defaut (verrou 11) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest accostage : le lisere de 60 cm est comble attendu  3000.0000  obtenu  2999.9627  OK
+2026-08-03 11:50:22  selftest accostage : l'herbe touche la chaussee attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest accostage : zero recouvrement du mineral attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest accostage : a 5 m, l'herbe n'est PAS tiree attendu  2500.0000  obtenu  2500.0000  OK
+2026-08-03 11:50:22  selftest accostage : l'ecart de 5 m est conserve attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest lissage : le contour dentele est simplifie (204 -> 5 sommets) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest lissage : l'aire est preservee a 1 %% attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest axiale : une rue LIBRE garde ses tirets (44) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest axiale : zero tiret sur une rue « ayants droit » attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest axiale par rue : les 4 troncons forment UNE rue attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:50:22  selftest axiale par rue : la rue mixte est muette (150 m / 200 m) attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:50:22  selftest axiale par rue : zero tiret sur la rue mixte attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest axiale par rue : une rue minoritairement restreinte garde son axe attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest axiale par rue : et elle garde bien ses tirets attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest axiale par rue : deux rues distinctes malgre le noeud partage attendu     2.0000  obtenu     2.0000  OK
+2026-08-03 11:50:22  selftest axiale par rue : la rue Libre voisine garde ses tirets (40) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest axiale sans nom : deux troncons alignes = une rue attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:50:22  selftest axiale sans nom : le carrefour (3 troncons) COUPE le chainage attendu     3.0000  obtenu     3.0000  OK
+2026-08-03 11:50:22  selftest axiale : attribut absent = voie ouverte attendu    44.0000  obtenu    44.0000  OK
+2026-08-03 11:50:22  selftest facade : le lisere de 60 cm est comble attendu  3000.0000  obtenu  2999.9627  OK
+2026-08-03 11:50:22  selftest facade : l'herbe touche le mur     attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest facade : zero recouvrement du bati attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest trous : les 3 trous sont vus       attendu     3.0000  obtenu     3.0000  OK
+2026-08-03 11:50:22  selftest trous : un seul comble             attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:50:22  selftest trous : c'est bien le trou VIDE (25 m2) attendu    25.0000  obtenu    25.0000  OK
+2026-08-03 11:50:22  selftest trous : le trou a batiment reste ouvert attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest trous : le trou de 100 m2 reste ouvert attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest miettes : 4 fragments vus          attendu     4.0000  obtenu     4.0000  OK
+2026-08-03 11:50:22  selftest miettes : 2 retires                attendu     2.0000  obtenu     2.0000  OK
+2026-08-03 11:50:22  selftest miettes : 5 m2 retires             attendu     5.0000  obtenu     5.0000  OK
+2026-08-03 11:50:22  selftest miettes : la pelouse de 25 m2 (au-dessus du seuil) est INTACTE attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest miettes : le gros fragment est INTACT attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest regularisation : le contour est decime (104 -> 5 sommets) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest regularisation : l'aire est preservee a 2 % attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest regularisation : zero debord sur le mineral apres re-soustraction attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest bordurette : au moins un segment pose (2 segments, 199 m) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest bordurette : rien le long du MUR   attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest bordurette : rien LE LONG de la bordure de chaussee existante (bouts exclus : le raccord v4 y est colle expres) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest bordurette : le total vaut les deux cotes libres (200 m, obtenu 199) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest bordurette : l'herbe est A DROITE, le mineral A GAUCHE attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest bordurette : le trou de 1 m entre deux bordures ne produit rien attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:50:22  selftest bordurette : ce bout est bien compte comme ecarte (trop court) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest v4 retraction : la peinture perd recul x longueur (0,10 x 20 = 2 m2) attendu     2.0000  obtenu     2.0000  OK
+2026-08-03 11:50:22  selftest v4 retraction : le polygone d'ORIGINE est intact (la pierre ne bouge pas) attendu   400.0000  obtenu   400.0000  OK
+2026-08-03 11:50:22  selftest v4 retraction : le recul se fait bien DANS l'herbe (y=0,05 sorti) attendu      False  obtenu      False  OK
+2026-08-03 11:50:22  selftest v4 retraction : au-dela du recul l'herbe est intacte (y=0,20 garde) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest v4 retraction : le cote NON borde ne recule pas (x=0,05 garde) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest v4 retraction : sans bordurette, aucun recul attendu   400.0000  obtenu   400.0000  OK
+2026-08-03 11:50:22  selftest v4 retraction : recul nul = polygone inchange attendu   400.0000  obtenu   400.0000  OK
+2026-08-03 11:50:22  selftest v4 retraction : bouts DROITS (pas de morsure au-dela de la pierre) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest v4 snap : au moins une extremite est POSEE sur la bordure (d = 0) attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest v4 snap : le recalage est compte   attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  selftest v4 snap : au-dela de 1 m, aucune extremite n'est deplacee attendu       True  obtenu       True  OK
+2026-08-03 11:50:22  SELFTEST : PASS
+2026-08-03 11:51:07  selftest SDF centre du disque (sature)      attendu    10.5000  obtenu    10.5000  OK
+2026-08-03 11:51:07  selftest SDF a 5 px du bord (dedans)        attendu     5.0000  obtenu     4.5990  OK
+2026-08-03 11:51:07  selftest SDF a 5 px du bord (dehors)        attendu    -5.0000  obtenu    -4.5000  OK
+2026-08-03 11:51:07  selftest SDF signe dedans                   attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest SDF signe dehors                   attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest encodage frontiere -> 128          attendu   128.0000  obtenu   127.0000  OK
+2026-08-03 11:51:07  selftest encodage -2 m -> plancher 1        attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:07  selftest encodage +2 m -> 255               attendu   255.0000  obtenu   255.0000  OK
+2026-08-03 11:51:07  selftest encodage sature en bas             attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:07  selftest encodage sature en haut            attendu   255.0000  obtenu   255.0000  OK
+2026-08-03 11:51:07  selftest sans bati : pas d'union batie      attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest corridor synthetique (m2)          attendu  1000.0000  obtenu  1000.0000  OK
+2026-08-03 11:51:07  selftest chaussee = corridor - pont         attendu   920.0000  obtenu   920.0000  OK
+2026-08-03 11:51:07  selftest le pont ne se peint pas            attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest voirie privee (m2)                 attendu   356.0000  obtenu   356.0000  OK
+2026-08-03 11:51:07  selftest gravier present                    attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest gravier disjoint de la chaussee    attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest ouvrage : la RAMPE sur l'axe est appariee attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest ouvrage : une route qui passe DESSOUS en travers n'est PAS appariee attendu      False  obtenu      False  OK
+2026-08-03 11:51:07  selftest ouvrage : une route PARALLELE a 6 m n'est PAS appariee attendu      False  obtenu      False  OK
+2026-08-03 11:51:07  selftest ouvrage : un troncon a moitie dedans (60 %) est apparie attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest ouvrage : un troncon a 40 % dedans est ECARTE attendu      False  obtenu      False  OK
+2026-08-03 11:51:07  selftest ouvrage : side-car absent = aucun appariement attendu      False  obtenu      False  OK
+2026-08-03 11:51:07  selftest bordures produites                 attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest bordures mal orientees             attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest bordures echantillonnees           attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest bordures sur autoroutier           attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest sites de passage                   attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:07  selftest passage : demi-largeur             attendu     5.0000  obtenu     5.0000  OK
+2026-08-03 11:51:07  selftest passage : |dy| (axe de rue)        attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:07  selftest passage : x du site (snappe sur l'axe) attendu    50.0000  obtenu    50.0000  OK
+2026-08-03 11:51:07  selftest passage : noeud sans axe rejete    attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest passage : noeud hors chaussee rejete attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest passage : dedoublonnage a 7 m      attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:07  selftest bordure coupee a la traversee      attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest tirets produits                    attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest longueur de tiret                  attendu     3.0000  obtenu     3.0000  OK
+2026-08-03 11:51:07  selftest tirets hors chaussee               attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest tirets dans un carrefour           attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest carrefour = moins de tirets        attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest rasterisation 50 x 50 (m2)         attendu  2500.0000  obtenu  2500.0000  OK
+2026-08-03 11:51:07  selftest largeur rendue d'une chaussee de 10 m attendu    10.0000  obtenu    10.0098  OK
+2026-08-03 11:51:07  selftest corridor sans bati (m2)            attendu  2000.0000  obtenu  2000.0000  OK
+2026-08-03 11:51:07  selftest union batie rendue                 attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest corridor - batiment (m2)           attendu    45.7255  obtenu    45.7255  OK
+2026-08-03 11:51:07  selftest corridor sous batiment (m2)        attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest chaussee sous batiment (m2)        attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest la chaussee perd bien du terrain   attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest privee sous batiment (m2)          attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest points de bordure dans le bati     attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest longueur de bordure dans le bati   attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest des bordures subsistent ailleurs   attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest le porche a de la surface          attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest chaussee conservee sous le porche  attendu   128.0000  obtenu   128.0000  OK
+2026-08-03 11:51:07  selftest le centre du porche est de la chaussee attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest corridor sous le porche hors bande attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest extremites pendantes               attendu     2.0000  obtenu     2.0000  OK
+2026-08-03 11:51:07  selftest largeur retenue au bout            attendu     8.0000  obtenu     8.0000  OK
+2026-08-03 11:51:07  selftest bordures d'impasse produites       attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest bout plat present dans la chaussee (10) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest bordure au bout pendant (10)       attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest bout plat present dans la chaussee (60) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest bordure au bout pendant (60)       attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest pendantes du T (le noeud exclu)    attendu     3.0000  obtenu     3.0000  OK
+2026-08-03 11:51:07  selftest le noeud du T n'est pas pendant    attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest CROSSINGS_ON coupe                 attendu      False  obtenu      False  OK
+2026-08-03 11:51:07  selftest crossing_sites appelee directement attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:07  selftest crossing_sites SANS noeud OSM (jamais invente) attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest site propose : demi-largeur        attendu     5.0000  obtenu     5.0000  OK
+2026-08-03 11:51:07  selftest site propose : dans l'axe de la rue attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:07  cellule +9999,+9999 : chaussee 2.0 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 2 bordures (1000 m) | 0 bordurettes (0 m) | 0 passages | 112 tirets | masque 0.00 Mo | json 0.01 Mo | 0.0 s
+2026-08-03 11:51:07     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-03 11:51:07     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-03 11:51:07  selftest passages ecrits par la cuisson (CROSSINGS_ON coupe) attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest la cuisson ecrit toujours ses bordures attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest la cuisson ecrit toujours ses tirets attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest bordure continue : au plus 2 rives sur une rue droite attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest marche de largeur : aucune bordure en travers attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest marche de largeur : les bordures longitudinales restent (231 m) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest depointage : pointe de 2 cm retiree attendu     4.0000  obtenu     4.0000  OK
+2026-08-03 11:51:07  selftest depointage : epingle de 3 m conservee attendu     6.0000  obtenu     6.0000  OK
+2026-08-03 11:51:07  selftest frontiere interne : rien de maille dans la chaussee attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  cellule +8888,+8888 : chaussee 2.0 % | herbe 13025 m2 (raster 13000 m2, ecart 0.16 %) | 2 bordures (1000 m) | 2 bordurettes (458 m) | 0 passages | 112 tirets | masque 0.00 Mo | json 0.01 Mo | 0.0 s
+2026-08-03 11:51:07     herbe v3 : releve 13198 m2 -> regularisation -281 m2 (138 -> 10 sommets) -> accostage+trous +108 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/2 retirees (0.0 m2) | contour 701 m -> bordurette 458 m
+2026-08-03 11:51:07     bordurette v4 : 4 extremites recalees sur une bordure de chaussee (1.60 m cumules) | peinture retractee de 0.10 m sous 2 pierres (-46.1 m2, soit 0.35 % de l'herbe)
+2026-08-03 11:51:07  selftest herbe : pelouse peinte             attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest herbe : complement de la chaussee  attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest canal R : coeur de pelouse >= 200  attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest canal R : chaussee <= 60           attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest canal R : languette EFFACEE        attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest canal R : hors tout vert <= 60     attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest herbe absente par defaut (verrou 11) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest accostage : le lisere de 60 cm est comble attendu  3000.0000  obtenu  2999.9627  OK
+2026-08-03 11:51:07  selftest accostage : l'herbe touche la chaussee attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest accostage : zero recouvrement du mineral attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest accostage : a 5 m, l'herbe n'est PAS tiree attendu  2500.0000  obtenu  2500.0000  OK
+2026-08-03 11:51:07  selftest accostage : l'ecart de 5 m est conserve attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest lissage : le contour dentele est simplifie (204 -> 5 sommets) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest lissage : l'aire est preservee a 1 %% attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest axiale : une rue LIBRE garde ses tirets (44) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest axiale : zero tiret sur une rue « ayants droit » attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest axiale par rue : les 4 troncons forment UNE rue attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:07  selftest axiale par rue : la rue mixte est muette (150 m / 200 m) attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:07  selftest axiale par rue : zero tiret sur la rue mixte attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest axiale par rue : une rue minoritairement restreinte garde son axe attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest axiale par rue : et elle garde bien ses tirets attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest axiale par rue : deux rues distinctes malgre le noeud partage attendu     2.0000  obtenu     2.0000  OK
+2026-08-03 11:51:07  selftest axiale par rue : la rue Libre voisine garde ses tirets (40) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest axiale sans nom : deux troncons alignes = une rue attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:07  selftest axiale sans nom : le carrefour (3 troncons) COUPE le chainage attendu     3.0000  obtenu     3.0000  OK
+2026-08-03 11:51:07  selftest axiale : attribut absent = voie ouverte attendu    44.0000  obtenu    44.0000  OK
+2026-08-03 11:51:07  selftest facade : le lisere de 60 cm est comble attendu  3000.0000  obtenu  2999.9627  OK
+2026-08-03 11:51:07  selftest facade : l'herbe touche le mur     attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest facade : zero recouvrement du bati attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest trous : les 3 trous sont vus       attendu     3.0000  obtenu     3.0000  OK
+2026-08-03 11:51:07  selftest trous : un seul comble             attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:07  selftest trous : c'est bien le trou VIDE (25 m2) attendu    25.0000  obtenu    25.0000  OK
+2026-08-03 11:51:07  selftest trous : le trou a batiment reste ouvert attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest trous : le trou de 100 m2 reste ouvert attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest miettes : 4 fragments vus          attendu     4.0000  obtenu     4.0000  OK
+2026-08-03 11:51:07  selftest miettes : 2 retires                attendu     2.0000  obtenu     2.0000  OK
+2026-08-03 11:51:07  selftest miettes : 5 m2 retires             attendu     5.0000  obtenu     5.0000  OK
+2026-08-03 11:51:07  selftest miettes : la pelouse de 25 m2 (au-dessus du seuil) est INTACTE attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest miettes : le gros fragment est INTACT attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest regularisation : le contour est decime (104 -> 5 sommets) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest regularisation : l'aire est preservee a 2 % attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest regularisation : zero debord sur le mineral apres re-soustraction attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest bordurette : au moins un segment pose (2 segments, 199 m) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest bordurette : rien le long du MUR   attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest bordurette : rien LE LONG de la bordure de chaussee existante (bouts exclus : le raccord v4 y est colle expres) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest bordurette : le total vaut les deux cotes libres (200 m, obtenu 199) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest bordurette : l'herbe est A DROITE, le mineral A GAUCHE attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest bordurette : le trou de 1 m entre deux bordures ne produit rien attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:07  selftest bordurette : ce bout est bien compte comme ecarte (trop court) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest v4 retraction : la peinture perd recul x longueur (0,10 x 20 = 2 m2) attendu     2.0000  obtenu     2.0000  OK
+2026-08-03 11:51:07  selftest v4 retraction : le polygone d'ORIGINE est intact (la pierre ne bouge pas) attendu   400.0000  obtenu   400.0000  OK
+2026-08-03 11:51:07  selftest v4 retraction : le recul se fait bien DANS l'herbe (y=0,05 sorti) attendu      False  obtenu      False  OK
+2026-08-03 11:51:07  selftest v4 retraction : au-dela du recul l'herbe est intacte (y=0,20 garde) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest v4 retraction : le cote NON borde ne recule pas (x=0,05 garde) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest v4 retraction : sans bordurette, aucun recul attendu   400.0000  obtenu   400.0000  OK
+2026-08-03 11:51:07  selftest v4 retraction : recul nul = polygone inchange attendu   400.0000  obtenu   400.0000  OK
+2026-08-03 11:51:07  selftest v4 retraction : bouts DROITS (pas de morsure au-dela de la pierre) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest v4 snap : au moins une extremite est POSEE sur la bordure (d = 0) attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest v4 snap : le recalage est compte   attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  selftest v4 snap : au-dela de 1 m, aucune extremite n'est deplacee attendu       True  obtenu       True  OK
+2026-08-03 11:51:07  SELFTEST : PASS
+2026-08-03 11:51:15  selftest SDF centre du disque (sature)      attendu    10.5000  obtenu    10.5000  OK
+2026-08-03 11:51:15  selftest SDF a 5 px du bord (dedans)        attendu     5.0000  obtenu     4.5990  OK
+2026-08-03 11:51:15  selftest SDF a 5 px du bord (dehors)        attendu    -5.0000  obtenu    -4.5000  OK
+2026-08-03 11:51:15  selftest SDF signe dedans                   attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest SDF signe dehors                   attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest encodage frontiere -> 128          attendu   128.0000  obtenu   127.0000  OK
+2026-08-03 11:51:15  selftest encodage -2 m -> plancher 1        attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:15  selftest encodage +2 m -> 255               attendu   255.0000  obtenu   255.0000  OK
+2026-08-03 11:51:15  selftest encodage sature en bas             attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:15  selftest encodage sature en haut            attendu   255.0000  obtenu   255.0000  OK
+2026-08-03 11:51:15  selftest sans bati : pas d'union batie      attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest corridor synthetique (m2)          attendu  1000.0000  obtenu  1000.0000  OK
+2026-08-03 11:51:15  selftest chaussee = corridor - pont         attendu   920.0000  obtenu   920.0000  OK
+2026-08-03 11:51:15  selftest le pont ne se peint pas            attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest voirie privee (m2)                 attendu   356.0000  obtenu   356.0000  OK
+2026-08-03 11:51:15  selftest gravier present                    attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest gravier disjoint de la chaussee    attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest ouvrage : la RAMPE sur l'axe est appariee attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest ouvrage : une route qui passe DESSOUS en travers n'est PAS appariee attendu      False  obtenu      False  OK
+2026-08-03 11:51:15  selftest ouvrage : une route PARALLELE a 6 m n'est PAS appariee attendu      False  obtenu      False  OK
+2026-08-03 11:51:15  selftest ouvrage : un troncon a moitie dedans (60 %) est apparie attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest ouvrage : un troncon a 40 % dedans est ECARTE attendu      False  obtenu      False  OK
+2026-08-03 11:51:15  selftest ouvrage : side-car absent = aucun appariement attendu      False  obtenu      False  OK
+2026-08-03 11:51:15  selftest bordures produites                 attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest bordures mal orientees             attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest bordures echantillonnees           attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest bordures sur autoroutier           attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest sites de passage                   attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:15  selftest passage : demi-largeur             attendu     5.0000  obtenu     5.0000  OK
+2026-08-03 11:51:15  selftest passage : |dy| (axe de rue)        attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:15  selftest passage : x du site (snappe sur l'axe) attendu    50.0000  obtenu    50.0000  OK
+2026-08-03 11:51:15  selftest passage : noeud sans axe rejete    attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest passage : noeud hors chaussee rejete attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest passage : dedoublonnage a 7 m      attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:15  selftest bordure coupee a la traversee      attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest tirets produits                    attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest longueur de tiret                  attendu     3.0000  obtenu     3.0000  OK
+2026-08-03 11:51:15  selftest tirets hors chaussee               attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest tirets dans un carrefour           attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest carrefour = moins de tirets        attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest rasterisation 50 x 50 (m2)         attendu  2500.0000  obtenu  2500.0000  OK
+2026-08-03 11:51:15  selftest largeur rendue d'une chaussee de 10 m attendu    10.0000  obtenu    10.0098  OK
+2026-08-03 11:51:15  selftest corridor sans bati (m2)            attendu  2000.0000  obtenu  2000.0000  OK
+2026-08-03 11:51:15  selftest union batie rendue                 attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest corridor - batiment (m2)           attendu    45.7255  obtenu    45.7255  OK
+2026-08-03 11:51:15  selftest corridor sous batiment (m2)        attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest chaussee sous batiment (m2)        attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest la chaussee perd bien du terrain   attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest privee sous batiment (m2)          attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest points de bordure dans le bati     attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest longueur de bordure dans le bati   attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest des bordures subsistent ailleurs   attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest le porche a de la surface          attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest chaussee conservee sous le porche  attendu   128.0000  obtenu   128.0000  OK
+2026-08-03 11:51:15  selftest le centre du porche est de la chaussee attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest corridor sous le porche hors bande attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest extremites pendantes               attendu     2.0000  obtenu     2.0000  OK
+2026-08-03 11:51:15  selftest largeur retenue au bout            attendu     8.0000  obtenu     8.0000  OK
+2026-08-03 11:51:15  selftest bordures d'impasse produites       attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest bout plat present dans la chaussee (10) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest bordure au bout pendant (10)       attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest bout plat present dans la chaussee (60) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest bordure au bout pendant (60)       attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest pendantes du T (le noeud exclu)    attendu     3.0000  obtenu     3.0000  OK
+2026-08-03 11:51:15  selftest le noeud du T n'est pas pendant    attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest CROSSINGS_ON coupe                 attendu      False  obtenu      False  OK
+2026-08-03 11:51:15  selftest crossing_sites appelee directement attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:15  selftest crossing_sites SANS noeud OSM (jamais invente) attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest site propose : demi-largeur        attendu     5.0000  obtenu     5.0000  OK
+2026-08-03 11:51:15  selftest site propose : dans l'axe de la rue attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:15  cellule +9999,+9999 : chaussee 2.0 % | herbe 0 m2 (raster 0 m2, ecart 0.00 %) | 2 bordures (1000 m) | 0 bordurettes (0 m) | 0 passages | 112 tirets | masque 0.00 Mo | json 0.01 Mo | 0.0 s
+2026-08-03 11:51:15     herbe v3 : releve 0 m2 -> regularisation +0 m2 (0 -> 0 sommets) -> accostage+trous +0 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/0 retirees (0.0 m2) | contour 0 m -> bordurette 0 m
+2026-08-03 11:51:15     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 0 pierres (-0.0 m2, soit 0.00 % de l'herbe)
+2026-08-03 11:51:15  selftest passages ecrits par la cuisson (CROSSINGS_ON coupe) attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest la cuisson ecrit toujours ses bordures attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest la cuisson ecrit toujours ses tirets attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest bordure continue : au plus 2 rives sur une rue droite attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest marche de largeur : aucune bordure en travers attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest marche de largeur : les bordures longitudinales restent (231 m) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest depointage : pointe de 2 cm retiree attendu     4.0000  obtenu     4.0000  OK
+2026-08-03 11:51:15  selftest depointage : epingle de 3 m conservee attendu     6.0000  obtenu     6.0000  OK
+2026-08-03 11:51:15  selftest frontiere interne : rien de maille dans la chaussee attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  cellule +8888,+8888 : chaussee 2.0 % | herbe 13025 m2 (raster 13000 m2, ecart 0.16 %) | 2 bordures (1000 m) | 2 bordurettes (458 m) | 0 passages | 112 tirets | masque 0.00 Mo | json 0.01 Mo | 0.0 s
+2026-08-03 11:51:15     herbe v3 : releve 13198 m2 -> regularisation -281 m2 (138 -> 10 sommets) -> accostage+trous +108 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/2 retirees (0.0 m2) | contour 701 m -> bordurette 458 m
+2026-08-03 11:51:15     bordurette v4 : 4 extremites recalees sur une bordure de chaussee (1.60 m cumules) | peinture retractee de 0.10 m sous 2 pierres (-46.1 m2, soit 0.35 % de l'herbe)
+2026-08-03 11:51:15  selftest herbe : pelouse peinte             attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest herbe : complement de la chaussee  attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest canal R : coeur de pelouse >= 200  attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest canal R : chaussee <= 60           attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest canal R : languette EFFACEE        attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest canal R : hors tout vert <= 60     attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest herbe absente par defaut (verrou 11) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest accostage : le lisere de 60 cm est comble attendu  3000.0000  obtenu  2999.9627  OK
+2026-08-03 11:51:15  selftest accostage : l'herbe touche la chaussee attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest accostage : zero recouvrement du mineral attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest accostage : a 5 m, l'herbe n'est PAS tiree attendu  2500.0000  obtenu  2500.0000  OK
+2026-08-03 11:51:15  selftest accostage : l'ecart de 5 m est conserve attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest lissage : le contour dentele est simplifie (204 -> 5 sommets) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest lissage : l'aire est preservee a 1 %% attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest axiale : une rue LIBRE garde ses tirets (44) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest axiale : zero tiret sur une rue « ayants droit » attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest axiale par rue : les 4 troncons forment UNE rue attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:15  selftest axiale par rue : la rue mixte est muette (150 m / 200 m) attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:15  selftest axiale par rue : zero tiret sur la rue mixte attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest axiale par rue : une rue minoritairement restreinte garde son axe attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest axiale par rue : et elle garde bien ses tirets attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest axiale par rue : deux rues distinctes malgre le noeud partage attendu     2.0000  obtenu     2.0000  OK
+2026-08-03 11:51:15  selftest axiale par rue : la rue Libre voisine garde ses tirets (40) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest axiale sans nom : deux troncons alignes = une rue attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:15  selftest axiale sans nom : le carrefour (3 troncons) COUPE le chainage attendu     3.0000  obtenu     3.0000  OK
+2026-08-03 11:51:15  selftest axiale : attribut absent = voie ouverte attendu    44.0000  obtenu    44.0000  OK
+2026-08-03 11:51:15  selftest facade : le lisere de 60 cm est comble attendu  3000.0000  obtenu  2999.9627  OK
+2026-08-03 11:51:15  selftest facade : l'herbe touche le mur     attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest facade : zero recouvrement du bati attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest trous : les 3 trous sont vus       attendu     3.0000  obtenu     3.0000  OK
+2026-08-03 11:51:15  selftest trous : un seul comble             attendu     1.0000  obtenu     1.0000  OK
+2026-08-03 11:51:15  selftest trous : c'est bien le trou VIDE (25 m2) attendu    25.0000  obtenu    25.0000  OK
+2026-08-03 11:51:15  selftest trous : le trou a batiment reste ouvert attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest trous : le trou de 100 m2 reste ouvert attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest miettes : 4 fragments vus          attendu     4.0000  obtenu     4.0000  OK
+2026-08-03 11:51:15  selftest miettes : 2 retires                attendu     2.0000  obtenu     2.0000  OK
+2026-08-03 11:51:15  selftest miettes : 5 m2 retires             attendu     5.0000  obtenu     5.0000  OK
+2026-08-03 11:51:15  selftest miettes : la pelouse de 25 m2 (au-dessus du seuil) est INTACTE attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest miettes : le gros fragment est INTACT attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest regularisation : le contour est decime (104 -> 5 sommets) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest regularisation : l'aire est preservee a 2 % attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest regularisation : zero debord sur le mineral apres re-soustraction attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest bordurette : au moins un segment pose (2 segments, 199 m) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest bordurette : rien le long du MUR   attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest bordurette : rien LE LONG de la bordure de chaussee existante (bouts exclus : le raccord v4 y est colle expres) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest bordurette : le total vaut les deux cotes libres (200 m, obtenu 199) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest bordurette : l'herbe est A DROITE, le mineral A GAUCHE attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest bordurette : le trou de 1 m entre deux bordures ne produit rien attendu     0.0000  obtenu     0.0000  OK
+2026-08-03 11:51:15  selftest bordurette : ce bout est bien compte comme ecarte (trop court) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest v4 retraction : la peinture perd recul x longueur (0,10 x 20 = 2 m2) attendu     2.0000  obtenu     2.0000  OK
+2026-08-03 11:51:15  selftest v4 retraction : le polygone d'ORIGINE est intact (la pierre ne bouge pas) attendu   400.0000  obtenu   400.0000  OK
+2026-08-03 11:51:15  selftest v4 retraction : le recul se fait bien DANS l'herbe (y=0,05 sorti) attendu      False  obtenu      False  OK
+2026-08-03 11:51:15  selftest v4 retraction : au-dela du recul l'herbe est intacte (y=0,20 garde) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest v4 retraction : le cote NON borde ne recule pas (x=0,05 garde) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest v4 retraction : sans bordurette, aucun recul attendu   400.0000  obtenu   400.0000  OK
+2026-08-03 11:51:15  selftest v4 retraction : recul nul = polygone inchange attendu   400.0000  obtenu   400.0000  OK
+2026-08-03 11:51:15  selftest v4 retraction : bouts DROITS (pas de morsure au-dela de la pierre) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest v4 snap : au moins une extremite est POSEE sur la bordure (d = 0) attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest v4 snap : le recalage est compte   attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  selftest v4 snap : au-dela de 1 m, aucune extremite n'est deplacee attendu       True  obtenu       True  OK
+2026-08-03 11:51:15  SELFTEST : PASS
+2026-08-03 11:52:11  === MAQUETTE DU SOL : cuisson de 1 cellules -2,+0 ===
+2026-08-03 11:52:12  routes BD TOPO : 73 troncons dans la fenetre (64 au sol, 9 ponts exclus du masque dont 7 RAMPES d'ouvrage a pos <= 0, 0 souterrains, 22 natures pietonnes, 3 hors service) ; largeurs mesurees 64 / replis 0 ; side-car Ponts : 98 troncons / 4734 m d'axe
+2026-08-03 11:52:12  passages OSM : 10236 noeuds lus, 8388 peints (1848 refuses par le filtre de marquage), 22 dans la fenetre
+2026-08-03 11:52:13  verts OCS GE : 716 polygones CS2.* lus, 18 dans la fenetre
+2026-08-03 11:52:13  chargements : 2.1 s
+2026-08-03 11:52:17  cellule -2,+0 : chaussee 2.9 % | herbe 13709 m2 (raster 13749 m2, ecart 1.23 %) | 30 bordures (3460 m) | 27 bordurettes (1264 m) | 0 passages | 12 tirets | masque 0.12 Mo | json 0.01 Mo | 3.2 s
+2026-08-03 11:52:17     herbe v3 : releve 13368 m2 -> regularisation -355 m2 (1987 -> 144 sommets) -> accostage+trous +695 m2 | trous vus 0, combles 0 (0 m2) | miettes 5/18 retirees (0.8 m2) | contour 2378 m -> bordurette 1264 m
+2026-08-03 11:52:17     bordurette v4 : 7 extremites recalees sur une bordure de chaussee (2.80 m cumules) | peinture retractee de 0.10 m sous 27 pierres (-126.0 m2, soit 0.92 % de l'herbe)
+2026-08-03 11:52:17  TOTAL 5.3 s | 1 cellules | masques 0.1 Mo (0.12 Mo/cellule) | json 0.01 Mo
+2026-08-03 11:52:17  QUAIS V3 : 3541 m2 de PROMENADE DE BERGE dans la classe gravier, sur 1 cellules
+2026-08-03 11:52:17  PEINT   : 7180 m2 de chaussee, 1871 m2 de voirie privee, 3541 m2 de gravier, 13708 m2 d'HERBE (ecart raster max 1.23 %)
+2026-08-03 11:52:17  HERBE V3: releve 13368 m2 -> regularisation -354 m2 (1987 -> 144 sommets) -> accostage+trous +695 m2 | trous vus 0, combles 0 (0 m2) | miettes 5/18 retirees (0.8 m2)
+2026-08-03 11:52:17  MAILLE  : 30 polylignes de bordure (3460 m), 27 bordurettes d'herbe (1264 m sur 2378 m de contour, 0 m ecartes trop courts), 0 passages, 12 tirets
+2026-08-03 11:52:30  === MAQUETTE DU SOL : cuisson de 36 cellules -3,-3 -3,-2 -3,-1 -3,+0 -3,+1 -3,+2 -2,-3 -2,-2 -2,-1 -2,+0 -2,+1 -2,+2 -1,-3 -1,-2 -1,-1 -1,+0 -1,+1 -1,+2 +0,-3 +0,-2 +0,-1 +0,+0 +0,+1 +0,+2 +1,-3 +1,-2 +1,-1 +1,+0 +1,+1 +1,+2 +2,-3 +2,-2 +2,-1 +2,+0 +2,+1 +2,+2 ===
+2026-08-03 11:52:31  routes BD TOPO : 3576 troncons dans la fenetre (3494 au sol, 82 ponts exclus du masque dont 37 RAMPES d'ouvrage a pos <= 0, 3 souterrains, 692 natures pietonnes, 109 hors service) ; largeurs mesurees 3480 / replis 14 ; side-car Ponts : 98 troncons / 4734 m d'axe
+2026-08-03 11:52:31  passages OSM : 10236 noeuds lus, 8388 peints (1848 refuses par le filtre de marquage), 1614 dans la fenetre
+2026-08-03 11:52:33  verts OCS GE : 716 polygones CS2.* lus, 608 dans la fenetre
+2026-08-03 11:52:33  chargements : 3.3 s
+2026-08-03 11:52:36  cellule -3,-3 : chaussee 5.9 % | herbe 33975 m2 (raster 34102 m2, ecart 0.86 %) | 35 bordures (6479 m) | 73 bordurettes (1605 m) | 0 passages | 70 tirets | masque 0.16 Mo | json 0.02 Mo | 3.2 s
+2026-08-03 11:52:36     herbe v3 : releve 33056 m2 -> regularisation -390 m2 (5721 -> 305 sommets) -> accostage+trous +1309 m2 | trous vus 3, combles 0 (0 m2) | miettes 1/19 retirees (11.4 m2) | contour 4315 m -> bordurette 1605 m
+2026-08-03 11:52:36     bordurette v4 : 28 extremites recalees sur une bordure de chaussee (11.20 m cumules) | peinture retractee de 0.10 m sous 73 pierres (-162.9 m2, soit 0.48 % de l'herbe)
+2026-08-03 11:52:40  cellule -3,-2 : chaussee 7.4 % | herbe 43105 m2 (raster 43223 m2, ecart 1.15 %) | 51 bordures (6322 m) | 64 bordurettes (3753 m) | 0 passages | 264 tirets | masque 0.21 Mo | json 0.03 Mo | 3.5 s
+2026-08-03 11:52:40     herbe v3 : releve 41345 m2 -> regularisation -638 m2 (5955 -> 396 sommets) -> accostage+trous +2398 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/29 retirees (0.0 m2) | contour 6332 m -> bordurette 3753 m
+2026-08-03 11:52:40     bordurette v4 : 22 extremites recalees sur une bordure de chaussee (8.80 m cumules) | peinture retractee de 0.10 m sous 64 pierres (-372.5 m2, soit 0.86 % de l'herbe)
+2026-08-03 11:52:44  cellule -3,-1 : chaussee 11.1 % | herbe 48246 m2 (raster 48573 m2, ecart 1.13 %) | 71 bordures (10250 m) | 100 bordurettes (2156 m) | 0 passages | 241 tirets | masque 0.19 Mo | json 0.03 Mo | 4.2 s
+2026-08-03 11:52:44     herbe v3 : releve 46443 m2 -> regularisation -658 m2 (5607 -> 331 sommets) -> accostage+trous +2461 m2 | trous vus 3, combles 0 (0 m2) | miettes 15/45 retirees (4.9 m2) | contour 7174 m -> bordurette 2156 m
+2026-08-03 11:52:44     bordurette v4 : 62 extremites recalees sur une bordure de chaussee (24.80 m cumules) | peinture retractee de 0.10 m sous 100 pierres (-215.3 m2, soit 0.45 % de l'herbe)
+2026-08-03 11:52:47  cellule -3,+0 : chaussee 3.8 % | herbe 28281 m2 (raster 28382 m2, ecart 0.98 %) | 41 bordures (3253 m) | 56 bordurettes (1770 m) | 0 passages | 147 tirets | masque 0.13 Mo | json 0.02 Mo | 3.5 s
+2026-08-03 11:52:47     herbe v3 : releve 27926 m2 -> regularisation -426 m2 (4345 -> 267 sommets) -> accostage+trous +781 m2 | trous vus 1, combles 0 (0 m2) | miettes 12/29 retirees (16.0 m2) | contour 3461 m -> bordurette 1770 m
+2026-08-03 11:52:47     bordurette v4 : 20 extremites recalees sur une bordure de chaussee (8.00 m cumules) | peinture retractee de 0.10 m sous 56 pierres (-174.6 m2, soit 0.62 % de l'herbe)
+2026-08-03 11:52:51  cellule -3,+1 : chaussee 10.4 % | herbe 29324 m2 (raster 29541 m2, ecart 1.26 %) | 60 bordures (10050 m) | 82 bordurettes (1504 m) | 0 passages | 173 tirets | masque 0.16 Mo | json 0.02 Mo | 3.5 s
+2026-08-03 11:52:51     herbe v3 : releve 28793 m2 -> regularisation -561 m2 (5092 -> 279 sommets) -> accostage+trous +1091 m2 | trous vus 5, combles 0 (0 m2) | miettes 0/22 retirees (0.0 m2) | contour 4181 m -> bordurette 1504 m
+2026-08-03 11:52:51     bordurette v4 : 8 extremites recalees sur une bordure de chaussee (3.20 m cumules) | peinture retractee de 0.10 m sous 82 pierres (-151.8 m2, soit 0.52 % de l'herbe)
+2026-08-03 11:52:55  cellule -3,+2 : chaussee 5.4 % | herbe 44774 m2 (raster 44951 m2, ecart 1.09 %) | 41 bordures (6338 m) | 134 bordurettes (3073 m) | 0 passages | 63 tirets | masque 0.19 Mo | json 0.02 Mo | 4.5 s
+2026-08-03 11:52:55     herbe v3 : releve 43794 m2 -> regularisation -795 m2 (9861 -> 552 sommets) -> accostage+trous +1775 m2 | trous vus 13, combles 0 (0 m2) | miettes 18/51 retirees (4.8 m2) | contour 6894 m -> bordurette 3073 m
+2026-08-03 11:52:55     bordurette v4 : 28 extremites recalees sur une bordure de chaussee (11.20 m cumules) | peinture retractee de 0.10 m sous 134 pierres (-308.7 m2, soit 0.69 % de l'herbe)
+2026-08-03 11:52:59  cellule -2,-3 : chaussee 10.3 % | herbe 27993 m2 (raster 28125 m2, ecart 1.09 %) | 65 bordures (9926 m) | 77 bordurettes (1697 m) | 0 passages | 219 tirets | masque 0.17 Mo | json 0.02 Mo | 4.0 s
+2026-08-03 11:52:59     herbe v3 : releve 27381 m2 -> regularisation -506 m2 (4420 -> 263 sommets) -> accostage+trous +1118 m2 | trous vus 4, combles 0 (0 m2) | miettes 8/26 retirees (9.8 m2) | contour 4269 m -> bordurette 1697 m
+2026-08-03 11:52:59     bordurette v4 : 22 extremites recalees sur une bordure de chaussee (8.80 m cumules) | peinture retractee de 0.10 m sous 77 pierres (-171.7 m2, soit 0.61 % de l'herbe)
+2026-08-03 11:53:02  cellule -2,-2 : chaussee 7.0 % | herbe 60548 m2 (raster 60699 m2, ecart 0.55 %) | 40 bordures (6395 m) | 53 bordurettes (1790 m) | 0 passages | 190 tirets | masque 0.13 Mo | json 0.02 Mo | 3.0 s
+2026-08-03 11:53:02     herbe v3 : releve 60130 m2 -> regularisation -404 m2 (3998 -> 314 sommets) -> accostage+trous +822 m2 | trous vus 3, combles 0 (0 m2) | miettes 0/11 retirees (0.0 m2) | contour 4043 m -> bordurette 1790 m
+2026-08-03 11:53:02     bordurette v4 : 18 extremites recalees sur une bordure de chaussee (7.57 m cumules) | peinture retractee de 0.10 m sous 53 pierres (-179.9 m2, soit 0.30 % de l'herbe)
+2026-08-03 11:53:06  cellule -2,-1 : chaussee 4.4 % | herbe 43851 m2 (raster 44061 m2, ecart 1.08 %) | 33 bordures (5667 m) | 65 bordurettes (2633 m) | 0 passages | 9 tirets | masque 0.16 Mo | json 0.01 Mo | 3.6 s
+2026-08-03 11:53:06     herbe v3 : releve 42864 m2 -> regularisation -590 m2 (4957 -> 350 sommets) -> accostage+trous +1577 m2 | trous vus 4, combles 0 (0 m2) | miettes 0/22 retirees (0.0 m2) | contour 5955 m -> bordurette 2633 m
+2026-08-03 11:53:06     bordurette v4 : 24 extremites recalees sur une bordure de chaussee (9.60 m cumules) | peinture retractee de 0.10 m sous 65 pierres (-261.7 m2, soit 0.60 % de l'herbe)
+2026-08-03 11:53:09  cellule -2,+0 : chaussee 2.9 % | herbe 13709 m2 (raster 13749 m2, ecart 1.23 %) | 30 bordures (3460 m) | 27 bordurettes (1264 m) | 0 passages | 12 tirets | masque 0.12 Mo | json 0.01 Mo | 3.1 s
+2026-08-03 11:53:09     herbe v3 : releve 13368 m2 -> regularisation -355 m2 (1987 -> 144 sommets) -> accostage+trous +695 m2 | trous vus 0, combles 0 (0 m2) | miettes 5/18 retirees (0.8 m2) | contour 2378 m -> bordurette 1264 m
+2026-08-03 11:53:09     bordurette v4 : 7 extremites recalees sur une bordure de chaussee (2.80 m cumules) | peinture retractee de 0.10 m sous 27 pierres (-126.0 m2, soit 0.92 % de l'herbe)
+2026-08-03 11:53:13  cellule -2,+1 : chaussee 7.6 % | herbe 53158 m2 (raster 53353 m2, ecart 0.82 %) | 63 bordures (8772 m) | 45 bordurettes (2358 m) | 0 passages | 63 tirets | masque 0.16 Mo | json 0.02 Mo | 3.6 s
+2026-08-03 11:53:13     herbe v3 : releve 52733 m2 -> regularisation -533 m2 (3898 -> 267 sommets) -> accostage+trous +957 m2 | trous vus 3, combles 0 (0 m2) | miettes 0/16 retirees (0.0 m2) | contour 4331 m -> bordurette 2358 m
+2026-08-03 11:53:13     bordurette v4 : 24 extremites recalees sur une bordure de chaussee (9.60 m cumules) | peinture retractee de 0.10 m sous 45 pierres (-236.4 m2, soit 0.44 % de l'herbe)
+2026-08-03 11:53:16  cellule -2,+2 : chaussee 5.3 % | herbe 53355 m2 (raster 53508 m2, ecart 0.76 %) | 47 bordures (6044 m) | 77 bordurettes (2438 m) | 0 passages | 41 tirets | masque 0.15 Mo | json 0.01 Mo | 3.4 s
+2026-08-03 11:53:16     herbe v3 : releve 52931 m2 -> regularisation -772 m2 (4516 -> 296 sommets) -> accostage+trous +1195 m2 | trous vus 5, combles 0 (0 m2) | miettes 2/18 retirees (14.5 m2) | contour 4845 m -> bordurette 2438 m
+2026-08-03 11:53:16     bordurette v4 : 27 extremites recalees sur une bordure de chaussee (10.80 m cumules) | peinture retractee de 0.10 m sous 77 pierres (-250.6 m2, soit 0.47 % de l'herbe)
+2026-08-03 11:53:21  cellule -1,-3 : chaussee 9.8 % | herbe 21713 m2 (raster 21919 m2, ecart 1.53 %) | 53 bordures (10269 m) | 100 bordurettes (1242 m) | 0 passages | 193 tirets | masque 0.17 Mo | json 0.02 Mo | 4.5 s
+2026-08-03 11:53:21     herbe v3 : releve 20822 m2 -> regularisation -322 m2 (5105 -> 253 sommets) -> accostage+trous +1214 m2 | trous vus 8, combles 0 (0 m2) | miettes 13/33 retirees (4.0 m2) | contour 4091 m -> bordurette 1242 m
+2026-08-03 11:53:21     bordurette v4 : 10 extremites recalees sur une bordure de chaussee (4.00 m cumules) | peinture retractee de 0.10 m sous 100 pierres (-125.4 m2, soit 0.58 % de l'herbe)
+2026-08-03 11:53:25  cellule -1,-2 : chaussee 12.6 % | herbe 3832 m2 (raster 3861 m2, ecart 1.28 %) | 85 bordures (11022 m) | 17 bordurettes (191 m) | 0 passages | 196 tirets | masque 0.14 Mo | json 0.02 Mo | 4.0 s
+2026-08-03 11:53:25     herbe v3 : releve 3677 m2 -> regularisation -62 m2 (1239 -> 61 sommets) -> accostage+trous +217 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/7 retirees (0.0 m2) | contour 859 m -> bordurette 191 m
+2026-08-03 11:53:25     bordurette v4 : 8 extremites recalees sur une bordure de chaussee (3.20 m cumules) | peinture retractee de 0.10 m sous 17 pierres (-19.7 m2, soit 0.51 % de l'herbe)
+2026-08-03 11:53:28  cellule -1,-1 : chaussee 6.6 % | herbe 27695 m2 (raster 27822 m2, ecart 0.89 %) | 69 bordures (7974 m) | 67 bordurettes (1194 m) | 0 passages | 4 tirets | masque 0.15 Mo | json 0.02 Mo | 3.4 s
+2026-08-03 11:53:28     herbe v3 : releve 27211 m2 -> regularisation -521 m2 (3779 -> 209 sommets) -> accostage+trous +1006 m2 | trous vus 1, combles 0 (0 m2) | miettes 1/15 retirees (7.4 m2) | contour 3187 m -> bordurette 1194 m
+2026-08-03 11:53:28     bordurette v4 : 17 extremites recalees sur une bordure de chaussee (6.80 m cumules) | peinture retractee de 0.10 m sous 67 pierres (-120.1 m2, soit 0.43 % de l'herbe)
+2026-08-03 11:53:31  cellule -1,+0 : chaussee 7.5 % | herbe 10280 m2 (raster 10352 m2, ecart 1.30 %) | 114 bordures (8389 m) | 11 bordurettes (614 m) | 0 passages | 27 tirets | masque 0.13 Mo | json 0.01 Mo | 3.4 s
+2026-08-03 11:53:31     herbe v3 : releve 10229 m2 -> regularisation -239 m2 (1049 -> 74 sommets) -> accostage+trous +290 m2 | trous vus 0, combles 0 (0 m2) | miettes 1/8 retirees (2.0 m2) | contour 1312 m -> bordurette 614 m
+2026-08-03 11:53:31     bordurette v4 : 2 extremites recalees sur une bordure de chaussee (0.80 m cumules) | peinture retractee de 0.10 m sous 11 pierres (-61.0 m2, soit 0.59 % de l'herbe)
+2026-08-03 11:53:35  cellule -1,+1 : chaussee 5.4 % | herbe 8452 m2 (raster 8539 m2, ecart 1.50 %) | 60 bordures (5724 m) | 21 bordurettes (378 m) | 0 passages | 63 tirets | masque 0.10 Mo | json 0.01 Mo | 3.2 s
+2026-08-03 11:53:35     herbe v3 : releve 8331 m2 -> regularisation -138 m2 (1632 -> 98 sommets) -> accostage+trous +259 m2 | trous vus 5, combles 0 (0 m2) | miettes 0/6 retirees (0.0 m2) | contour 1261 m -> bordurette 378 m
+2026-08-03 11:53:35     bordurette v4 : 10 extremites recalees sur une bordure de chaussee (4.00 m cumules) | peinture retractee de 0.10 m sous 21 pierres (-38.8 m2, soit 0.46 % de l'herbe)
+2026-08-03 11:53:38  cellule -1,+2 : chaussee 5.9 % | herbe 10397 m2 (raster 10442 m2, ecart 1.17 %) | 60 bordures (5876 m) | 21 bordurettes (743 m) | 0 passages | 154 tirets | masque 0.13 Mo | json 0.02 Mo | 3.2 s
+2026-08-03 11:53:38     herbe v3 : releve 10132 m2 -> regularisation -256 m2 (1551 -> 94 sommets) -> accostage+trous +521 m2 | trous vus 2, combles 0 (0 m2) | miettes 0/9 retirees (0.0 m2) | contour 1541 m -> bordurette 743 m
+2026-08-03 11:53:38     bordurette v4 : 23 extremites recalees sur une bordure de chaussee (9.20 m cumules) | peinture retractee de 0.10 m sous 21 pierres (-76.2 m2, soit 0.73 % de l'herbe)
+2026-08-03 11:53:41  cellule +0,-3 : chaussee 7.2 % | herbe 20199 m2 (raster 20311 m2, ecart 1.20 %) | 44 bordures (6981 m) | 28 bordurettes (1300 m) | 0 passages | 223 tirets | masque 0.16 Mo | json 0.02 Mo | 3.1 s
+2026-08-03 11:53:41     herbe v3 : releve 19206 m2 -> regularisation -417 m2 (2522 -> 152 sommets) -> accostage+trous +1409 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/12 retirees (0.0 m2) | contour 3294 m -> bordurette 1300 m
+2026-08-03 11:53:41     bordurette v4 : 6 extremites recalees sur une bordure de chaussee (2.40 m cumules) | peinture retractee de 0.10 m sous 28 pierres (-128.9 m2, soit 0.64 % de l'herbe)
+2026-08-03 11:53:44  cellule +0,-2 : chaussee 10.3 % | herbe 1283 m2 (raster 1284 m2, ecart 0.64 %) | 51 bordures (10660 m) | 4 bordurettes (72 m) | 0 passages | 100 tirets | masque 0.12 Mo | json 0.01 Mo | 3.3 s
+2026-08-03 11:53:44     herbe v3 : releve 1256 m2 -> regularisation -47 m2 (315 -> 15 sommets) -> accostage+trous +74 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/2 retirees (0.0 m2) | contour 233 m -> bordurette 72 m
+2026-08-03 11:53:44     bordurette v4 : 0 extremites recalees sur une bordure de chaussee (0.00 m cumules) | peinture retractee de 0.10 m sous 4 pierres (-7.2 m2, soit 0.56 % de l'herbe)
+2026-08-03 11:53:47  cellule +0,-1 : chaussee 12.8 % | herbe 5607 m2 (raster 5629 m2, ecart 1.09 %) | 74 bordures (13232 m) | 11 bordurettes (384 m) | 0 passages | 143 tirets | masque 0.15 Mo | json 0.02 Mo | 3.0 s
+2026-08-03 11:53:47     herbe v3 : releve 5357 m2 -> regularisation -161 m2 (813 -> 71 sommets) -> accostage+trous +411 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/6 retirees (0.0 m2) | contour 868 m -> bordurette 384 m
+2026-08-03 11:53:47     bordurette v4 : 13 extremites recalees sur une bordure de chaussee (5.20 m cumules) | peinture retractee de 0.10 m sous 11 pierres (-39.5 m2, soit 0.70 % de l'herbe)
+2026-08-03 11:53:50  cellule +0,+0 : chaussee 10.1 % | herbe 6317 m2 (raster 6394 m2, ecart 2.07 %) | 75 bordures (10611 m) | 15 bordurettes (518 m) | 0 passages | 113 tirets | masque 0.11 Mo | json 0.01 Mo | 2.9 s
+2026-08-03 11:53:50     herbe v3 : releve 6072 m2 -> regularisation -217 m2 (1516 -> 96 sommets) -> accostage+trous +463 m2 | trous vus 1, combles 0 (0 m2) | miettes 0/10 retirees (0.0 m2) | contour 1302 m -> bordurette 518 m
+2026-08-03 11:53:50     bordurette v4 : 15 extremites recalees sur une bordure de chaussee (6.00 m cumules) | peinture retractee de 0.10 m sous 15 pierres (-52.5 m2, soit 0.83 % de l'herbe)
+2026-08-03 11:53:53  cellule +0,+1 : chaussee 9.8 % | herbe 16309 m2 (raster 16380 m2, ecart 0.79 %) | 150 bordures (9357 m) | 31 bordurettes (572 m) | 0 passages | 70 tirets | masque 0.15 Mo | json 0.02 Mo | 3.3 s
+2026-08-03 11:53:53     herbe v3 : releve 16178 m2 -> regularisation -284 m2 (2061 -> 113 sommets) -> accostage+trous +415 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/9 retirees (0.0 m2) | contour 1854 m -> bordurette 572 m
+2026-08-03 11:53:53     bordurette v4 : 8 extremites recalees sur une bordure de chaussee (3.20 m cumules) | peinture retractee de 0.10 m sous 31 pierres (-57.3 m2, soit 0.35 % de l'herbe)
+2026-08-03 11:53:57  cellule +0,+2 : chaussee 8.5 % | herbe 42717 m2 (raster 42807 m2, ecart 0.57 %) | 63 bordures (8446 m) | 49 bordurettes (1564 m) | 0 passages | 51 tirets | masque 0.15 Mo | json 0.01 Mo | 3.5 s
+2026-08-03 11:53:57     herbe v3 : releve 41651 m2 -> regularisation -526 m2 (2623 -> 164 sommets) -> accostage+trous +1592 m2 | trous vus 0, combles 0 (0 m2) | miettes 1/14 retirees (12.0 m2) | contour 3711 m -> bordurette 1564 m
+2026-08-03 11:53:57     bordurette v4 : 38 extremites recalees sur une bordure de chaussee (15.20 m cumules) | peinture retractee de 0.10 m sous 49 pierres (-152.8 m2, soit 0.36 % de l'herbe)
+2026-08-03 11:54:00  cellule +1,-3 : chaussee 6.3 % | herbe 15246 m2 (raster 15255 m2, ecart 0.62 %) | 45 bordures (6226 m) | 34 bordurettes (847 m) | 0 passages | 81 tirets | masque 0.15 Mo | json 0.01 Mo | 3.4 s
+2026-08-03 11:54:00     herbe v3 : releve 14926 m2 -> regularisation -155 m2 (1711 -> 112 sommets) -> accostage+trous +475 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/10 retirees (0.0 m2) | contour 1723 m -> bordurette 847 m
+2026-08-03 11:54:00     bordurette v4 : 11 extremites recalees sur une bordure de chaussee (4.40 m cumules) | peinture retractee de 0.10 m sous 34 pierres (-85.2 m2, soit 0.56 % de l'herbe)
+2026-08-03 11:54:04  cellule +1,-2 : chaussee 7.7 % | herbe 6771 m2 (raster 6813 m2, ecart 1.09 %) | 55 bordures (6907 m) | 9 bordurettes (306 m) | 0 passages | 183 tirets | masque 0.13 Mo | json 0.01 Mo | 3.1 s
+2026-08-03 11:54:04     herbe v3 : releve 6385 m2 -> regularisation +35 m2 (510 -> 43 sommets) -> accostage+trous +351 m2 | trous vus 0, combles 0 (0 m2) | miettes 0/4 retirees (0.0 m2) | contour 1152 m -> bordurette 306 m
+2026-08-03 11:54:04     bordurette v4 : 6 extremites recalees sur une bordure de chaussee (2.40 m cumules) | peinture retractee de 0.10 m sous 9 pierres (-31.2 m2, soit 0.46 % de l'herbe)
+2026-08-03 11:54:07  cellule +1,-1 : chaussee 9.7 % | herbe 5953 m2 (raster 5977 m2, ecart 1.10 %) | 47 bordures (11013 m) | 18 bordurettes (399 m) | 0 passages | 168 tirets | masque 0.12 Mo | json 0.01 Mo | 3.4 s
+2026-08-03 11:54:07     herbe v3 : releve 5681 m2 -> regularisation -175 m2 (1180 -> 67 sommets) -> accostage+trous +447 m2 | trous vus 1, combles 0 (0 m2) | miettes 0/7 retirees (0.0 m2) | contour 1142 m -> bordurette 399 m
+2026-08-03 11:54:07     bordurette v4 : 10 extremites recalees sur une bordure de chaussee (4.00 m cumules) | peinture retractee de 0.10 m sous 18 pierres (-41.0 m2, soit 0.69 % de l'herbe)
+2026-08-03 11:54:10  cellule +1,+0 : chaussee 11.8 % | herbe 14082 m2 (raster 14269 m2, ecart 1.83 %) | 81 bordures (12399 m) | 39 bordurettes (698 m) | 0 passages | 226 tirets | masque 0.15 Mo | json 0.02 Mo | 3.5 s
+2026-08-03 11:54:10     herbe v3 : releve 13102 m2 -> regularisation -231 m2 (2260 -> 150 sommets) -> accostage+trous +1210 m2 | trous vus 2, combles 2 (9 m2) | miettes 5/21 retirees (0.5 m2) | contour 2782 m -> bordurette 698 m
+2026-08-03 11:54:10     bordurette v4 : 31 extremites recalees sur une bordure de chaussee (12.40 m cumules) | peinture retractee de 0.10 m sous 39 pierres (-68.3 m2, soit 0.49 % de l'herbe)
+2026-08-03 11:54:14  cellule +1,+1 : chaussee 9.9 % | herbe 55507 m2 (raster 55754 m2, ecart 0.77 %) | 57 bordures (10724 m) | 64 bordurettes (1771 m) | 0 passages | 103 tirets | masque 0.16 Mo | json 0.02 Mo | 3.6 s
+2026-08-03 11:54:14     herbe v3 : releve 54468 m2 -> regularisation -606 m2 (4528 -> 322 sommets) -> accostage+trous +1646 m2 | trous vus 6, combles 0 (0 m2) | miettes 0/14 retirees (0.0 m2) | contour 4620 m -> bordurette 1771 m
+2026-08-03 11:54:14     bordurette v4 : 41 extremites recalees sur une bordure de chaussee (16.40 m cumules) | peinture retractee de 0.10 m sous 64 pierres (-181.6 m2, soit 0.33 % de l'herbe)
+2026-08-03 11:54:17  cellule +1,+2 : chaussee 6.5 % | herbe 69288 m2 (raster 69426 m2, ecart 0.44 %) | 27 bordures (6688 m) | 60 bordurettes (1649 m) | 0 passages | 147 tirets | masque 0.13 Mo | json 0.01 Mo | 3.4 s
+2026-08-03 11:54:17     herbe v3 : releve 68460 m2 -> regularisation -365 m2 (4858 -> 298 sommets) -> accostage+trous +1193 m2 | trous vus 9, combles 0 (0 m2) | miettes 2/17 retirees (17.4 m2) | contour 4301 m -> bordurette 1649 m
+2026-08-03 11:54:17     bordurette v4 : 14 extremites recalees sur une bordure de chaussee (5.60 m cumules) | peinture retractee de 0.10 m sous 60 pierres (-165.9 m2, soit 0.24 % de l'herbe)
+2026-08-03 11:54:22  cellule +2,-3 : chaussee 8.8 % | herbe 33606 m2 (raster 33822 m2, ecart 1.32 %) | 68 bordures (10112 m) | 109 bordurettes (2225 m) | 0 passages | 73 tirets | masque 0.21 Mo | json 0.03 Mo | 4.1 s
+2026-08-03 11:54:22     herbe v3 : releve 32396 m2 -> regularisation -463 m2 (9017 -> 457 sommets) -> accostage+trous +1673 m2 | trous vus 19, combles 0 (0 m2) | miettes 0/23 retirees (0.0 m2) | contour 5498 m -> bordurette 2225 m
+2026-08-03 11:54:22     bordurette v4 : 47 extremites recalees sur une bordure de chaussee (18.80 m cumules) | peinture retractee de 0.10 m sous 109 pierres (-223.9 m2, soit 0.67 % de l'herbe)
+2026-08-03 11:54:26  cellule +2,-2 : chaussee 9.4 % | herbe 56636 m2 (raster 56896 m2, ecart 0.91 %) | 70 bordures (10362 m) | 121 bordurettes (2473 m) | 0 passages | 138 tirets | masque 0.22 Mo | json 0.03 Mo | 4.4 s
+2026-08-03 11:54:26     herbe v3 : releve 54548 m2 -> regularisation -551 m2 (8953 -> 509 sommets) -> accostage+trous +2640 m2 | trous vus 12, combles 0 (0 m2) | miettes 1/21 retirees (11.9 m2) | contour 6584 m -> bordurette 2473 m
+2026-08-03 11:54:26     bordurette v4 : 61 extremites recalees sur une bordure de chaussee (24.40 m cumules) | peinture retractee de 0.10 m sous 121 pierres (-251.8 m2, soit 0.44 % de l'herbe)
+2026-08-03 11:54:30  cellule +2,-1 : chaussee 7.7 % | herbe 12660 m2 (raster 12733 m2, ecart 1.20 %) | 73 bordures (8108 m) | 40 bordurettes (764 m) | 0 passages | 51 tirets | masque 0.12 Mo | json 0.01 Mo | 4.1 s
+2026-08-03 11:54:30     herbe v3 : releve 12311 m2 -> regularisation -224 m2 (2866 -> 155 sommets) -> accostage+trous +573 m2 | trous vus 4, combles 0 (0 m2) | miettes 4/14 retirees (12.3 m2) | contour 1961 m -> bordurette 764 m
+2026-08-03 11:54:30     bordurette v4 : 14 extremites recalees sur une bordure de chaussee (5.60 m cumules) | peinture retractee de 0.10 m sous 40 pierres (-77.2 m2, soit 0.61 % de l'herbe)
+2026-08-03 11:54:34  cellule +2,+0 : chaussee 10.1 % | herbe 39045 m2 (raster 39409 m2, ecart 1.46 %) | 58 bordures (10151 m) | 81 bordurettes (1998 m) | 0 passages | 160 tirets | masque 0.15 Mo | json 0.02 Mo | 4.3 s
+2026-08-03 11:54:34     herbe v3 : releve 37727 m2 -> regularisation -639 m2 (5308 -> 292 sommets) -> accostage+trous +1957 m2 | trous vus 5, combles 0 (0 m2) | miettes 14/36 retirees (3.1 m2) | contour 5091 m -> bordurette 1998 m
+2026-08-03 11:54:34     bordurette v4 : 26 extremites recalees sur une bordure de chaussee (10.40 m cumules) | peinture retractee de 0.10 m sous 81 pierres (-201.2 m2, soit 0.52 % de l'herbe)
+2026-08-03 11:54:38  cellule +2,+1 : chaussee 6.2 % | herbe 58283 m2 (raster 58787 m2, ecart 1.31 %) | 29 bordures (5929 m) | 114 bordurettes (2531 m) | 0 passages | 185 tirets | masque 0.13 Mo | json 0.02 Mo | 3.4 s
+2026-08-03 11:54:38     herbe v3 : releve 57577 m2 -> regularisation -583 m2 (8887 -> 445 sommets) -> accostage+trous +1289 m2 | trous vus 6, combles 0 (0 m2) | miettes 0/21 retirees (0.0 m2) | contour 6429 m -> bordurette 2531 m
+2026-08-03 11:54:38     bordurette v4 : 11 extremites recalees sur une bordure de chaussee (4.40 m cumules) | peinture retractee de 0.10 m sous 114 pierres (-254.2 m2, soit 0.44 % de l'herbe)
+2026-08-03 11:54:42  cellule +2,+2 : chaussee 8.4 % | herbe 53041 m2 (raster 53505 m2, ecart 1.37 %) | 45 bordures (9115 m) | 168 bordurettes (2528 m) | 0 passages | 119 tirets | masque 0.20 Mo | json 0.02 Mo | 3.9 s
+2026-08-03 11:54:42     herbe v3 : releve 51578 m2 -> regularisation -719 m2 (11391 -> 537 sommets) -> accostage+trous +2182 m2 | trous vus 10, combles 0 (0 m2) | miettes 1/32 retirees (11.1 m2) | contour 7898 m -> bordurette 2528 m
+2026-08-03 11:54:42     bordurette v4 : 60 extremites recalees sur une bordure de chaussee (24.00 m cumules) | peinture retractee de 0.10 m sous 168 pierres (-259.2 m2, soit 0.49 % de l'herbe)
+2026-08-03 11:54:42  TOTAL 132.0 s | 36 cellules | masques 5.5 Mo (0.15 Mo/cellule) | json 0.63 Mo
+2026-08-03 11:54:42  QUAIS V3 : 17894 m2 de PROMENADE DE BERGE dans la classe gravier, sur 20 cellules
+2026-08-03 11:54:42  PEINT   : 726566 m2 de chaussee, 86824 m2 de voirie privee, 19746 m2 de gravier, 1075236 m2 d'HERBE (ecart raster max 2.07 %)
+2026-08-03 11:54:42  HERBE V3: releve 1050045 m2 -> regularisation -14493 m2 (146031 -> 8551 sommets) -> accostage+trous +39685 m2 | trous vus 135, combles 2 (9 m2) | miettes 104/657 retirees (143.8 m2)
+2026-08-03 11:54:42  MAILLE  : 2130 polylignes de bordure (299232 m), 2085 bordurettes d'herbe (53005 m sur 130870 m de contour, 103 m ecartes trop courts), 0 passages, 4463 tirets
+2026-08-03 11:55:29  routes BD TOPO : 3891 troncons dans la fenetre (3805 au sol, 86 ponts exclus du masque dont 37 RAMPES d'ouvrage a pos <= 0, 3 souterrains, 742 natures pietonnes, 112 hors service) ; largeurs mesurees 3790 / replis 15 ; side-car Ponts : 98 troncons / 4734 m d'axe
+2026-08-03 11:56:28  routes BD TOPO : 3891 troncons dans la fenetre (3805 au sol, 86 ponts exclus du masque dont 37 RAMPES d'ouvrage a pos <= 0, 3 souterrains, 742 natures pietonnes, 112 hors service) ; largeurs mesurees 3790 / replis 15 ; side-car Ponts : 98 troncons / 4734 m d'axe
