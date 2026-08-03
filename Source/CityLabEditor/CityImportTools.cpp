@@ -1276,6 +1276,151 @@ namespace
 		return true;
 	}
 
+	// -------------------------------------------------------------------------
+	// CHANTIER C2 (03/08) — LES PONTS.
+	//
+	// Ce que la passe remplace, MESURE : le ruban de pont d'avant C2 recevait son Z
+	// par interpolation du MNT ENTRE SES DEUX BOUTS (ComputePolylineZ, bBridge=true).
+	// Sur le Pont Saint-Pierre cela donnait 134,50 -> 135,03 m alors que le tablier
+	// est a 142,10-142,70 m : 7,62 m de manque MOYEN, 7,95 m au pire. Le pont
+	// traversait donc la promenade au niveau du sable. La cote vient desormais de la
+	// GEOMETRIE 3D de BD TOPO, cuite par cellule dans SourceData/Ponts.
+	//
+	// PAS DE PILES. Rien dans la donnee ne dit ou sont les appuis d'un ouvrage : les
+	// inventer serait exactement la faute des gradins (« pas de donnee, pas d'objet »).
+	// Le tablier est donc une DALLE qui part du sol d'une rive et y revient — la
+	// chaine d'ouvrage du side-car s'arrete sur le troncon qui atterrit, ce qui
+	// garantit qu'elle rejoint le terrain sans marche et sans culee aveugle.
+	constexpr float GBridgeDeckThickCm = 90.f;   // epaisseur du tablier (sous-face)
+	constexpr float GBridgeParapetHCm = 100.f;   // hauteur du parapet au-dessus de la chaussee
+	constexpr float GBridgeParapetWCm = 25.f;    // epaisseur du parapet
+	constexpr float GBridgeStepCm = 400.f;       // re-echantillonnage de l'axe
+	// En dessous de cette hauteur libre, le « pont » est au ras du sol : ni parapet
+	// ni sous-face visible. Mesure qui l'exige : le troncon « Quai Saint Pierre » est
+	// code position=+1 pour 2 cm de hauteur reelle.
+	constexpr float GBridgeMinClearCm = 100.f;
+	// Le bord du tablier s'enfonce sous le sol au raccord : meme remede que le pied
+	// de bordure (GMaskCurbSinkCm) — zero jour, zero triangle.
+	constexpr float GBridgeSinkCm = 25.f;
+
+	struct FCityBridge
+	{
+		TArray<FVector2D> PtsCm;   // axe EN PLAN, cm locaux
+		TArray<float> ZCm;         // Z UNREAL par sommet (vide si le side-car n'a pas de Z)
+		bool bHasZ = false;
+		float WidthCm = 600.f;
+		int32 Lanes = 0;
+		int32 Pos = 0;
+		FString Id;
+		FString Nom;
+		bool bFreeStart = false;
+		bool bFreeEnd = false;
+	};
+
+	FString BridgesDir(const FCityGenProfile& Gen)
+	{
+		return Gen.BridgesPath.IsEmpty()
+			? FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/Ponts"))
+			: Gen.BridgesPath;
+	}
+
+	// Meme grammaire, memes gardes et meme discipline de journalisation que
+	// LoadStairsCell / LoadRetainingWallCell. AltCapCm : le side-car porte des
+	// ALTITUDES NGF en metres (c'est la donnee IGN telle quelle) ; le rebase sur
+	// l'origine Unreal se fait ICI, au seul endroit qui connaisse les deux reperes.
+	bool LoadBridgesCell(const FString& Dir, int32 CellX, int32 CellY, float CellSizeM,
+		float AltCapCm, TArray<FCityBridge>& Out, int32& OutTailleKo, double& OutTailleCuiteM)
+	{
+		const FString Path = FPaths::Combine(Dir, FString::Printf(TEXT("ponts_%d_%d.json"), CellX, CellY));
+		FString Text;
+		if (!FFileHelper::LoadFileToString(Text, *Path))
+		{
+			return false;
+		}
+		TSharedPtr<FJsonObject> Root;
+		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid())
+		{
+			RaiseError(FString::Printf(TEXT("Bridges file '%s' is not valid JSON."), *Path));
+			return false;
+		}
+		double BakedCellM = 0.0;
+		if (Root->TryGetNumberField(TEXT("cellSizeM"), BakedCellM) &&
+			!FMath::IsNearlyEqual((float)BakedCellM, CellSizeM, 0.01f))
+		{
+			++OutTailleKo;
+			OutTailleCuiteM = BakedCellM;
+			return false;
+		}
+		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+		if (!Root->TryGetArrayField(TEXT("ponts"), Arr))
+		{
+			return true;
+		}
+		for (const TSharedPtr<FJsonValue>& V : *Arr)
+		{
+			const TSharedPtr<FJsonObject>& O = V->AsObject();
+			if (!O.IsValid())
+			{
+				continue;
+			}
+			FCityBridge B;
+			const TArray<TSharedPtr<FJsonValue>>* P = nullptr;
+			if (!O->TryGetArrayField(TEXT("pts"), P))
+			{
+				continue;
+			}
+			bool bAllZ = true;
+			for (const TSharedPtr<FJsonValue>& PV : *P)
+			{
+				const TArray<TSharedPtr<FJsonValue>>& C = PV->AsArray();
+				if (C.Num() < 2)
+				{
+					continue;
+				}
+				B.PtsCm.Add(FVector2D(C[0]->AsNumber() * 100.0, C[1]->AsNumber() * 100.0));
+				if (C.Num() >= 3 && C[2].IsValid() && C[2]->Type == EJson::Number)
+				{
+					B.ZCm.Add((float)(C[2]->AsNumber() * 100.0) - AltCapCm);
+				}
+				else
+				{
+					B.ZCm.Add(0.f);
+					bAllZ = false;
+				}
+			}
+			if (B.PtsCm.Num() < 2)
+			{
+				continue;
+			}
+			B.bHasZ = bAllZ;
+			double W = 0.0;
+			if (O->TryGetNumberField(TEXT("largeur_m"), W) && W > 0.0)
+			{
+				B.WidthCm = FMath::Clamp((float)(W * 100.0), 250.f, 3000.f);
+			}
+			double L = 0.0;
+			if (O->TryGetNumberField(TEXT("voies"), L))
+			{
+				B.Lanes = (int32)L;
+			}
+			double Pos = 0.0;
+			if (O->TryGetNumberField(TEXT("pos"), Pos))
+			{
+				B.Pos = (int32)Pos;
+			}
+			O->TryGetStringField(TEXT("id"), B.Id);
+			O->TryGetStringField(TEXT("nom"), B.Nom);
+			const TArray<TSharedPtr<FJsonValue>>* Libres = nullptr;
+			if (O->TryGetArrayField(TEXT("bout_libre"), Libres) && Libres->Num() >= 2)
+			{
+				B.bFreeStart = (*Libres)[0]->AsBool();
+				B.bFreeEnd = (*Libres)[1]->AsBool();
+			}
+			Out.Add(MoveTemp(B));
+		}
+		return true;
+	}
+
 	// Le RELIEF d'une cellule, lu dans sols_<x>_<y>.json. Tout est deja decoupe au
 	// prep (bordures orientees chaussee a gauche, tirets debites, passages
 	// dedoublonnes) : ici on ne fait que poser des quads.
@@ -3000,6 +3145,262 @@ namespace
 			NLandings, St.WidthCm);
 
 		return Marches;
+	}
+
+	// -------------------------------------------------------------------------
+	// C2 — LE TABLIER A SA COTE.
+	//
+	// Une dalle d'epaisseur GBridgeDeckThickCm suivant l'axe du side-car : chaussee
+	// dessus (l'asphalte des rubans), sous-face et bandeaux lateraux en pierre (celle
+	// des murs et des bordures). Deux garde-fous de geometrie, tous deux mesures :
+	//   (a) la sous-face est CLAMPEE sous le sol rendu au raccord — sans ca, la ou
+	//       l'ouvrage atterrit, le bandeau de 90 cm flotterait au-dessus du terrain ;
+	//   (b) parapets seulement la ou la hauteur libre depasse GBridgeMinClearCm — un
+	//       troncon code pont au ras du sol (Quai Saint Pierre : 2 cm) ne doit pas se
+	//       retrouver borde de deux murets.
+	// Rend le nombre de METRES de tablier poses (0 = ecarte, avec sa cause au log).
+	float BuildBridge(FCityMeshBuilder& QM, const FCityBridge& B, const FRenderedGroundZ& RGZ,
+		const FResolvedSurface* DeckSurf, const FResolvedSurface* StoneSurf,
+		const FVector3f& StoneTint, bool bParapets, int32& OutQuads)
+	{
+		OutQuads = 0;
+		if (!DeckSurf || !StoneSurf || B.PtsCm.Num() < 2)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("PONTS C2 tablier ECARTE id=%s cause=SANS_SURFACE_OU_TRACE (%d points)."),
+				*B.Id, B.PtsCm.Num());
+			return 0.f;
+		}
+
+		// --- 1. abscisse curviligne ------------------------------------------------
+		const int32 NP = B.PtsCm.Num();
+		TArray<float> S;
+		S.SetNum(NP);
+		S[0] = 0.f;
+		for (int32 i = 1; i < NP; ++i)
+		{
+			S[i] = S[i - 1] + (float)(B.PtsCm[i] - B.PtsCm[i - 1]).Size();
+		}
+		const float RunCm = S[NP - 1];
+		if (RunCm < 200.f)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("PONTS C2 tablier ECARTE id=%s cause=TRACE_TROP_COURT run=%.0f cm (< 200)."),
+				*B.Id, RunCm);
+			return 0.f;
+		}
+
+		// --- 2. re-echantillonnage a pas fixe, Z interpole DANS LA DONNEE ----------
+		// (le pas est ce qui fait epouser la courbure d'un tablier de 240 m sans
+		//  exploser le nombre de quads : 400 cm -> ~60 sections pour Saint-Pierre)
+		const int32 NSeg = FMath::Max(1, FMath::CeilToInt32(RunCm / GBridgeStepCm));
+		TArray<FVector2D> Axe;
+		TArray<float> Z;
+		Axe.SetNum(NSeg + 1);
+		Z.SetNum(NSeg + 1);
+		auto EchantillonneA = [&](float s, FVector2D& OutP, float& OutZ)
+		{
+			s = FMath::Clamp(s, 0.f, RunCm);
+			for (int32 i = 1; i < NP; ++i)
+			{
+				if (s <= S[i] || i == NP - 1)
+				{
+					const float d = FMath::Max(S[i] - S[i - 1], 1e-4f);
+					const float u = FMath::Clamp((s - S[i - 1]) / d, 0.f, 1.f);
+					OutP = B.PtsCm[i - 1] + (B.PtsCm[i] - B.PtsCm[i - 1]) * (double)u;
+					OutZ = FMath::Lerp(B.ZCm[i - 1], B.ZCm[i], u);
+					return;
+				}
+			}
+			OutP = B.PtsCm[NP - 1];
+			OutZ = B.ZCm[NP - 1];
+		};
+		for (int32 i = 0; i <= NSeg; ++i)
+		{
+			EchantillonneA(RunCm * (float)i / (float)NSeg, Axe[i], Z[i]);
+		}
+		// REPLI quand le side-car n'a pas de cote : exactement le comportement
+		// d'avant C2 (interpolation entre les deux rives), mais sur le sol RENDU et
+		// journalise — jamais en silence.
+		if (!B.bHasZ)
+		{
+			const float Z0 = RGZ.At(Axe[0].X, Axe[0].Y);
+			const float Z1 = RGZ.At(Axe[NSeg].X, Axe[NSeg].Y);
+			for (int32 i = 0; i <= NSeg; ++i)
+			{
+				Z[i] = FMath::Lerp(Z0, Z1, (float)i / (float)NSeg);
+			}
+		}
+
+		// --- 3. pose --------------------------------------------------------------
+		const FPolygonGroupID DeckGroup = QM.GetOrCreateGroup(DeckSurf->SlotName(), DeckSurf->Material);
+		const FPolygonGroupID StoneGroup = QM.GetOrCreateGroup(StoneSurf->SlotName(), StoneSurf->Material);
+		const FVector3f Up(0, 0, 1);
+		const FVector3f Down(0, 0, -1);
+		const FVector3f DeckTint(1.f, 1.f, 1.f);
+		const float HalfW = B.WidthCm * 0.5f;
+		auto V3 = [](const FVector2D& P, float Zc) { return FVector3f((float)P.X, (float)P.Y, Zc); };
+		auto WorldUV = [](const FVector3f& P) { return FVector2f(P.X * 0.01f, P.Y * 0.01f); };
+
+		// Normale en plan a chaque section (moyenne des deux segments voisins : sans
+		// ca les bords se croisent dans les virages serres).
+		TArray<FVector2D> Nrm;
+		Nrm.SetNum(NSeg + 1);
+		for (int32 i = 0; i <= NSeg; ++i)
+		{
+			const FVector2D A = Axe[FMath::Max(0, i - 1)];
+			const FVector2D C = Axe[FMath::Min(NSeg, i + 1)];
+			FVector2D D = C - A;
+			if (D.IsNearlyZero())
+			{
+				D = FVector2D(1.0, 0.0);
+			}
+			D = D.GetSafeNormal();
+			Nrm[i] = FVector2D(-D.Y, D.X);
+		}
+
+		// Hauteur libre par section (tablier - sol rendu sous l'axe) : elle decide des
+		// parapets, elle est aussi ce que le journal rapporte.
+		TArray<float> Clear;
+		Clear.SetNum(NSeg + 1);
+		float ClearMax = -FLT_MAX;
+		for (int32 i = 0; i <= NSeg; ++i)
+		{
+			Clear[i] = Z[i] - RGZ.At(Axe[i].X, Axe[i].Y);
+			ClearMax = FMath::Max(ClearMax, Clear[i]);
+		}
+
+		for (int32 i = 0; i < NSeg; ++i)
+		{
+			const FVector2D AL = Axe[i] - Nrm[i] * (double)HalfW;
+			const FVector2D AR = Axe[i] + Nrm[i] * (double)HalfW;
+			const FVector2D BL = Axe[i + 1] - Nrm[i + 1] * (double)HalfW;
+			const FVector2D BR = Axe[i + 1] + Nrm[i + 1] * (double)HalfW;
+			const float ZA = Z[i], ZB = Z[i + 1];
+			// SOUS-FACE : le tablier est une DALLE d'epaisseur constante, point.
+			// (Premiere version rejetee sur capture : elle clampait la sous-face
+			//  SOUS le sol rendu « pour fermer le raccord ». Au-dessus du lit de la
+			//  Garonne, 10 m plus bas, cela transformait le pont en MUR PLEIN d'une
+			//  rive a l'autre et bouchait la promenade — l'inverse exact du but.
+			//  Aux atterrissages, la dalle de 90 cm s'enterre d'elle-meme : le sol y
+			//  est a la cote du tablier, donc au-dessus de la sous-face.)
+			const float SA = ZA - GBridgeDeckThickCm;
+			const float SB = ZB - GBridgeDeckThickCm;
+
+			// (a) LA CHAUSSEE. UV monde metrique, comme la dalle : le revetement reste
+			//     en phase avec la rue qui arrive sur le pont.
+			{
+				const FVector3f Q[4] = { V3(AL, ZA), V3(AR, ZA), V3(BR, ZB), V3(BL, ZB) };
+				const FVector2f UV[4] = { WorldUV(Q[0]), WorldUV(Q[1]), WorldUV(Q[2]), WorldUV(Q[3]) };
+				QM.AddPoly(DeckGroup, Q, 4, Up, UV, DeckTint);
+				++OutQuads;
+			}
+			// (b) LA SOUS-FACE. C'est elle qu'on voit depuis la promenade : elle est
+			//     en pierre, pas en asphalte.
+			{
+				const FVector3f Q[4] = { V3(BL, SB), V3(BR, SB), V3(AR, SA), V3(AL, SA) };
+				const FVector2f UV[4] = { WorldUV(Q[0]), WorldUV(Q[1]), WorldUV(Q[2]), WorldUV(Q[3]) };
+				QM.AddPoly(StoneGroup, Q, 4, Down, UV, StoneTint);
+				++OutQuads;
+			}
+			// (c) LES DEUX BANDEAUX (les flancs du tablier).
+			{
+				const FVector3f NG(-(float)Nrm[i].X, -(float)Nrm[i].Y, 0.f);
+				const FVector3f G[4] = { V3(AL, ZA), V3(BL, ZB), V3(BL, SB), V3(AL, SA) };
+				const FVector2f UVG[4] = {
+					FVector2f(S[0], 0.f), FVector2f((float)(BL - AL).Size() * 0.01f, 0.f),
+					FVector2f((float)(BL - AL).Size() * 0.01f, (ZB - SB) * 0.01f),
+					FVector2f(0.f, (ZA - SA) * 0.01f) };
+				QM.AddPoly(StoneGroup, G, 4, NG.GetSafeNormal(), UVG, StoneTint);
+				const FVector3f ND((float)Nrm[i].X, (float)Nrm[i].Y, 0.f);
+				const FVector3f D[4] = { V3(BR, ZB), V3(AR, ZA), V3(AR, SA), V3(BR, SB) };
+				QM.AddPoly(StoneGroup, D, 4, ND.GetSafeNormal(), UVG, StoneTint);
+				OutQuads += 2;
+			}
+			// (d) LES PARAPETS, seulement la ou l'ouvrage est REELLEMENT en l'air.
+			if (bParapets && Clear[i] > GBridgeMinClearCm && Clear[i + 1] > GBridgeMinClearCm)
+			{
+				for (int32 Cote = 0; Cote < 2; ++Cote)
+				{
+					const double Sgn = (Cote == 0) ? -1.0 : 1.0;
+					const FVector2D EA = Axe[i] + Nrm[i] * (Sgn * (double)HalfW);
+					const FVector2D EB = Axe[i + 1] + Nrm[i + 1] * (Sgn * (double)HalfW);
+					const FVector2D IA = Axe[i] + Nrm[i] * (Sgn * (double)(HalfW - GBridgeParapetWCm));
+					const FVector2D IB = Axe[i + 1] + Nrm[i + 1] * (Sgn * (double)(HalfW - GBridgeParapetWCm));
+					const float TA = ZA + GBridgeParapetHCm, TB = ZB + GBridgeParapetHCm;
+					const FVector3f NExt((float)(Nrm[i].X * Sgn), (float)(Nrm[i].Y * Sgn), 0.f);
+					// face EXTERIEURE — l'ordre des sommets s'inverse avec le cote,
+					// sinon la face du cote droit sort a l'envers.
+					FVector3f Ext[4];
+					if (Sgn < 0.0)
+					{
+						Ext[0] = V3(EA, ZA); Ext[1] = V3(EB, ZB);
+						Ext[2] = V3(EB, TB); Ext[3] = V3(EA, TA);
+					}
+					else
+					{
+						Ext[0] = V3(EB, ZB); Ext[1] = V3(EA, ZA);
+						Ext[2] = V3(EA, TA); Ext[3] = V3(EB, TB);
+					}
+					const FVector2f UVE[4] = {
+						FVector2f(0.f, 0.f), FVector2f((float)(EB - EA).Size() * 0.01f, 0.f),
+						FVector2f((float)(EB - EA).Size() * 0.01f, GBridgeParapetHCm * 0.01f),
+						FVector2f(0.f, GBridgeParapetHCm * 0.01f) };
+					QM.AddPoly(StoneGroup, Ext, 4, NExt.GetSafeNormal(), UVE, StoneTint);
+					// COURONNEMENT
+					const FVector3f Cour[4] = { V3(IA, TA), V3(IB, TB), V3(EB, TB), V3(EA, TA) };
+					const FVector2f UVC[4] = { WorldUV(Cour[0]), WorldUV(Cour[1]),
+						WorldUV(Cour[2]), WorldUV(Cour[3]) };
+					QM.AddPoly(StoneGroup, Cour, 4, Up, UVC, StoneTint);
+					// face INTERIEURE (celle que voit l'automobiliste)
+					const FVector3f NInt(-(float)(Nrm[i].X * Sgn), -(float)(Nrm[i].Y * Sgn), 0.f);
+					const FVector3f Int[4] = { V3(IB, ZB), V3(IA, ZA), V3(IA, TA), V3(IB, TB) };
+					QM.AddPoly(StoneGroup, Int, 4, NInt.GetSafeNormal(), UVE, StoneTint);
+					OutQuads += 3;
+				}
+			}
+		}
+
+		// (e) BOUCHONS DE BOUT : le tablier est une piece fermee. Meme quand le bout
+		//     n'est pas « libre », le bouchon ne coute rien et supprime tout jour au
+		//     raccord (deux ouvrages voisins se recouvrent exactement au noeud).
+		for (int32 Bout = 0; Bout < 2; ++Bout)
+		{
+			const int32 i = (Bout == 0) ? 0 : NSeg;
+			const FVector2D L = Axe[i] - Nrm[i] * (double)HalfW;
+			const FVector2D R = Axe[i] + Nrm[i] * (double)HalfW;
+			const float Zt = Z[i];
+			// Meme dalle d'epaisseur constante que les sections (cf. la note ci-dessus) ;
+			// le bouchon s'enfonce d'un cran de plus pour ne laisser aucun jour au
+			// raccord de deux ouvrages voisins.
+			const float Zs = Zt - GBridgeDeckThickCm - GBridgeSinkCm;
+			FVector2D Dir = (Bout == 0) ? (Axe[0] - Axe[1]) : (Axe[NSeg] - Axe[NSeg - 1]);
+			Dir = Dir.IsNearlyZero() ? FVector2D(1.0, 0.0) : Dir.GetSafeNormal();
+			const FVector3f N((float)Dir.X, (float)Dir.Y, 0.f);
+			FVector3f Q[4];
+			if (Bout == 0)
+			{
+				Q[0] = V3(L, Zt); Q[1] = V3(R, Zt); Q[2] = V3(R, Zs); Q[3] = V3(L, Zs);
+			}
+			else
+			{
+				Q[0] = V3(R, Zt); Q[1] = V3(L, Zt); Q[2] = V3(L, Zs); Q[3] = V3(R, Zs);
+			}
+			const FVector2f UV[4] = { FVector2f(0.f, 0.f), FVector2f(B.WidthCm * 0.01f, 0.f),
+				FVector2f(B.WidthCm * 0.01f, (Zt - Zs) * 0.01f), FVector2f(0.f, (Zt - Zs) * 0.01f) };
+			QM.AddPoly(StoneGroup, Q, 4, N, UV, StoneTint);
+			++OutQuads;
+		}
+
+		// Le tablier POSE se nomme — comme la volee d'escalier. Sans cette ligne,
+		// aucune enquete n'est possible (lecon payee par une enquete entiere au lot
+		// QUAIS : un compte agrege ne nomme personne).
+		UE_LOG(LogCityImport, Display,
+			TEXT("PONTS C2 tablier POSE id=%s nom='%s' pos=%+d long=%.1f m larg=%.1f m z=%.2f..%.2f m hauteur_libre_max=%.2f m z_source=%s quads=%d."),
+			*B.Id, *B.Nom, B.Pos, RunCm * 0.01f, B.WidthCm * 0.01f,
+			FMath::Min(Z[0], Z[NSeg]) * 0.01f, FMath::Max(Z[0], Z[NSeg]) * 0.01f,
+			ClearMax * 0.01f, B.bHasZ ? TEXT("bdtopo3d") : TEXT("REPLI_RIVES"), OutQuads);
+		return RunCm * 0.01f;
 	}
 
 	// TIRET de ligne axiale : un quad de 15 cm de large. Le debitage (3 m plein /
@@ -9011,6 +9412,24 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				++Index;
 				continue;
 			}
+			// C2 (03/08) — LE RUBAN DE PONT EST REMPLACE PAR LE TABLIER A SA COTE.
+			// Le ruban OSM n'a AUCUNE cote : ComputePolylineZ l'interpolait entre les
+			// deux bouts drapes au MNT, ce qui l'enfoncait de 7,62 m en moyenne sous
+			// le vrai tablier du Pont Saint-Pierre (mesure du 03/08) — il traversait
+			// la promenade au niveau du sable. Des que la passe ponts est active,
+			// c'est elle qui pose le franchissement, depuis BD TOPO 3D.
+			// `bBridgeRibbonsHistorique` restitue l'ancien comportement pour l'A/B.
+			if (Gen.bBridges && Drape.IsActive() && !Gen.bBridgeRibbonsHistorique)
+			{
+				bool bBridgeRibbon = false;
+				O->TryGetBoolField(TEXT("bridge"), bBridgeRibbon);
+				if (bBridgeRibbon)
+				{
+					++Summary.BridgeRibbonsReplaced;
+					++Index;
+					continue;
+				}
+			}
 			// J3c maquette — LA CHAUSSEE N'EST PLUS UN FILM POSE SUR LA DALLE. Une
 			// fois le sol peint, un ruban au niveau du sol ne ferait que doubler la
 			// peinture (et se battre avec elle en profondeur). Seuls survivent les
@@ -9441,6 +9860,91 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			UE_LOG(LogCityImport, Display,
 				TEXT("QUAIS V2 escaliers : %d cellules IGNOREES — leur side-car est cuit pour des cellules de %.0f m et cet import travaille a %.0f m."),
 				StCellsWrongSize, StBakedCellM, CellSizeM);
+		}
+	}
+
+	// --- C2 : LES PONTS. Meme place, meme hote et meme dependance que les murs et
+	// les escaliers (le drapage : sans relief il n'y a rien a franchir). Le tablier
+	// vit dans la cellule de RUBANS de son PREMIER point — la meme regle que tout le
+	// reste, `CleSol`, celle qui evite d'ecraser l'asset de la cellule voisine en
+	// mode district (garde du §11.6 du Playbook).
+	if (Gen.bBridges && Drape.IsActive())
+	{
+		const FString BrDir = BridgesDir(Gen);
+		TArray<FString> Files;
+		IFileManager::Get().FindFiles(Files, *(BrDir / TEXT("ponts_*.json")), true, false);
+		// Chaussee = l'asphalte des rubans ; sous-face, bandeaux et parapets = la
+		// pierre des bordures et des murs. AUCUN materiau nouveau.
+		const FResolvedSurface* BrDeck = Surfaces.Resolve(&GSurfAsphalt);
+		const FResolvedSurface* BrStone = Surfaces.Resolve(&GSurfCurb);
+		if (!BrDeck || !BrStone)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("Ponts demandes mais bSurfaceMaterials est faux : aucun tablier pose."));
+		}
+		const FVector3f BrTint(0.85f, 0.85f, 0.80f);
+		FRenderedGroundZ BrRGZ;
+		BrRGZ.Init(Drape, Gen.GroundGridN, Cell);
+		int32 CellsWithBridges = 0;
+		int32 BrCellsWrongSize = 0;
+		double BrBakedCellM = 0.0;
+		float DeckM = 0.f;
+		for (const FString& File : Files)
+		{
+			FString Rest = FPaths::GetBaseFilename(File);
+			Rest.RemoveFromStart(TEXT("ponts_"));
+			FString Sx, Sy;
+			if (!Rest.Split(TEXT("_"), &Sx, &Sy, ESearchCase::CaseSensitive, ESearchDir::FromEnd))
+			{
+				continue;
+			}
+			if (!CelluleVisee(FIntPoint(FCString::Atoi(*Sx), FCString::Atoi(*Sy))))
+			{
+				continue;
+			}
+			TArray<FCityBridge> Decks;
+			if (!LoadBridgesCell(BrDir, FCString::Atoi(*Sx), FCString::Atoi(*Sy),
+				CellSizeM, Drape.AltCapCm, Decks, BrCellsWrongSize, BrBakedCellM) ||
+				Decks.Num() == 0)
+			{
+				continue;
+			}
+			++CellsWithBridges;
+			const FIntPoint CellulePont(FCString::Atoi(*Sx), FCString::Atoi(*Sy));
+			for (const FCityBridge& Bd : Decks)
+			{
+				int32 Q = 0;
+				const float M = BuildBridge(
+					GetInKey(GroundCells, CleSol(Bd.PtsCm[0], CellulePont),
+						bLinearColors, bWorldUVs),
+					Bd, BrRGZ, BrDeck, BrStone, BrTint, Gen.bBridgeParapets, Q);
+				if (M > 0.f)
+				{
+					++Summary.Bridges;
+					Summary.BridgeQuads += Q;
+					DeckM += M;
+					if (!Bd.bHasZ)
+					{
+						++Summary.BridgesZFallback;
+					}
+				}
+				else
+				{
+					++Summary.BridgesSkipped;
+				}
+			}
+		}
+		Summary.BridgeDeckM = FMath::RoundToInt(DeckM);
+		UE_LOG(LogCityImport, Display,
+			TEXT("PONTS C2 : %d cellules, %d tabliers poses (%d m de tablier, %d quads), %d ecartes, %d au repli de cote ; %d rubans OSM de pont remplaces — dossier '%s'."),
+			CellsWithBridges, Summary.Bridges, Summary.BridgeDeckM, Summary.BridgeQuads,
+			Summary.BridgesSkipped, Summary.BridgesZFallback,
+			Summary.BridgeRibbonsReplaced, *BrDir);
+		if (BrCellsWrongSize > 0)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("PONTS C2 : %d cellules IGNOREES — leur side-car est cuit pour des cellules de %.0f m et cet import travaille a %.0f m."),
+				BrCellsWrongSize, BrBakedCellM, CellSizeM);
 		}
 	}
 

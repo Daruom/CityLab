@@ -1,0 +1,527 @@
+{
+ "cell": [
+  -3,
+  0
+ ],
+ "cellSizeM": 500.0,
+ "origin": [
+  -1500.0,
+  0.0
+ ],
+ "crs": "local_citylab_equirect_capitole",
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y ; z = altitude NGF (m)",
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0), geometrie 3D : z = altitude NGF en metres",
+ "recette": {
+  "regle": "OUVRAGE = chaine connexe amorcee sur position_par_rapport_au_sol >= 1, etendue aux voisins encore EN L'AIR",
+  "seuil_en_lair_m": 1.5,
+  "tol_noeud_m": 1.0,
+  "mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "alt_capitole_m": 142.39
+ },
+ "note": "z absent = null sur les 3 composantes : le C++ retombe alors sur l'interpolation entre les cotes RENDUES des deux rives (comportement historique) et le journalise.",
+ "stats": {
+  "ponts": 12,
+  "longueur_m": 875.59
+ },
+ "ponts": [
+  {
+   "id": "TRONROUT0000002206820891",
+   "pts": [
+    [
+     -1323.541,
+     268.409,
+     null
+    ],
+    [
+     -1323.049,
+     258.053,
+     140.8
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 0,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 10.37,
+   "hauteur_moy_m": 10.62
+  },
+  {
+   "id": "TRONROUT0000002206820879",
+   "pts": [
+    [
+     -1323.049,
+     258.053,
+     140.8
+    ],
+    [
+     -1322.509,
+     245.11,
+     null
+    ],
+    [
+     -1322.176,
+     226.799,
+     null
+    ],
+    [
+     -1321.542,
+     208.582,
+     null
+    ],
+    [
+     -1320.009,
+     185.373,
+     null
+    ],
+    [
+     -1319.327,
+     164.568,
+     null
+    ],
+    [
+     -1318.186,
+     146.738,
+     null
+    ],
+    [
+     -1317.008,
+     125.725,
+     null
+    ],
+    [
+     -1315.826,
+     99.936,
+     null
+    ],
+    [
+     -1314.613,
+     75.738,
+     null
+    ],
+    [
+     -1313.094,
+     46.859,
+     null
+    ],
+    [
+     -1311.407,
+     26.333,
+     128.9
+    ],
+    [
+     -1311.351,
+     24.143,
+     140.8
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 0,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 234.23,
+   "hauteur_moy_m": 7.01
+  },
+  {
+   "id": "TRONROUT0000002206820898",
+   "pts": [
+    [
+     -1314.256,
+     258.476,
+     139.6
+    ],
+    [
+     -1311.501,
+     276.427,
+     139.5
+    ]
+   ],
+   "largeur_m": 7.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 2 chaussées",
+   "nom": "Allées Charles de Fitte",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 18.16,
+   "hauteur_moy_m": 5.93
+  },
+  {
+   "id": "TRONROUT0000000073501932",
+   "pts": [
+    [
+     -1302.159,
+     24.558,
+     139.8
+    ],
+    [
+     -1302.414,
+     26.751,
+     139.8
+    ],
+    [
+     -1307.32,
+     115.982,
+     141.0
+    ],
+    [
+     -1310.347,
+     179.312,
+     141.8
+    ],
+    [
+     -1313.608,
+     245.928,
+     139.9
+    ],
+    [
+     -1314.256,
+     258.476,
+     139.6
+    ]
+   ],
+   "largeur_m": 12.0,
+   "voies": 4,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Pont des Catalans",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 234.24,
+   "hauteur_moy_m": 11.82
+  },
+  {
+   "id": "TRONROUT0000002206820893",
+   "pts": [
+    [
+     -1311.501,
+     276.427,
+     139.5
+    ],
+    [
+     -1311.051,
+     279.004,
+     139.4
+    ],
+    [
+     -1310.345,
+     284.362,
+     139.4
+    ],
+    [
+     -1309.646,
+     289.322,
+     139.4
+    ]
+   ],
+   "largeur_m": 7.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 2 chaussées",
+   "nom": "Allées Charles de Fitte",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 13.03,
+   "hauteur_moy_m": 2.29
+  },
+  {
+   "id": "TRONROUT0000002206820890",
+   "pts": [
+    [
+     -1306.86,
+     258.926,
+     null
+    ],
+    [
+     -1306.891,
+     272.356,
+     null
+    ],
+    [
+     -1311.501,
+     276.427,
+     139.5
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 0,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 19.58,
+   "hauteur_moy_m": 2.34
+  },
+  {
+   "id": "TRONROUT0000002206820880",
+   "pts": [
+    [
+     -1294.978,
+     24.216,
+     null
+    ],
+    [
+     -1295.684,
+     38.854,
+     null
+    ],
+    [
+     -1296.717,
+     52.105,
+     null
+    ],
+    [
+     -1297.8,
+     72.818,
+     null
+    ],
+    [
+     -1298.888,
+     93.333,
+     null
+    ],
+    [
+     -1299.72,
+     111.654,
+     null
+    ],
+    [
+     -1300.51,
+     132.063,
+     null
+    ],
+    [
+     -1302.22,
+     156.37,
+     null
+    ],
+    [
+     -1302.699,
+     172.395,
+     null
+    ],
+    [
+     -1304.199,
+     192.222,
+     null
+    ],
+    [
+     -1305.208,
+     216.714,
+     null
+    ],
+    [
+     -1305.99,
+     237.52,
+     null
+    ],
+    [
+     -1306.828,
+     255.543,
+     null
+    ],
+    [
+     -1306.86,
+     258.926,
+     null
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 0,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 235.04,
+   "hauteur_moy_m": null
+  },
+  {
+   "id": "TRONROUT0000002206820882",
+   "pts": [
+    [
+     -1311.351,
+     24.143,
+     140.8
+    ],
+    [
+     -1310.399,
+     -3.133,
+     139.2
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 0,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 27.29,
+   "hauteur_moy_m": 7.47
+  },
+  {
+   "id": "TRONROUT0000002206820894",
+   "pts": [
+    [
+     -1309.646,
+     289.322,
+     139.3
+    ],
+    [
+     -1303.314,
+     306.506,
+     138.7
+    ]
+   ],
+   "largeur_m": 7.0,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 2 chaussées",
+   "nom": "Allées Charles de Fitte",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 18.31,
+   "hauteur_moy_m": 0.15
+  },
+  {
+   "id": "TRONROUT0000002206820895",
+   "pts": [
+    [
+     -1318.202,
+     285.811,
+     139.8
+    ],
+    [
+     -1313.056,
+     303.516,
+     139.5
+    ]
+   ],
+   "largeur_m": 9.0,
+   "voies": 3,
+   "pos": 1,
+   "nature": "Route à 2 chaussées",
+   "nom": "Allées Charles de Fitte",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 18.44,
+   "hauteur_moy_m": 0.98
+  },
+  {
+   "id": "TRONROUT0000002206820896",
+   "pts": [
+    [
+     -1319.48,
+     301.754,
+     null
+    ],
+    [
+     -1323.243,
+     293.273,
+     135.9
+    ],
+    [
+     -1324.704,
+     285.145,
+     null
+    ],
+    [
+     -1324.638,
+     283.452,
+     null
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 0,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 19.23,
+   "hauteur_moy_m": -3.66
+  },
+  {
+   "id": "TRONROUT0000000073502354",
+   "pts": [
+    [
+     -1314.256,
+     258.476,
+     139.6
+    ],
+    [
+     -1315.236,
+     264.364,
+     140.2
+    ],
+    [
+     -1317.363,
+     277.836,
+     139.8
+    ],
+    [
+     -1318.345,
+     283.626,
+     139.8
+    ],
+    [
+     -1318.202,
+     285.811,
+     139.8
+    ]
+   ],
+   "largeur_m": 7.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 2 chaussées",
+   "nom": "Pont des Catalans",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 27.67,
+   "hauteur_moy_m": 4.82
+  }
+ ]
+}

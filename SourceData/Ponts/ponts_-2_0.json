@@ -1,0 +1,358 @@
+{
+ "cell": [
+  -2,
+  0
+ ],
+ "cellSizeM": 500.0,
+ "origin": [
+  -1000.0,
+  0.0
+ ],
+ "crs": "local_citylab_equirect_capitole",
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y ; z = altitude NGF (m)",
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0), geometrie 3D : z = altitude NGF en metres",
+ "recette": {
+  "regle": "OUVRAGE = chaine connexe amorcee sur position_par_rapport_au_sol >= 1, etendue aux voisins encore EN L'AIR",
+  "seuil_en_lair_m": 1.5,
+  "tol_noeud_m": 1.0,
+  "mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "alt_capitole_m": 142.39
+ },
+ "note": "z absent = null sur les 3 composantes : le C++ retombe alors sur l'interpolation entre les cotes RENDUES des deux rives (comportement historique) et le journalise.",
+ "stats": {
+  "ponts": 10,
+  "longueur_m": 467.55
+ },
+ "ponts": [
+  {
+   "id": "TRONROUT0000002223815356",
+   "pts": [
+    [
+     -701.514,
+     148.856,
+     142.1
+    ],
+    [
+     -695.646,
+     137.698,
+     141.6
+    ]
+   ],
+   "largeur_m": 9.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Pont Saint Pierre",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 12.61,
+   "hauteur_moy_m": 5.92
+  },
+  {
+   "id": "TRONROUT0000002274866905",
+   "pts": [
+    [
+     -695.646,
+     137.698,
+     141.6
+    ],
+    [
+     -692.474,
+     131.567,
+     141.3
+    ],
+    [
+     -691.033,
+     128.753,
+     141.5
+    ],
+    [
+     -689.495,
+     125.739,
+     141.5
+    ]
+   ],
+   "largeur_m": 9.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Place Saint Pierre",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 13.45,
+   "hauteur_moy_m": 1.5
+  },
+  {
+   "id": "TRONROUT0000000073501541",
+   "pts": [
+    [
+     -876.451,
+     482.685,
+     137.2
+    ],
+    [
+     -843.473,
+     419.361,
+     139.7
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Rue du Pont Saint Pierre",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 71.4,
+   "hauteur_moy_m": 2.16
+  },
+  {
+   "id": "TRONROUT0000000073500904",
+   "pts": [
+    [
+     -829.916,
+     393.328,
+     140.8
+    ],
+    [
+     -833.088,
+     399.458,
+     140.5
+    ],
+    [
+     -843.473,
+     419.361,
+     139.7
+    ]
+   ],
+   "largeur_m": 7.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Rue du Pont Saint Pierre",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 29.35,
+   "hauteur_moy_m": 5.16
+  },
+  {
+   "id": "TRONROUT0000000073501852",
+   "pts": [
+    [
+     -829.916,
+     393.328,
+     140.8
+    ],
+    [
+     -820.312,
+     399.405,
+     135.0
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 11.37,
+   "hauteur_moy_m": 2.97
+  },
+  {
+   "id": "TRONROUT0000002202743654",
+   "pts": [
+    [
+     -829.916,
+     393.328,
+     140.8
+    ],
+    [
+     -816.836,
+     368.398,
+     141.7
+    ]
+   ],
+   "largeur_m": 7.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Rue du Pont Saint Pierre",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 28.15,
+   "hauteur_moy_m": 6.43
+  },
+  {
+   "id": "TRONROUT0000000223313255",
+   "pts": [
+    [
+     -816.836,
+     368.398,
+     141.7
+    ],
+    [
+     -815.01,
+     364.88,
+     142.1
+    ],
+    [
+     -812.51,
+     360.056,
+     142.3
+    ]
+   ],
+   "largeur_m": 7.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Rue du Pont Saint Pierre",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 9.4,
+   "hauteur_moy_m": 7.45
+  },
+  {
+   "id": "TRONROUT0000002223815342",
+   "pts": [
+    [
+     -812.51,
+     360.056,
+     142.3
+    ],
+    [
+     -802.317,
+     340.555,
+     142.5
+    ],
+    [
+     -796.835,
+     330.101,
+     142.5
+    ],
+    [
+     -764.704,
+     269.281,
+     142.6
+    ],
+    [
+     -707.945,
+     161.816,
+     142.7
+    ],
+    [
+     -705.637,
+     157.393,
+     142.7
+    ],
+    [
+     -703.335,
+     152.672,
+     142.3
+    ],
+    [
+     -703.239,
+     152.472,
+     142.3
+    ],
+    [
+     -701.514,
+     148.856,
+     142.1
+    ]
+   ],
+   "largeur_m": 7.0,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Pont Saint Pierre",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 238.6,
+   "hauteur_moy_m": 8.75
+  },
+  {
+   "id": "TRONROUT0000000073500895",
+   "pts": [
+    [
+     -799.848,
+     78.378,
+     140.1
+    ],
+    [
+     -812.39,
+     70.17,
+     140.0
+    ],
+    [
+     -821.703,
+     63.689,
+     139.9
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Quai Saint Pierre",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 26.34,
+   "hauteur_moy_m": 0.02
+  },
+  {
+   "id": "TRONROUT0000002499198055",
+   "pts": [
+    [
+     -822.865,
+     65.502,
+     null
+    ],
+    [
+     -800.409,
+     80.279,
+     null
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 0,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 26.88,
+   "hauteur_moy_m": null
+  }
+ ]
+}

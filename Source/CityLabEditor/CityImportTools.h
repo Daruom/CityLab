@@ -238,6 +238,54 @@ struct FCityGenProfile
 	UPROPERTY() FString StairsPath;
 
 	/**
+	 * CHANTIER C2 (03/08) — LES PONTS, ET POURQUOI LE TABLIER A SA PROPRE COTE.
+	 *
+	 * MESURE qui fonde la passe (work/PONTS/p1b_cotes.py) : le tablier du Pont
+	 * Saint-Pierre est a 142,10-142,70 m NGF dans BD TOPO 3D, le MNT dessous est a
+	 * 132,3-135,0 m — soit +8,75 m en moyenne. Le code d'avant ce chantier posait le
+	 * ruban de pont par INTERPOLATION DU MNT ENTRE SES DEUX BOUTS
+	 * (`ComputePolylineZ`, bBridge=true) : il manquait 7,62 m en moyenne au tablier,
+	 * qui traversait donc la promenade au niveau du sable, sa ligne axiale peinte
+	 * dessus. Sur le proto 3x3, 70 rubans de pont etaient construits ainsi, dont 26
+	 * de classe marquee ; les quatre pires manquaient 6,4 a 8,5 m.
+	 *
+	 * REGLE NATIONALE, zero cas particulier : le side-car
+	 * `SourceData/Ponts/ponts_<x>_<y>.json` porte l'OUVRAGE — la chaine connexe de
+	 * troncons amorcee sur `position_par_rapport_au_sol >= 1` et etendue aux voisins
+	 * encore EN L'AIR (BD TOPO ne code « pont » que la travee au-dessus de l'eau ;
+	 * les rampes restent pos=0 et pourtant a la cote du tablier). La chaine s'arrete
+	 * sur le troncon qui ATTERRIT, si bien qu'aucune culee aveugle n'est necessaire :
+	 * le tablier rejoint le sol tout seul. Le Z vient de la GEOMETRIE 3D de BD TOPO ;
+	 * quand elle n'en a pas (18 troncons sur 98 dans le proto), on retombe sur
+	 * l'interpolation entre les cotes RENDUES des deux rives, et on le journalise.
+	 *
+	 * Materiaux : chaussee = l'asphalte des rubans, sous-face/bandeaux/parapets = la
+	 * pierre des bordures et des murs. AUCUN materiau nouveau, AUCUNE classe de sol.
+	 * Exige le drapage (sans relief il n'y a rien a franchir) : le golden path mobile
+	 * n'est pas concerne.
+	 */
+	UPROPERTY() bool bBridges = true;
+
+	/** Dossier des ponts cuits (ponts_<x>_<y>.json). Vide = <projet>/SourceData/Ponts. */
+	UPROPERTY() FString BridgesPath;
+
+	/**
+	 * C2 : les PARAPETS, poses seulement la ou le tablier est REELLEMENT en l'air (un
+	 * troncon code « pont » au ras du sol — il y en a : Quai Saint Pierre, 2 cm de
+	 * hauteur mesuree — ne doit pas se retrouver borde de deux murets). false =
+	 * tablier nu : rollback sans re-cuire le side-car ni rebuilder.
+	 */
+	UPROPERTY() bool bBridgeParapets = true;
+
+	/**
+	 * C2 : ROLLBACK du remplacement des rubans. Par defaut, quand la passe ponts est
+	 * active, les rubans OSM `bridge=true` ne sont PLUS construits — c'est le tablier
+	 * a sa cote qui les remplace. true restitue les rubans drapes d'avant C2 (et le
+	 * grief avec) : sert a refaire l'A/B sans toucher a autre chose.
+	 */
+	UPROPERTY() bool bBridgeRibbonsHistorique = false;
+
+	/**
 	 * LOT QUAIS (V4) — LES GRADINS.
 	 *
 	 * Regle NATIONALE : la ou un mur de classe « quai » borde une zone PIETONNE
@@ -448,6 +496,24 @@ struct FCityStreamedSummary
 
 	/** QUAIS V4 : gradins poses, tous murs confondus. */
 	UPROPERTY() int32 QuayTiers = 0;
+
+	/** C2 : tabliers de pont poses A LEUR COTE (un par troncon d'ouvrage). */
+	UPROPERTY() int32 Bridges = 0;
+
+	/** C2 : quads poses par la passe ponts (tablier + sous-face + bandeaux + parapets). */
+	UPROPERTY() int32 BridgeQuads = 0;
+
+	/** C2 : metres de tablier poses (longueur en plan). Le discriminant de la passe. */
+	UPROPERTY() int32 BridgeDeckM = 0;
+
+	/** C2 : ouvrages ECARTES — trace inexploitable ou surface absente. Jamais tu en silence. */
+	UPROPERTY() int32 BridgesSkipped = 0;
+
+	/** C2 : tabliers dont le Z venait du REPLI (side-car sans geometrie 3D). */
+	UPROPERTY() int32 BridgesZFallback = 0;
+
+	/** C2 : rubans OSM `bridge=true` NON construits — remplaces par le tablier a sa cote. */
+	UPROPERTY() int32 BridgeRibbonsReplaced = 0;
 };
 
 /** Counts of what GenerateBuildingCollisionCell produced for one cell. */

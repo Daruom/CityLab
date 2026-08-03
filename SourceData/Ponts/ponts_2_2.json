@@ -1,0 +1,27 @@
+{
+ "cell": [
+  2,
+  2
+ ],
+ "cellSizeM": 500.0,
+ "origin": [
+  1000.0,
+  1000.0
+ ],
+ "crs": "local_citylab_equirect_capitole",
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y ; z = altitude NGF (m)",
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0), geometrie 3D : z = altitude NGF en metres",
+ "recette": {
+  "regle": "OUVRAGE = chaine connexe amorcee sur position_par_rapport_au_sol >= 1, etendue aux voisins encore EN L'AIR",
+  "seuil_en_lair_m": 1.5,
+  "tol_noeud_m": 1.0,
+  "mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "alt_capitole_m": 142.39
+ },
+ "note": "z absent = null sur les 3 composantes : le C++ retombe alors sur l'interpolation entre les cotes RENDUES des deux rives (comportement historique) et le journalise.",
+ "stats": {
+  "ponts": 0,
+  "longueur_m": 0
+ },
+ "ponts": []
+}

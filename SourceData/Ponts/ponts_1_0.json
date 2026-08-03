@@ -1,0 +1,257 @@
+{
+ "cell": [
+  1,
+  0
+ ],
+ "cellSizeM": 500.0,
+ "origin": [
+  500.0,
+  0.0
+ ],
+ "crs": "local_citylab_equirect_capitole",
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y ; z = altitude NGF (m)",
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0), geometrie 3D : z = altitude NGF en metres",
+ "recette": {
+  "regle": "OUVRAGE = chaine connexe amorcee sur position_par_rapport_au_sol >= 1, etendue aux voisins encore EN L'AIR",
+  "seuil_en_lair_m": 1.5,
+  "tol_noeud_m": 1.0,
+  "mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "alt_capitole_m": 142.39
+ },
+ "note": "z absent = null sur les 3 composantes : le C++ retombe alors sur l'interpolation entre les cotes RENDUES des deux rives (comportement historique) et le journalise.",
+ "stats": {
+  "ponts": 7,
+  "longueur_m": 104.1
+ },
+ "ponts": [
+  {
+   "id": "TRONROUT0000000230208138",
+   "pts": [
+    [
+     970.987,
+     408.915,
+     150.4
+    ],
+    [
+     968.514,
+     410.057,
+     150.4
+    ],
+    [
+     962.382,
+     412.962,
+     150.2
+    ]
+   ],
+   "largeur_m": 9.0,
+   "voies": 3,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Rue du Pont Guilhemery",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 9.51,
+   "hauteur_moy_m": 2.08
+  },
+  {
+   "id": "TRONROUT0000000339767089",
+   "pts": [
+    [
+     992.662,
+     414.66,
+     152.0
+    ],
+    [
+     987.704,
+     411.275,
+     151.6
+    ],
+    [
+     980.588,
+     409.822,
+     151.0
+    ],
+    [
+     970.987,
+     408.915,
+     150.4
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 1,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Port Saint Etienne",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 22.91,
+   "hauteur_moy_m": 3.98
+  },
+  {
+   "id": "TRONROUT0000002223815446",
+   "pts": [
+    [
+     964.995,
+     398.586,
+     151.3
+    ],
+    [
+     962.956,
+     396.438,
+     null
+    ],
+    [
+     961.108,
+     388.714,
+     150.3
+    ]
+   ],
+   "largeur_m": 3.5,
+   "voies": 1,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 10.9,
+   "hauteur_moy_m": 1.78
+  },
+  {
+   "id": "TRONROUT0000002499963286",
+   "pts": [
+    [
+     980.383,
+     404.454,
+     150.4
+    ],
+    [
+     968.033,
+     400.815,
+     145.0
+    ],
+    [
+     964.995,
+     398.586,
+     151.3
+    ]
+   ],
+   "largeur_m": 3.5,
+   "voies": 1,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 16.64,
+   "hauteur_moy_m": 2.07
+  },
+  {
+   "id": "TRONROUT0000002499963288",
+   "pts": [
+    [
+     980.383,
+     404.454,
+     150.4
+    ],
+    [
+     978.01,
+     405.595,
+     150.4
+    ],
+    [
+     975.339,
+     406.841,
+     150.4
+    ],
+    [
+     970.987,
+     408.915,
+     150.4
+    ]
+   ],
+   "largeur_m": 9.0,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Rue du Pont Guilhemery",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 10.4,
+   "hauteur_moy_m": 4.65
+  },
+  {
+   "id": "TRONROUT0000002499963289",
+   "pts": [
+    [
+     994.689,
+     406.066,
+     152.1
+    ],
+    [
+     988.665,
+     404.293,
+     null
+    ],
+    [
+     980.383,
+     404.454,
+     null
+    ]
+   ],
+   "largeur_m": 3.5,
+   "voies": 1,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 14.56,
+   "hauteur_moy_m": 1.91
+  },
+  {
+   "id": "TRONROUT0000000073500156",
+   "pts": [
+    [
+     997.171,
+     395.174,
+     152.2
+    ],
+    [
+     980.383,
+     404.454,
+     150.4
+    ]
+   ],
+   "largeur_m": 12.0,
+   "voies": 4,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Rue du Pont Guilhemery",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 19.18,
+   "hauteur_moy_m": 3.5
+  }
+ ]
+}

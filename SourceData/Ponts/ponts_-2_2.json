@@ -1,0 +1,221 @@
+{
+ "cell": [
+  -2,
+  2
+ ],
+ "cellSizeM": 500.0,
+ "origin": [
+  -1000.0,
+  1000.0
+ ],
+ "crs": "local_citylab_equirect_capitole",
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y ; z = altitude NGF (m)",
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0), geometrie 3D : z = altitude NGF en metres",
+ "recette": {
+  "regle": "OUVRAGE = chaine connexe amorcee sur position_par_rapport_au_sol >= 1, etendue aux voisins encore EN L'AIR",
+  "seuil_en_lair_m": 1.5,
+  "tol_noeud_m": 1.0,
+  "mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "alt_capitole_m": 142.39
+ },
+ "note": "z absent = null sur les 3 composantes : le C++ retombe alors sur l'interpolation entre les cotes RENDUES des deux rives (comportement historique) et le journalise.",
+ "stats": {
+  "ponts": 4,
+  "longueur_m": 753.66
+ },
+ "ponts": [
+  {
+   "id": "TRONROUT0000002012084006",
+   "pts": [
+    [
+     -721.012,
+     1301.709,
+     142.8
+    ],
+    [
+     -735.027,
+     1299.598,
+     142.9
+    ],
+    [
+     -743.539,
+     1298.175,
+     143.1
+    ]
+   ],
+   "largeur_m": 3.0,
+   "voies": 1,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Pont Saint Michel",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 22.8,
+   "hauteur_moy_m": 0.59
+  },
+  {
+   "id": "TRONROUT0000002291983232",
+   "pts": [
+    [
+     -720.659,
+     1299.414,
+     142.8
+    ],
+    [
+     -735.398,
+     1296.024,
+     null
+    ],
+    [
+     -744.113,
+     1294.406,
+     null
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 0,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 23.99,
+   "hauteur_moy_m": 2.98
+  },
+  {
+   "id": "TRONROUT0000000339766713",
+   "pts": [
+    [
+     -727.791,
+     1317.162,
+     142.9
+    ],
+    [
+     -707.684,
+     1319.451,
+     143.1
+    ],
+    [
+     -687.777,
+     1321.744,
+     143.3
+    ],
+    [
+     -673.474,
+     1323.252,
+     143.4
+    ],
+    [
+     -653.986,
+     1324.559,
+     143.5
+    ],
+    [
+     -605.07,
+     1330.059,
+     143.8
+    ],
+    [
+     -535.637,
+     1338.438,
+     144.0
+    ],
+    [
+     -442.398,
+     1349.432,
+     144.0
+    ],
+    [
+     -394.782,
+     1354.861,
+     143.4
+    ],
+    [
+     -374.668,
+     1357.548,
+     143.6
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 1,
+   "pos": 1,
+   "nature": "Route à 2 chaussées",
+   "nom": "Pont Saint Michel",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 355.45,
+   "hauteur_moy_m": 8.41
+  },
+  {
+   "id": "TRONROUT0000002291983231",
+   "pts": [
+    [
+     -720.659,
+     1299.414,
+     142.8
+    ],
+    [
+     -697.253,
+     1301.936,
+     null
+    ],
+    [
+     -671.438,
+     1305.206,
+     null
+    ],
+    [
+     -613.513,
+     1312.021,
+     null
+    ],
+    [
+     -588.801,
+     1315.015,
+     null
+    ],
+    [
+     -554.499,
+     1318.417,
+     null
+    ],
+    [
+     -444.34,
+     1332.062,
+     null
+    ],
+    [
+     -390.522,
+     1338.164,
+     null
+    ],
+    [
+     -371.619,
+     1340.179,
+     143.6
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 0,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 351.42,
+   "hauteur_moy_m": 4.03
+  }
+ ]
+}

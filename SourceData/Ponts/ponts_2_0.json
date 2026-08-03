@@ -1,0 +1,181 @@
+{
+ "cell": [
+  2,
+  0
+ ],
+ "cellSizeM": 500.0,
+ "origin": [
+  1000.0,
+  0.0
+ ],
+ "crs": "local_citylab_equirect_capitole",
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y ; z = altitude NGF (m)",
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0), geometrie 3D : z = altitude NGF en metres",
+ "recette": {
+  "regle": "OUVRAGE = chaine connexe amorcee sur position_par_rapport_au_sol >= 1, etendue aux voisins encore EN L'AIR",
+  "seuil_en_lair_m": 1.5,
+  "tol_noeud_m": 1.0,
+  "mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "alt_capitole_m": 142.39
+ },
+ "note": "z absent = null sur les 3 composantes : le C++ retombe alors sur l'interpolation entre les cotes RENDUES des deux rives (comportement historique) et le journalise.",
+ "stats": {
+  "ponts": 4,
+  "longueur_m": 89.26
+ },
+ "ponts": [
+  {
+   "id": "TRONROUT0000000339767090",
+   "pts": [
+    [
+     1000.449,
+     435.101,
+     150.5
+    ],
+    [
+     999.456,
+     430.246,
+     150.5
+    ],
+    [
+     998.265,
+     425.494,
+     150.6
+    ],
+    [
+     995.944,
+     419.172,
+     151.1
+    ],
+    [
+     992.662,
+     414.66,
+     152.0
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 1,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Port Saint Etienne",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 22.17,
+   "hauteur_moy_m": 0.6
+  },
+  {
+   "id": "TRONROUT0000002499963291",
+   "pts": [
+    [
+     1000.449,
+     435.101,
+     null
+    ],
+    [
+     1000.415,
+     423.164,
+     null
+    ],
+    [
+     998.228,
+     413.458,
+     null
+    ],
+    [
+     994.689,
+     406.066,
+     152.1
+    ]
+   ],
+   "largeur_m": 3.5,
+   "voies": 1,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Port Saint Etienne",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 30.08,
+   "hauteur_moy_m": 1.91
+  },
+  {
+   "id": "TRONROUT0000000073500152",
+   "pts": [
+    [
+     1154.018,
+     498.463,
+     155.3
+    ],
+    [
+     1147.816,
+     497.788,
+     155.2
+    ],
+    [
+     1143.316,
+     497.378,
+     155.2
+    ],
+    [
+     1138.012,
+     496.686,
+     153.8
+    ],
+    [
+     1136.412,
+     496.518,
+     153.4
+    ],
+    [
+     1125.107,
+     495.246,
+     153.9
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Rue de l'Aqueduc",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 29.09,
+   "hauteur_moy_m": 3.16
+  },
+  {
+   "id": "TRONROUT0000000073500241",
+   "pts": [
+    [
+     1003.876,
+     390.965,
+     150.5
+    ],
+    [
+     997.171,
+     395.174,
+     152.2
+    ]
+   ],
+   "largeur_m": 12.0,
+   "voies": 4,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Rue du Pont Guilhemery",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 7.92,
+   "hauteur_moy_m": 0.92
+  }
+ ]
+}

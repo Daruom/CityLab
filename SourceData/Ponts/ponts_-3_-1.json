@@ -1,0 +1,395 @@
+{
+ "cell": [
+  -3,
+  -1
+ ],
+ "cellSizeM": 500.0,
+ "origin": [
+  -1500.0,
+  -500.0
+ ],
+ "crs": "local_citylab_equirect_capitole",
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y ; z = altitude NGF (m)",
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0), geometrie 3D : z = altitude NGF en metres",
+ "recette": {
+  "regle": "OUVRAGE = chaine connexe amorcee sur position_par_rapport_au_sol >= 1, etendue aux voisins encore EN L'AIR",
+  "seuil_en_lair_m": 1.5,
+  "tol_noeud_m": 1.0,
+  "mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "alt_capitole_m": 142.39
+ },
+ "note": "z absent = null sur les 3 composantes : le C++ retombe alors sur l'interpolation entre les cotes RENDUES des deux rives (comportement historique) et le journalise.",
+ "stats": {
+  "ponts": 11,
+  "longueur_m": 253.74
+ },
+ "ponts": [
+  {
+   "id": "TRONROUT0000000073492887",
+   "pts": [
+    [
+     -1295.696,
+     -116.633,
+     135.3
+    ],
+    [
+     -1295.741,
+     -123.894,
+     135.3
+    ],
+    [
+     -1295.994,
+     -131.549,
+     135.3
+    ]
+   ],
+   "largeur_m": 12.0,
+   "voies": 4,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Avenue Paul Séjourné",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 14.92,
+   "hauteur_moy_m": -0.94
+  },
+  {
+   "id": "TRONROUT0000002206820881",
+   "pts": [
+    [
+     -1310.399,
+     -3.133,
+     139.2
+    ],
+    [
+     -1309.907,
+     -13.489,
+     null
+    ],
+    [
+     -1309.371,
+     -21.657,
+     null
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 0,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 18.55,
+   "hauteur_moy_m": 4.29
+  },
+  {
+   "id": "TRONROUT0000000073501980",
+   "pts": [
+    [
+     -1300.701,
+     -2.43,
+     138.7
+    ],
+    [
+     -1301.483,
+     13.402,
+     139.3
+    ],
+    [
+     -1302.047,
+     20.178,
+     139.7
+    ],
+    [
+     -1302.159,
+     24.558,
+     139.8
+    ]
+   ],
+   "largeur_m": 12.0,
+   "voies": 4,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Avenue Paul Séjourné",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 27.03,
+   "hauteur_moy_m": 6.01
+  },
+  {
+   "id": "TRONROUT0000002223815312",
+   "pts": [
+    [
+     -1288.34,
+     -278.136,
+     137.1
+    ],
+    [
+     -1287.758,
+     -288.991,
+     137.1
+    ],
+    [
+     -1287.104,
+     -301.24,
+     137.1
+    ],
+    [
+     -1286.305,
+     -316.178,
+     137.1
+    ]
+   ],
+   "largeur_m": 16.0,
+   "voies": 5,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Avenue Paul Séjourné",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 38.1,
+   "hauteur_moy_m": 1.82
+  },
+  {
+   "id": "TRONROUT0000000073501990",
+   "pts": [
+    [
+     -1299.672,
+     -20.855,
+     138.6
+    ],
+    [
+     -1300.321,
+     -13.381,
+     138.6
+    ],
+    [
+     -1300.553,
+     -9.994,
+     138.6
+    ],
+    [
+     -1300.701,
+     -2.43,
+     138.7
+    ]
+   ],
+   "largeur_m": 12.0,
+   "voies": 4,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Avenue Paul Séjourné",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 18.46,
+   "hauteur_moy_m": 4.12
+  },
+  {
+   "id": "TRONROUT0000000073502213",
+   "pts": [
+    [
+     -1299.672,
+     -20.855,
+     138.6
+    ],
+    [
+     -1295.965,
+     -70.171,
+     137.0
+    ],
+    [
+     -1295.556,
+     -94.651,
+     136.2
+    ]
+   ],
+   "largeur_m": 12.0,
+   "voies": 4,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Avenue Paul Séjourné",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 73.94,
+   "hauteur_moy_m": 1.61
+  },
+  {
+   "id": "TRONROUT0000000223310000",
+   "pts": [
+    [
+     -1138.754,
+     -201.318,
+     136.3
+    ],
+    [
+     -1133.778,
+     -202.113,
+     136.3
+    ],
+    [
+     -1130.218,
+     -203.776,
+     136.4
+    ],
+    [
+     -1128.549,
+     -205.201,
+     136.4
+    ],
+    [
+     -1127.479,
+     -206.615,
+     136.4
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 1,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Allée de Brienne",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 12.94,
+   "hauteur_moy_m": 0.71
+  },
+  {
+   "id": "TRONROUT0000000073493550",
+   "pts": [
+    [
+     -1127.479,
+     -206.615,
+     136.4
+    ],
+    [
+     -1125.942,
+     -209.63,
+     136.4
+    ]
+   ],
+   "largeur_m": 5.5,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Boulevard Maréchal Leclerc",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 3.38,
+   "hauteur_moy_m": 2.68
+  },
+  {
+   "id": "TRONROUT0000000223310024",
+   "pts": [
+    [
+     -1127.479,
+     -206.615,
+     136.4
+    ],
+    [
+     -1127.184,
+     -201.846,
+     136.4
+    ],
+    [
+     -1126.031,
+     -199.084,
+     136.4
+    ],
+    [
+     -1123.738,
+     -194.254,
+     136.4
+    ]
+   ],
+   "largeur_m": 3.0,
+   "voies": 1,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Allée de Brienne",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 13.12,
+   "hauteur_moy_m": 0.59
+  },
+  {
+   "id": "TRONROUT0000000223310110",
+   "pts": [
+    [
+     -1125.942,
+     -209.63,
+     136.4
+    ],
+    [
+     -1116.259,
+     -229.718,
+     136.5
+    ]
+   ],
+   "largeur_m": 5.5,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Boulevard Maréchal Leclerc",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 22.3,
+   "hauteur_moy_m": 2.48
+  },
+  {
+   "id": "TRONROUT0000000223310116",
+   "pts": [
+    [
+     -1116.259,
+     -229.718,
+     136.5
+    ],
+    [
+     -1111.364,
+     -239.564,
+     136.5
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 1,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Boulevard Maréchal Leclerc",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 11.0,
+   "hauteur_moy_m": 1.02
+  }
+ ]
+}

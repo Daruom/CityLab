@@ -1,0 +1,144 @@
+{
+ "cell": [
+  -1,
+  1
+ ],
+ "cellSizeM": 500.0,
+ "origin": [
+  -500.0,
+  500.0
+ ],
+ "crs": "local_citylab_equirect_capitole",
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y ; z = altitude NGF (m)",
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0), geometrie 3D : z = altitude NGF en metres",
+ "recette": {
+  "regle": "OUVRAGE = chaine connexe amorcee sur position_par_rapport_au_sol >= 1, etendue aux voisins encore EN L'AIR",
+  "seuil_en_lair_m": 1.5,
+  "tol_noeud_m": 1.0,
+  "mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "alt_capitole_m": 142.39
+ },
+ "note": "z absent = null sur les 3 composantes : le C++ retombe alors sur l'interpolation entre les cotes RENDUES des deux rives (comportement historique) et le journalise.",
+ "stats": {
+  "ponts": 3,
+  "longueur_m": 156.02
+ },
+ "ponts": [
+  {
+   "id": "TRONROUT0000000073500894",
+   "pts": [
+    [
+     -234.679,
+     760.903,
+     142.1
+    ],
+    [
+     -249.7,
+     763.487,
+     142.5
+    ],
+    [
+     -250.496,
+     763.602,
+     142.4
+    ],
+    [
+     -256.363,
+     764.712,
+     141.6
+    ],
+    [
+     -259.053,
+     764.964,
+     142.1
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Rue du Pont de Tounis",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 24.72,
+   "hauteur_moy_m": 5.55
+  },
+  {
+   "id": "TRONROUT0000000073500992",
+   "pts": [
+    [
+     -167.484,
+     741.675,
+     143.5
+    ],
+    [
+     -169.258,
+     742.804,
+     143.3
+    ],
+    [
+     -173.124,
+     744.173,
+     143.2
+    ],
+    [
+     -189.984,
+     749.678,
+     142.9
+    ],
+    [
+     -230.698,
+     760.327,
+     142.0
+    ],
+    [
+     -234.679,
+     760.903,
+     142.1
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Rue du Pont de Tounis",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 70.05,
+   "hauteur_moy_m": 1.59
+  },
+  {
+   "id": "TRONROUT0000000073501469",
+   "pts": [
+    [
+     -259.053,
+     764.964,
+     142.1
+    ],
+    [
+     -319.903,
+     771.931,
+     138.5
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Rue du Pont de Tounis",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 61.25,
+   "hauteur_moy_m": 0.93
+  }
+ ]
+}

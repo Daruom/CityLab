@@ -1,0 +1,196 @@
+{
+ "cell": [
+  2,
+  -1
+ ],
+ "cellSizeM": 500.0,
+ "origin": [
+  1000.0,
+  -500.0
+ ],
+ "crs": "local_citylab_equirect_capitole",
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y ; z = altitude NGF (m)",
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0), geometrie 3D : z = altitude NGF en metres",
+ "recette": {
+  "regle": "OUVRAGE = chaine connexe amorcee sur position_par_rapport_au_sol >= 1, etendue aux voisins encore EN L'AIR",
+  "seuil_en_lair_m": 1.5,
+  "tol_noeud_m": 1.0,
+  "mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "alt_capitole_m": 142.39
+ },
+ "note": "z absent = null sur les 3 composantes : le C++ retombe alors sur l'interpolation entre les cotes RENDUES des deux rives (comportement historique) et le journalise.",
+ "stats": {
+  "ponts": 4,
+  "longueur_m": 86.07
+ },
+ "ponts": [
+  {
+   "id": "TRONROUT0000000073500153",
+   "pts": [
+    [
+     1101.012,
+     -87.332,
+     153.1
+    ],
+    [
+     1096.844,
+     -86.057,
+     153.0
+    ],
+    [
+     1092.079,
+     -84.671,
+     152.4
+    ],
+    [
+     1089.698,
+     -83.928,
+     152.1
+    ],
+    [
+     1085.925,
+     -82.86,
+     152.7
+    ],
+    [
+     1084.141,
+     -82.229,
+     152.6
+    ],
+    [
+     1076.404,
+     -79.691,
+     151.9
+    ]
+   ],
+   "largeur_m": 5.0,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Avenue de la Gloire",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 25.77,
+   "hauteur_moy_m": 4.54
+  },
+  {
+   "id": "TRONROUT0000000073491035",
+   "pts": [
+    [
+     1026.987,
+     -222.277,
+     151.6
+    ],
+    [
+     1039.62,
+     -224.612,
+     151.9
+    ],
+    [
+     1040.713,
+     -224.832,
+     151.9
+    ],
+    [
+     1046.58,
+     -226.041,
+     152.2
+    ],
+    [
+     1052.053,
+     -226.943,
+     152.6
+    ],
+    [
+     1055.334,
+     -227.604,
+     153.0
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Avenue du Cimetière",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 28.85,
+   "hauteur_moy_m": 4.77
+  },
+  {
+   "id": "TRONROUT0000000073491512",
+   "pts": [
+    [
+     1055.334,
+     -227.604,
+     153.0
+    ],
+    [
+     1058.816,
+     -228.269,
+     153.2
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Avenue du Cimetière",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 3.54,
+   "hauteur_moy_m": 1.08
+  },
+  {
+   "id": "TRONROUT0000000073500830",
+   "pts": [
+    [
+     1008.789,
+     -60.866,
+     150.0
+    ],
+    [
+     1018.931,
+     -62.953,
+     149.9
+    ],
+    [
+     1022.508,
+     -63.819,
+     150.1
+    ],
+    [
+     1025.987,
+     -64.583,
+     150.3
+    ],
+    [
+     1036.023,
+     -66.967,
+     150.0
+    ]
+   ],
+   "largeur_m": 8.0,
+   "voies": 3,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 27.91,
+   "hauteur_moy_m": 2.54
+  }
+ ]
+}

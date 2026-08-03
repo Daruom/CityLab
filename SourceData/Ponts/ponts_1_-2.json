@@ -1,0 +1,394 @@
+{
+ "cell": [
+  1,
+  -2
+ ],
+ "cellSizeM": 500.0,
+ "origin": [
+  500.0,
+  -1000.0
+ ],
+ "crs": "local_citylab_equirect_capitole",
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y ; z = altitude NGF (m)",
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0), geometrie 3D : z = altitude NGF en metres",
+ "recette": {
+  "regle": "OUVRAGE = chaine connexe amorcee sur position_par_rapport_au_sol >= 1, etendue aux voisins encore EN L'AIR",
+  "seuil_en_lair_m": 1.5,
+  "tol_noeud_m": 1.0,
+  "mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "alt_capitole_m": 142.39
+ },
+ "note": "z absent = null sur les 3 composantes : le C++ retombe alors sur l'interpolation entre les cotes RENDUES des deux rives (comportement historique) et le journalise.",
+ "stats": {
+  "ponts": 8,
+  "longueur_m": 193.44
+ },
+ "ponts": [
+  {
+   "id": "TRONROUT0000000073492792",
+   "pts": [
+    [
+     668.614,
+     -769.19,
+     144.6
+    ],
+    [
+     676.28,
+     -775.408,
+     144.7
+    ],
+    [
+     680.413,
+     -778.473,
+     144.7
+    ],
+    [
+     682.884,
+     -779.715,
+     144.7
+    ],
+    [
+     693.518,
+     -787.284,
+     144.6
+    ]
+   ],
+   "largeur_m": 3.0,
+   "voies": 1,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Pont du 19 mars 1962",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 30.83,
+   "hauteur_moy_m": -1.76
+  },
+  {
+   "id": "TRONROUT0000000073491223",
+   "pts": [
+    [
+     789.516,
+     -535.783,
+     149.4
+    ],
+    [
+     790.3,
+     -536.495,
+     149.4
+    ],
+    [
+     795.012,
+     -540.566,
+     149.4
+    ],
+    [
+     796.78,
+     -542.093,
+     149.4
+    ],
+    [
+     797.369,
+     -542.601,
+     149.4
+    ],
+    [
+     800.807,
+     -545.454,
+     149.4
+    ],
+    [
+     803.848,
+     -548.199,
+     149.4
+    ],
+    [
+     806.006,
+     -550.131,
+     149.4
+    ]
+   ],
+   "largeur_m": 8.0,
+   "voies": 3,
+   "pos": 1,
+   "nature": "Route à 2 chaussées",
+   "nom": "Pont Riquet",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 21.86,
+   "hauteur_moy_m": -0.31
+  },
+  {
+   "id": "TRONROUT0000000073491446",
+   "pts": [
+    [
+     813.36,
+     -541.72,
+     149.9
+    ],
+    [
+     811.888,
+     -540.398,
+     149.8
+    ],
+    [
+     808.454,
+     -537.346,
+     149.7
+    ],
+    [
+     804.928,
+     -533.895,
+     149.6
+    ],
+    [
+     804.339,
+     -533.386,
+     149.6
+    ],
+    [
+     803.164,
+     -532.17,
+     149.5
+    ],
+    [
+     798.46,
+     -527.701,
+     149.4
+    ],
+    [
+     797.284,
+     -526.584,
+     149.4
+    ]
+   ],
+   "largeur_m": 8.0,
+   "voies": 3,
+   "pos": 1,
+   "nature": "Route à 2 chaussées",
+   "nom": "Pont Riquet",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 22.09,
+   "hauteur_moy_m": 0.24
+  },
+  {
+   "id": "TRONROUT0000000073491691",
+   "pts": [
+    [
+     822.017,
+     -548.255,
+     149.9
+    ],
+    [
+     835.25,
+     -560.749,
+     149.7
+    ],
+    [
+     836.032,
+     -561.56,
+     149.7
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 2 chaussées",
+   "nom": "PONT POMPIDOU",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 19.33,
+   "hauteur_moy_m": 0.83
+  },
+  {
+   "id": "TRONROUT0000000073491511",
+   "pts": [
+    [
+     828.186,
+     -569.664,
+     149.4
+    ],
+    [
+     828.97,
+     -570.376,
+     149.4
+    ],
+    [
+     836.618,
+     -577.489,
+     149.4
+    ],
+    [
+     845.544,
+     -585.621,
+     149.4
+    ],
+    [
+     846.426,
+     -586.434,
+     149.4
+    ],
+    [
+     851.817,
+     -591.513,
+     149.4
+    ],
+    [
+     858.487,
+     -597.612,
+     149.4
+    ],
+    [
+     861.23,
+     -600.252,
+     149.4
+    ]
+   ],
+   "largeur_m": 8.0,
+   "voies": 3,
+   "pos": 1,
+   "nature": "Route à 2 chaussées",
+   "nom": "PONT POMPIDOU",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 45.03,
+   "hauteur_moy_m": 2.5
+  },
+  {
+   "id": "TRONROUT0000000073491126",
+   "pts": [
+    [
+     836.032,
+     -561.56,
+     149.7
+    ],
+    [
+     841.909,
+     -567.345,
+     149.7
+    ],
+    [
+     850.631,
+     -575.673,
+     149.8
+    ],
+    [
+     852.786,
+     -577.804,
+     149.8
+    ],
+    [
+     856.609,
+     -581.36,
+     149.8
+    ],
+    [
+     862.684,
+     -587.249,
+     149.8
+    ],
+    [
+     865.625,
+     -589.992,
+     149.9
+    ],
+    [
+     867.192,
+     -591.515,
+     149.9
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 2 chaussées",
+   "nom": "PONT POMPIDOU",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 43.23,
+   "hauteur_moy_m": 3.33
+  },
+  {
+   "id": "TRONROUT0000000073491342",
+   "pts": [
+    [
+     870.912,
+     -595.268,
+     150.1
+    ],
+    [
+     868.954,
+     -593.34,
+     150.0
+    ],
+    [
+     867.192,
+     -591.515,
+     149.9
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 2 chaussées",
+   "nom": "Boulevard de Marengo",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 5.28,
+   "hauteur_moy_m": -0.18
+  },
+  {
+   "id": "TRONROUT0000000073491491",
+   "pts": [
+    [
+     861.23,
+     -600.252,
+     149.4
+    ],
+    [
+     864.958,
+     -603.608,
+     149.4
+    ],
+    [
+     865.547,
+     -604.116,
+     149.4
+    ]
+   ],
+   "largeur_m": 8.0,
+   "voies": 3,
+   "pos": 1,
+   "nature": "Route à 2 chaussées",
+   "nom": "Boulevard de Marengo",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 5.79,
+   "hauteur_moy_m": -1.24
+  }
+ ]
+}

@@ -1,0 +1,151 @@
+{
+ "cell": [
+  1,
+  -1
+ ],
+ "cellSizeM": 500.0,
+ "origin": [
+  500.0,
+  -500.0
+ ],
+ "crs": "local_citylab_equirect_capitole",
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y ; z = altitude NGF (m)",
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0), geometrie 3D : z = altitude NGF en metres",
+ "recette": {
+  "regle": "OUVRAGE = chaine connexe amorcee sur position_par_rapport_au_sol >= 1, etendue aux voisins encore EN L'AIR",
+  "seuil_en_lair_m": 1.5,
+  "tol_noeud_m": 1.0,
+  "mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "alt_capitole_m": 142.39
+ },
+ "note": "z absent = null sur les 3 composantes : le C++ retombe alors sur l'interpolation entre les cotes RENDUES des deux rives (comportement historique) et le journalise.",
+ "stats": {
+  "ponts": 4,
+  "longueur_m": 83.97
+ },
+ "ponts": [
+  {
+   "id": "TRONROUT0000000073491901",
+   "pts": [
+    [
+     956.972,
+     -208.677,
+     150.0
+    ],
+    [
+     944.535,
+     -206.545,
+     149.3
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Pont Gabriel Péri",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 12.62,
+   "hauteur_moy_m": 1.89
+  },
+  {
+   "id": "TRONROUT0000000073491034",
+   "pts": [
+    [
+     976.557,
+     -212.839,
+     150.1
+    ],
+    [
+     968.407,
+     -210.989,
+     150.0
+    ],
+    [
+     966.218,
+     -210.648,
+     150.0
+    ],
+    [
+     956.972,
+     -208.677,
+     150.0
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Pont Gabriel Péri",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 20.03,
+   "hauteur_moy_m": 3.94
+  },
+  {
+   "id": "TRONROUT0000000073491903",
+   "pts": [
+    [
+     989.48,
+     -215.677,
+     149.6
+    ],
+    [
+     976.557,
+     -212.839,
+     150.1
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Pont Gabriel Péri",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 13.23,
+   "hauteur_moy_m": 1.98
+  },
+  {
+   "id": "TRONROUT0000000073491307",
+   "pts": [
+    [
+     989.48,
+     -215.677,
+     149.6
+    ],
+    [
+     1000.825,
+     -217.49,
+     149.8
+    ],
+    [
+     1026.987,
+     -222.277,
+     151.6
+    ]
+   ],
+   "largeur_m": 4.0,
+   "voies": 2,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Avenue du Cimetière",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 38.09,
+   "hauteur_moy_m": 0.62
+  }
+ ]
+}

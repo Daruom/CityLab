@@ -1,0 +1,97 @@
+{
+ "cell": [
+  2,
+  1
+ ],
+ "cellSizeM": 500.0,
+ "origin": [
+  1000.0,
+  500.0
+ ],
+ "crs": "local_citylab_equirect_capitole",
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y ; z = altitude NGF (m)",
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0), geometrie 3D : z = altitude NGF en metres",
+ "recette": {
+  "regle": "OUVRAGE = chaine connexe amorcee sur position_par_rapport_au_sol >= 1, etendue aux voisins encore EN L'AIR",
+  "seuil_en_lair_m": 1.5,
+  "tol_noeud_m": 1.0,
+  "mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "alt_capitole_m": 142.39
+ },
+ "note": "z absent = null sur les 3 composantes : le C++ retombe alors sur l'interpolation entre les cotes RENDUES des deux rives (comportement historique) et le journalise.",
+ "stats": {
+  "ponts": 2,
+  "longueur_m": 33.41
+ },
+ "ponts": [
+  {
+   "id": "TRONROUT0000000073500150",
+   "pts": [
+    [
+     1116.887,
+     732.862,
+     155.3
+    ],
+    [
+     1125.663,
+     737.565,
+     154.7
+    ],
+    [
+     1127.682,
+     738.72,
+     154.7
+    ],
+    [
+     1133.031,
+     741.699,
+     154.8
+    ],
+    [
+     1139.99,
+     745.344,
+     155.3
+    ]
+   ],
+   "largeur_m": 9.0,
+   "voies": 3,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Avenue Jean Rieux",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 26.26,
+   "hauteur_moy_m": 3.81
+  },
+  {
+   "id": "TRONROUT0000000073500472",
+   "pts": [
+    [
+     1110.631,
+     729.402,
+     154.8
+    ],
+    [
+     1116.887,
+     732.862,
+     155.3
+    ]
+   ],
+   "largeur_m": 9.0,
+   "voies": 3,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "Avenue Jean Rieux",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 7.15,
+   "hauteur_moy_m": 1.71
+  }
+ ]
+}

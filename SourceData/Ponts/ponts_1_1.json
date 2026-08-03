@@ -1,0 +1,310 @@
+{
+ "cell": [
+  1,
+  1
+ ],
+ "cellSizeM": 500.0,
+ "origin": [
+  500.0,
+  500.0
+ ],
+ "crs": "local_citylab_equirect_capitole",
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y ; z = altitude NGF (m)",
+ "source": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0), geometrie 3D : z = altitude NGF en metres",
+ "recette": {
+  "regle": "OUVRAGE = chaine connexe amorcee sur position_par_rapport_au_sol >= 1, etendue aux voisins encore EN L'AIR",
+  "seuil_en_lair_m": 1.5,
+  "tol_noeud_m": 1.0,
+  "mnt": "SourceData/toulouse10_mnt.png (+ .json)",
+  "alt_capitole_m": 142.39
+ },
+ "note": "z absent = null sur les 3 composantes : le C++ retombe alors sur l'interpolation entre les cotes RENDUES des deux rives (comportement historique) et le journalise.",
+ "stats": {
+  "ponts": 6,
+  "longueur_m": 150.1
+ },
+ "ponts": [
+  {
+   "id": "TRONROUT0000002206919811",
+   "pts": [
+    [
+     991.769,
+     654.123,
+     150.7
+    ],
+    [
+     988.345,
+     652.598,
+     null
+    ],
+    [
+     984.567,
+     653.368,
+     null
+    ],
+    [
+     978.244,
+     651.601,
+     null
+    ],
+    [
+     964.099,
+     642.924,
+     null
+    ],
+    [
+     953.999,
+     636.854,
+     150.9
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 0,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 42.55,
+   "hauteur_moy_m": 0.95
+  },
+  {
+   "id": "TRONROUT0000002206919813",
+   "pts": [
+    [
+     954.292,
+     646.696,
+     150.6
+    ],
+    [
+     958.455,
+     650.296,
+     150.6
+    ],
+    [
+     960.485,
+     652.047,
+     150.7
+    ]
+   ],
+   "largeur_m": 10.5,
+   "voies": 3,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Pont Montaudran",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 8.18,
+   "hauteur_moy_m": 0.91
+  },
+  {
+   "id": "TRONROUT0000002206919819",
+   "pts": [
+    [
+     953.999,
+     636.854,
+     150.9
+    ],
+    [
+     952.686,
+     636.083,
+     null
+    ],
+    [
+     946.122,
+     632.232,
+     null
+    ]
+   ],
+   "largeur_m": 6.0,
+   "voies": 0,
+   "pos": 0,
+   "nature": "Route à 1 chaussée",
+   "nom": "",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "absent",
+   "longueur_m": 9.13,
+   "hauteur_moy_m": 1.5
+  },
+  {
+   "id": "TRONROUT0000002223815439",
+   "pts": [
+    [
+     954.072,
+     655.853,
+     151.1
+    ],
+    [
+     955.156,
+     655.135,
+     150.6
+    ],
+    [
+     960.485,
+     652.047,
+     150.7
+    ]
+   ],
+   "largeur_m": 5.5,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Port Saint Sauveur",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 7.46,
+   "hauteur_moy_m": 0.83
+  },
+  {
+   "id": "TRONROUT0000000073500805",
+   "pts": [
+    [
+     960.485,
+     652.047,
+     150.7
+    ],
+    [
+     963.428,
+     654.477,
+     150.8
+    ],
+    [
+     969.094,
+     658.345,
+     150.8
+    ],
+    [
+     971.621,
+     659.987,
+     150.8
+    ],
+    [
+     976.375,
+     663.177,
+     150.8
+    ],
+    [
+     982.442,
+     667.138,
+     150.8
+    ],
+    [
+     982.847,
+     667.428,
+     150.8
+    ],
+    [
+     986.789,
+     669.938,
+     150.8
+    ],
+    [
+     989.923,
+     671.966,
+     150.9
+    ],
+    [
+     993.053,
+     673.795,
+     150.9
+    ],
+    [
+     994.063,
+     674.372,
+     150.9
+    ]
+   ],
+   "largeur_m": 10.5,
+   "voies": 3,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Pont Montaudran",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 40.35,
+   "hauteur_moy_m": 2.08
+  },
+  {
+   "id": "TRONROUT0000000073500820",
+   "pts": [
+    [
+     991.769,
+     654.123,
+     150.7
+    ],
+    [
+     989.498,
+     655.361,
+     150.7
+    ],
+    [
+     982.427,
+     656.195,
+     150.7
+    ],
+    [
+     979.023,
+     655.665,
+     150.7
+    ],
+    [
+     975.491,
+     653.744,
+     150.7
+    ],
+    [
+     972.866,
+     652.204,
+     150.7
+    ],
+    [
+     972.054,
+     651.523,
+     150.7
+    ],
+    [
+     967.4,
+     648.331,
+     150.7
+    ],
+    [
+     964.469,
+     646.498,
+     150.7
+    ],
+    [
+     954.165,
+     640.233,
+     150.7
+    ]
+   ],
+   "largeur_m": 5.5,
+   "voies": 2,
+   "pos": 1,
+   "nature": "Route à 1 chaussée",
+   "nom": "Port Saint Etienne",
+   "bout_libre": [
+    false,
+    false
+   ],
+   "z_source": "bdtopo3d",
+   "longueur_m": 42.43,
+   "hauteur_moy_m": 2.63
+  }
+ ]
+}
