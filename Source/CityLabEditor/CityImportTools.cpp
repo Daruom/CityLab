@@ -90,6 +90,492 @@ namespace
 		return &Sampler;
 	}
 
+	// -------------------------------------------------------------------------
+	// ⭐ CHANTIER FRONTIERE DE BERGE — LE PLAFOND DU LIT.
+	//
+	// Side-car `SourceData/Frontiere/frontiere_<x>_<y>.json`, champ `plafond_cm` :
+	// une valeur par NOEUD de la grille de dalle ((GroundGridN + 1)^2), en
+	// CENTIMETRES NGF, ou la sentinelle = aucune contrainte. Tout le reglage
+	// (enfoncement sous le plan d'eau, marge de rive, seuil de type) vit dans la
+	// CUISSON : le moteur ne fait que POSER, comme pour les murs, les ponts, l'eau.
+	//
+	// Le plafond ne repond QU'AUX NOEUDS. C'est volontaire : `BuildGroundGrid` et
+	// `FRenderedGroundZ::At` n'echantillonnent que des noeuds (le second discretise
+	// en floor(X/pas)*pas) et la surface RENDUE est plane entre eux. Repondre
+	// ailleurs reviendrait a inventer une interpolation que personne ne demande —
+	// et a plafonner des points de TERRE au voisinage d'une berge.
+	// -------------------------------------------------------------------------
+	struct FCityBedCeiling
+	{
+		enum { Sentinelle = 9999999 };
+
+		// ⭐ CHANTIER PROFIL DE BERGE — LES DEUX NIVEAUX DE L'OUVRAGE.
+		// Le meme fichier porte desormais, sur la MEME grille de noeuds, deux
+		// grilles de plus :
+		//   `plateforme_cm` : la COTE D'EAU LOCALE (cm NGF) sous la bande de quai
+		//                     basse. Le moteur y ajoute QuayPlatformHeightM — la
+		//                     seule valeur de DESIGN, elle vit ici (cf. .h).
+		//   `esplanade_cm`  : le Z ABSOLU (cm NGF) de l'esplanade haute, mesure
+		//                     LOIN du bord, pour la bande situee cote terre du mur.
+		// Les deux FORCENT le noeud (elles ne le bornent pas) : la bande est un
+		// OUVRAGE, pas du terrain drape. Sentinelle = rien, comportement historique.
+		// ⭐ LOT SIMPLIFICATION BERGE — L'OUVRAGE, parce que la grille NE PEUT PAS.
+		// Mesure (work/SIMPLE/s1_enquete.py) : la dalle PERCE le plan de plateforme
+		// sur 61 % de l'emprise, et encore 14 % (depassement max 5,83 m) meme en
+		// enfoncant les noeuds de bande de DIX metres — la rampe entre le noeud de
+		// bande et le noeud d'esplanade traverse le plan A L'INTERIEUR de l'emprise
+		// quelle que soit la profondeur. « Poser un ouvrage par-dessus la dalle » est
+		// donc impossible : la bande CEDE LA PLACE.
+		//   `ouvrage_quads` : indices lineaires (GY * GridN + GX) des quads de dalle
+		//                     qui ne sont plus rendus par la grille ;
+		//   `ouvrage_z_cm`  : a leur place, (K+1)^2 cotes en cm NGF au pas fin
+		//                     (Step / K), dans l'ordre (sy, sx), quad par quad.
+		// Hors bande, la cuisson y met la cote que la DALLE aurait rendue : les
+		// aretes de BORD sont donc l'interpolation des memes noeuds que le voisin,
+		// et la couture est exacte (pas de jour, pas de z-fight, une seule surface).
+		struct FGrilles
+		{
+			TArray<int32> Plafond;
+			TArray<int32> Plateforme;
+			TArray<int32> Esplanade;
+			TArray<int32> OuvrageZ;
+			TMap<int32, int32> OuvrageQuads;   // index de quad -> rang dans OuvrageZ
+			int32 OuvrageK = 0;
+			bool bCharge = false;
+		};
+
+		FString Dir;
+		int32 GridN = 0;
+		float StepCm = 0.f;
+		float AltCapCm = 0.f;
+		bool bActive = false;
+		bool bProfil = false;      // CHANTIER PROFIL : bQuayPlatform
+		float PlatHeightCm = 0.f;  // CHANTIER PROFIL : QuayPlatformHeightM * 100
+		mutable TMap<FIntPoint, FGrilles> Cells;
+		mutable int32 Charges = 0;
+		mutable int32 Manquants = 0;
+		mutable int32 TailleKo = 0;
+		mutable int32 NoeudsProfil = 0;
+
+		void Reset()
+		{
+			Cells.Empty();
+			Charges = 0;
+			Manquants = 0;
+			TailleKo = 0;
+			NoeudsProfil = 0;
+			bActive = false;
+			bProfil = false;
+			PlatHeightCm = 0.f;
+			GridN = 0;
+			StepCm = 0.f;
+			Dir.Empty();
+		}
+
+		/** Lit un champ de (GridN+1)^2 entiers ; vide si absent ou mal dimensionne. */
+		bool LireGrille(const TSharedPtr<FJsonObject>& Root, const TCHAR* Champ,
+			TArray<int32>& Out, bool& bOutTailleKo) const
+		{
+			const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+			if (!Root->TryGetArrayField(Champ, Arr))
+			{
+				return false;
+			}
+			const int32 Attendu = (GridN + 1) * (GridN + 1);
+			if (Arr->Num() != Attendu)
+			{
+				bOutTailleKo = true;
+				return false;
+			}
+			Out.Reserve(Attendu);
+			for (const TSharedPtr<FJsonValue>& V : *Arr)
+			{
+				Out.Add((int32)V->AsNumber());
+			}
+			return true;
+		}
+
+		const FGrilles* Grille(const FIntPoint& Key) const
+		{
+			if (const FGrilles* Found = Cells.Find(Key))
+			{
+				return Found->bCharge ? Found : nullptr;
+			}
+			FGrilles& Slot = Cells.Add(Key);
+			const FString Path = FPaths::Combine(
+				Dir, FString::Printf(TEXT("frontiere_%d_%d.json"), Key.X, Key.Y));
+			FString Text;
+			if (!FFileHelper::LoadFileToString(Text, *Path))
+			{
+				++Manquants;
+				return nullptr;
+			}
+			TSharedPtr<FJsonObject> Root;
+			if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root)
+				|| !Root.IsValid())
+			{
+				RaiseError(FString::Printf(TEXT("Frontiere file '%s' is not valid JSON."), *Path));
+				return nullptr;
+			}
+			double BakedGrid = 0.0;
+			if (Root->TryGetNumberField(TEXT("grilleN"), BakedGrid)
+				&& (int32)BakedGrid != GridN)
+			{
+				// Une grille cuite pour une AUTRE resolution de dalle ne se
+				// reechantillonne pas : on la refuse et on le DIT. Le silence
+				// donnerait un lit a moitie ecrase, indebogable.
+				++TailleKo;
+				return nullptr;
+			}
+			bool bKo = false;
+			const bool bPlaf = LireGrille(Root, TEXT("plafond_cm"), Slot.Plafond, bKo);
+			// CHANTIER PROFIL : side-car anterieur = champs absents, et tout se
+			// comporte comme avant, bit pour bit.
+			LireGrille(Root, TEXT("plateforme_cm"), Slot.Plateforme, bKo);
+			LireGrille(Root, TEXT("esplanade_cm"), Slot.Esplanade, bKo);
+			if (bKo)
+			{
+				++TailleKo;
+				return nullptr;
+			}
+			if (!bPlaf)
+			{
+				++Manquants;
+				return nullptr;
+			}
+			for (const int32 V : Slot.Plateforme)
+			{
+				NoeudsProfil += (V < (int32)Sentinelle) ? 1 : 0;
+			}
+			for (const int32 V : Slot.Esplanade)
+			{
+				NoeudsProfil += (V < (int32)Sentinelle) ? 1 : 0;
+			}
+			// LOT SIMPLIFICATION : l'ouvrage de berge. Champs absents = side-car
+			// anterieur, et tout se comporte comme avant, bit pour bit.
+			double KOuv = 0.0;
+			const TArray<TSharedPtr<FJsonValue>>* QArr = nullptr;
+			const TArray<TSharedPtr<FJsonValue>>* ZArr = nullptr;
+			if (Root->TryGetNumberField(TEXT("ouvrage_k"), KOuv) && (int32)KOuv > 0
+				&& Root->TryGetArrayField(TEXT("ouvrage_quads"), QArr)
+				&& Root->TryGetArrayField(TEXT("ouvrage_z_cm"), ZArr))
+			{
+				const int32 K = (int32)KOuv;
+				const int32 NV = (K + 1) * (K + 1);
+				if (QArr->Num() > 0 && ZArr->Num() == QArr->Num() * NV)
+				{
+					Slot.OuvrageK = K;
+					Slot.OuvrageZ.Reserve(ZArr->Num());
+					for (const TSharedPtr<FJsonValue>& V : *ZArr)
+					{
+						Slot.OuvrageZ.Add((int32)V->AsNumber());
+					}
+					for (int32 q = 0; q < QArr->Num(); ++q)
+					{
+						Slot.OuvrageQuads.Add((int32)(*QArr)[q]->AsNumber(), q);
+					}
+				}
+				else
+				{
+					// Jamais en silence : une taille incoherente se DIT (la cellule
+					// n'est pas refusee pour autant — le plafond reste valable).
+					UE_LOG(LogCityImport, Display,
+						TEXT("Frontiere %d_%d : ouvrage de berge IGNORE (quads=%d, z=%d, attendu %d)."),
+						Key.X, Key.Y, QArr->Num(), ZArr->Num(), QArr->Num() * NV);
+				}
+			}
+			Slot.bCharge = true;
+			++Charges;
+			return &Slot;
+		}
+
+		/** Index du noeud (Xcm, Ycm) dans sa cellule, ou nullptr hors noeud. */
+		const FGrilles* Noeud(double Xcm, double Ycm, int32& OutIndex) const
+		{
+			if (!bActive || GridN <= 0 || StepCm <= 0.f)
+			{
+				return nullptr;
+			}
+			const double Fi = Xcm / (double)StepCm;
+			const double Fj = Ycm / (double)StepCm;
+			const double Ri = FMath::RoundToDouble(Fi);
+			const double Rj = FMath::RoundToDouble(Fj);
+			if (FMath::Abs(Fi - Ri) > 1e-4 || FMath::Abs(Fj - Rj) > 1e-4)
+			{
+				return nullptr;
+			}
+			const int64 I = (int64)Ri;
+			const int64 J = (int64)Rj;
+			const int32 Cx = (int32)FMath::FloorToDouble((double)I / (double)GridN);
+			const int32 Cy = (int32)FMath::FloorToDouble((double)J / (double)GridN);
+			const FGrilles* G = Grille(FIntPoint(Cx, Cy));
+			if (!G)
+			{
+				return nullptr;
+			}
+			const int32 Li = (int32)(I - (int64)Cx * GridN);
+			const int32 Lj = (int32)(J - (int64)Cy * GridN);
+			if (Li < 0 || Lj < 0 || Li > GridN || Lj > GridN)
+			{
+				return nullptr;
+			}
+			OutIndex = Lj * (GridN + 1) + Li;
+			return G;
+		}
+
+		/** Plafond (Z Unreal cm) AU NOEUD (Xcm, Ycm) ; +inf partout ailleurs. */
+		float At(double Xcm, double Ycm) const
+		{
+			int32 Idx = 0;
+			const FGrilles* G = Noeud(Xcm, Ycm, Idx);
+			if (!G || !G->Plafond.IsValidIndex(Idx))
+			{
+				return TNumericLimits<float>::Max();
+			}
+			const int32 V = G->Plafond[Idx];
+			if (V >= (int32)Sentinelle)
+			{
+				return TNumericLimits<float>::Max();
+			}
+			return (float)V - AltCapCm;
+		}
+
+		/**
+		 * ⭐ CHANTIER PROFIL — le Z FORCE de la bande de berge (Unreal cm), ou
+		 * -inf si ce noeud n'appartient a aucun des deux niveaux de l'ouvrage.
+		 * Plateforme d'abord (elle est cote eau du mur), esplanade ensuite.
+		 */
+		float ProfilAt(double Xcm, double Ycm) const
+		{
+			if (!bProfil)
+			{
+				return TNumericLimits<float>::Lowest();
+			}
+			int32 Idx = 0;
+			const FGrilles* G = Noeud(Xcm, Ycm, Idx);
+			if (!G)
+			{
+				return TNumericLimits<float>::Lowest();
+			}
+			if (G->Plateforme.IsValidIndex(Idx))
+			{
+				const int32 V = G->Plateforme[Idx];
+				if (V < (int32)Sentinelle)
+				{
+					// V = cote d'eau LOCALE, mesuree. La hauteur au-dessus d'elle
+					// est le seul choix de design, et il est dans le profil.
+					return (float)V + PlatHeightCm - AltCapCm;
+				}
+			}
+			if (G->Esplanade.IsValidIndex(Idx))
+			{
+				const int32 V = G->Esplanade[Idx];
+				if (V < (int32)Sentinelle)
+				{
+					return (float)V - AltCapCm;
+				}
+			}
+			return TNumericLimits<float>::Lowest();
+		}
+	};
+
+	FCityBedCeiling& BedCeilingSingleton()
+	{
+		static FCityBedCeiling Bed;
+		return Bed;
+	}
+
+	// =========================================================================
+	// ⭐ CHANTIER BUILDQUAY — LE CONSTRUCTEUR DE QUAI. `BuildQuay` ne CALCULE
+	// rien : il POSE, exactement comme les ponts, les murs et l'eau.
+	//
+	// Le diagnostic acte : huit mecanismes se superposaient sur la bande de
+	// berge (forcage de noeuds, pieces d'ouvrage sur quads, murs C1, peinture,
+	// dalle...) et le chaos vivait dans leurs COUTURES. Dans ce projet, tout ce
+	// qui n'a jamais fait de grief est un CONSTRUCTEUR ; tout ce qui fait grief
+	// est du TERRAIN MODIFIE. La bande `quai_dur` est donc CONSTRUITE D'UN BLOC,
+	// et dans son emprise le reste n'existe plus.
+	//
+	// La cuisson (`work/BUILDQUAY/bq2_quai.py`) balaye le profil transversal le
+	// long de la CHAINE de frontiere — donc aligne sur elle, jamais sur la
+	// grille de la dalle : face verticale sur la ligne de frontiere, plateforme
+	// plate a `cote d'eau + 1,20 m` la ou la largeur existe, mur (ou GRADINS
+	// tailles dans la meme piece) jusqu'au couronnement a la cote d'esplanade,
+	// tablier, puis raccord qui rejoint la dalle a son Z EXACT — l'unique
+	// couture, propre par construction.
+	//
+	// Side-car : `SourceData/Quai/quai_<x>_<y>.json`.
+	//   `masque_quads`  : quads de dalle (GY*GridN+GX) QUI NE SONT PLUS RENDUS ;
+	//   `quads_cm`      : 12 entiers par quad (4 sommets x, y, z en cm) ;
+	//   `quads_uv_cm`   : 8 entiers (4 UV en cm : monde en plan pour un pan
+	//                     horizontal, arc x hauteur pour un pan vertical) ;
+	//   `quads_nrm`     : 3 entiers (normale sortante x 1000) ;
+	//   `quads_slot`    : 0 = pan horizontal, 1 = pan vertical (meme pierre) ;
+	//   `apron_cm`      : 9 entiers par triangle — la DALLE qui reste dans les
+	//                     quads masques, au Z que la grille aurait rendu ;
+	//   `murs_exclus`   : les murs BD TOPO de classe `quai` que la piece
+	//                     remplace (exclusion PAR TYPE — C1 garde la ville) ;
+	//   `gradins_dm` / `gradins_n` : ce que la piece porte, pour le resume.
+	// DOSSIER ABSENT = AUCUNE PIECE, sans erreur : c'est le contrat des autres
+	// side-cars, et c'est le rollback (effacer le dossier, aucune recompilation).
+	struct FCityQuay
+	{
+		struct FCell
+		{
+			TSet<int32> Masque;
+			TArray<FVector3f> Verts;    // 4 par quad
+			TArray<FVector2f> UVs;      // 4 par quad
+			TArray<FVector3f> Nrm;      // 1 par quad
+			TArray<uint8> Slot;         // 1 par quad
+			TArray<FVector3f> Apron;    // 3 par triangle
+			int32 GradinsDm = 0;
+			int32 GradinsN = 0;
+			bool bCharge = false;
+		};
+
+		FString Dir;
+		int32 GridN = 0;
+		float AltCapCm = 0.f;
+		bool bActive = false;
+		TSet<FString> MursExclus;
+		// QUAIV2 : les volees BD TOPO que la piece RECONSTRUIT en entaille
+		// (cf. `volees_constructeur` de l'index) — `BuildStairs` ne doit plus
+		// les draper. Vide = comportement d'avant ce lot.
+		TSet<FString> VoleesConstructeur;
+		mutable TMap<FIntPoint, FCell> Cells;
+		mutable int32 Charges = 0;
+		mutable int32 Quads = 0;
+		mutable int32 ApronTris = 0;
+		mutable int32 QuadsMasques = 0;
+
+		void Reset()
+		{
+			Cells.Empty();
+			MursExclus.Empty();
+			VoleesConstructeur.Empty();
+			Dir.Empty();
+			GridN = 0;
+			AltCapCm = 0.f;
+			bActive = false;
+			Charges = Quads = ApronTris = QuadsMasques = 0;
+		}
+
+		static bool LireEntiers(const TSharedPtr<FJsonObject>& Root, const TCHAR* Champ,
+			TArray<int32>& Out)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+			if (!Root->TryGetArrayField(Champ, Arr))
+			{
+				return false;
+			}
+			Out.Reserve(Arr->Num());
+			for (const TSharedPtr<FJsonValue>& V : *Arr)
+			{
+				Out.Add((int32)V->AsNumber());
+			}
+			return true;
+		}
+
+		const FCell* Cellule(const FIntPoint& Key) const
+		{
+			if (!bActive)
+			{
+				return nullptr;
+			}
+			if (const FCell* Found = Cells.Find(Key))
+			{
+				return Found->bCharge ? Found : nullptr;
+			}
+			FCell& Slot = Cells.Add(Key);
+			FString Text;
+			if (!FFileHelper::LoadFileToString(Text, *FPaths::Combine(Dir,
+				FString::Printf(TEXT("quai_%d_%d.json"), Key.X, Key.Y))))
+			{
+				return nullptr;
+			}
+			TSharedPtr<FJsonObject> Root;
+			if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root)
+				|| !Root.IsValid())
+			{
+				RaiseError(FString::Printf(TEXT("Quai file for cell %d_%d is not valid JSON."),
+					Key.X, Key.Y));
+				return nullptr;
+			}
+			double G = 0.0;
+			if (Root->TryGetNumberField(TEXT("grilleN"), G) && (int32)G != GridN)
+			{
+				// Une piece cuite pour une AUTRE resolution de dalle ne se
+				// reechantillonne pas : on la refuse et on le DIT (Playbook S10).
+				UE_LOG(LogCityImport, Display,
+					TEXT("Quai %d_%d : grilleN cuite %d != %d — PIECE IGNOREE."),
+					Key.X, Key.Y, (int32)G, GridN);
+				return nullptr;
+			}
+			TArray<int32> Q, U, N, S, A, M;
+			LireEntiers(Root, TEXT("masque_quads"), M);
+			LireEntiers(Root, TEXT("quads_cm"), Q);
+			LireEntiers(Root, TEXT("quads_uv_cm"), U);
+			LireEntiers(Root, TEXT("quads_nrm"), N);
+			LireEntiers(Root, TEXT("quads_slot"), S);
+			LireEntiers(Root, TEXT("apron_cm"), A);
+			const int32 NQ = S.Num();
+			if (Q.Num() != NQ * 12 || U.Num() != NQ * 8 || N.Num() != NQ * 3
+				|| (A.Num() % 9) != 0)
+			{
+				// Jamais en silence : une taille incoherente se DIT.
+				UE_LOG(LogCityImport, Display,
+					TEXT("Quai %d_%d : tailles incoherentes (quads=%d pos=%d uv=%d nrm=%d apron=%d) — PIECE IGNOREE."),
+					Key.X, Key.Y, NQ, Q.Num(), U.Num(), N.Num(), A.Num());
+				return nullptr;
+			}
+			for (const int32 V : M)
+			{
+				Slot.Masque.Add(V);
+			}
+			Slot.Verts.Reserve(NQ * 4);
+			Slot.UVs.Reserve(NQ * 4);
+			for (int32 i = 0; i < NQ; ++i)
+			{
+				for (int32 c = 0; c < 4; ++c)
+				{
+					Slot.Verts.Add(FVector3f((float)Q[i * 12 + c * 3], (float)Q[i * 12 + c * 3 + 1],
+						(float)Q[i * 12 + c * 3 + 2] - AltCapCm));
+					Slot.UVs.Add(FVector2f((float)U[i * 8 + c * 2] * 0.01f,
+						(float)U[i * 8 + c * 2 + 1] * 0.01f));
+				}
+				Slot.Nrm.Add(FVector3f((float)N[i * 3] * 0.001f, (float)N[i * 3 + 1] * 0.001f,
+					(float)N[i * 3 + 2] * 0.001f).GetSafeNormal());
+				Slot.Slot.Add((uint8)S[i]);
+			}
+			Slot.Apron.Reserve(A.Num() / 3);
+			for (int32 i = 0; i + 2 < A.Num(); i += 3)
+			{
+				Slot.Apron.Add(FVector3f((float)A[i], (float)A[i + 1], (float)A[i + 2] - AltCapCm));
+			}
+			double D = 0.0;
+			Root->TryGetNumberField(TEXT("gradins_dm"), D);
+			Slot.GradinsDm = (int32)D;
+			D = 0.0;
+			Root->TryGetNumberField(TEXT("gradins_n"), D);
+			Slot.GradinsN = (int32)D;
+			// `murs_exclus` est lu UNE fois dans l'index (les murs sont poses
+			// AVANT que la moindre cellule de quai soit chargee : le lire ici
+			// arriverait trop tard).
+			Slot.bCharge = true;
+			++Charges;
+			Quads += NQ;
+			ApronTris += Slot.Apron.Num() / 3;
+			QuadsMasques += Slot.Masque.Num();
+			return &Slot;
+		}
+	};
+
+	FCityQuay& QuaySingleton()
+	{
+		static FCityQuay Quay;
+		return Quay;
+	}
+
 	// Contexte de drapage resolu en debut d'import : sampler charge une fois +
 	// altitude de rebase (Capitole -> z=0). Sampler nul = profil plat (mobile),
 	// GroundZ rend alors exactement 0 (golden path bit-a-bit).
@@ -97,12 +583,29 @@ namespace
 	{
 		const FTerrainSampler* Sampler = nullptr;
 		float AltCapCm = 0.f;
+		// CHANTIER FRONTIERE : le plafond du lit. Nul = comportement historique,
+		// bit pour bit (c'est le rollback `bWaterBedCrush = false`).
+		const FCityBedCeiling* Bed = nullptr;
 
 		bool IsActive() const { return Sampler != nullptr; }
 
 		float GroundZ(double Xcm, double Ycm) const
 		{
-			return Sampler ? Sampler->AltCmAt(Xcm, Ycm) - AltCapCm : 0.f;
+			const float Z = Sampler ? Sampler->AltCmAt(Xcm, Ycm) - AltCapCm : 0.f;
+			if (!Bed)
+			{
+				return Z;
+			}
+			// ⭐ CHANTIER PROFIL : sur la bande de berge, le sol n'est plus du
+			// terrain — c'est un OUVRAGE A NIVEAUX. Le noeud est donc FORCE
+			// (plateforme ou esplanade), pas borne. Hors de la bande, rien ne
+			// change : le plafond du lit reprend la main, bit pour bit.
+			const float Profil = Bed->ProfilAt(Xcm, Ycm);
+			if (Profil > TNumericLimits<float>::Lowest())
+			{
+				return Profil;
+			}
+			return FMath::Min(Z, Bed->At(Xcm, Ycm));
 		}
 	};
 
@@ -128,6 +631,115 @@ namespace
 		}
 		Out.Sampler = Sampler;
 		Out.AltCapCm = Sampler->AltCapitoleCm();
+		// CHANTIER FRONTIERE : le plafond du lit, cuit aux noeuds de la dalle.
+		// Recharge a CHAQUE import (le side-car peut avoir ete recuit entre deux
+		// passes — c'est la boucle d'iteration du Playbook S11).
+		FCityBedCeiling& Bed = BedCeilingSingleton();
+		Bed.Reset();
+		if (Profile.bWaterBedCrush)
+		{
+			const FString Dir = Profile.FrontierePath.IsEmpty()
+				? FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/Frontiere"))
+				: Profile.FrontierePath;
+			// Le PAS des noeuds vient du side-car, pas d'une constante moteur : il
+			// est le produit de `cellSizeM` et `grilleN` de la CUISSON. S'ils ne
+			// coincident pas avec le profil, on refuse — sans etre fatal (Playbook
+			// S10 : un refus se journalise en Display, il ne casse pas la passe).
+			FString Text;
+			TSharedPtr<FJsonObject> Idx;
+			double CellM = 0.0, GrilleN = 0.0;
+			if (FFileHelper::LoadFileToString(Text, *FPaths::Combine(Dir, TEXT("index.json")))
+				&& FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Idx)
+				&& Idx.IsValid()
+				&& Idx->TryGetNumberField(TEXT("cellSizeM"), CellM)
+				&& Idx->TryGetNumberField(TEXT("grilleN"), GrilleN)
+				&& CellM > 0.0 && GrilleN > 0.0)
+			{
+				if ((int32)GrilleN != FMath::Clamp(Profile.GroundGridN, 1, 256))
+				{
+					UE_LOG(LogCityImport, Display,
+						TEXT("Frontiere: grilleN cuite %d != GroundGridN %d — plafond du lit IGNORE."),
+						(int32)GrilleN, Profile.GroundGridN);
+				}
+				else
+				{
+					Bed.Dir = Dir;
+					Bed.GridN = (int32)GrilleN;
+					Bed.StepCm = (float)(CellM * 100.0 / GrilleN);
+					Bed.AltCapCm = Out.AltCapCm;
+					Bed.bActive = true;
+					// CHANTIER PROFIL : le profil de berge voyage dans le MEME
+					// side-car et la MEME grille. Side-car anterieur (sans les
+					// deux champs) = comportement historique, bit pour bit.
+					Bed.bProfil = Profile.bQuayPlatform;
+					Bed.PlatHeightCm = Profile.QuayPlatformHeightM * 100.f;
+					Out.Bed = &Bed;
+				}
+			}
+			else
+			{
+				UE_LOG(LogCityImport, Display,
+					TEXT("Frontiere: pas d'index.json lisible dans '%s' — plafond du lit IGNORE "
+						 "(pas de donnee, pas d'objet)."), *Dir);
+			}
+		}
+		// ⭐ BUILDQUAY : le constructeur de quai. Recharge a CHAQUE import, comme
+		// le plafond. Dossier ou index absents = AUCUNE piece, sans erreur : le
+		// generateur se comporte alors exactement comme avant, bit pour bit.
+		FCityQuay& Quay = QuaySingleton();
+		Quay.Reset();
+		{
+			const FString QDir = FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/Quai"));
+			FString QText;
+			TSharedPtr<FJsonObject> QIdx;
+			double QCellM = 0.0, QGrilleN = 0.0;
+			if (FFileHelper::LoadFileToString(QText, *FPaths::Combine(QDir, TEXT("index.json")))
+				&& FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(QText), QIdx)
+				&& QIdx.IsValid()
+				&& QIdx->TryGetNumberField(TEXT("cellSizeM"), QCellM)
+				&& QIdx->TryGetNumberField(TEXT("grilleN"), QGrilleN)
+				&& QCellM > 0.0 && QGrilleN > 0.0)
+			{
+				if ((int32)QGrilleN != FMath::Clamp(Profile.GroundGridN, 1, 256))
+				{
+					UE_LOG(LogCityImport, Display,
+						TEXT("Quai: grilleN cuite %d != GroundGridN %d — CONSTRUCTEUR IGNORE."),
+						(int32)QGrilleN, Profile.GroundGridN);
+				}
+				else
+				{
+					Quay.Dir = QDir;
+					Quay.GridN = (int32)QGrilleN;
+					Quay.AltCapCm = Out.AltCapCm;
+					Quay.bActive = true;
+					const TArray<TSharedPtr<FJsonValue>>* Ex = nullptr;
+					if (QIdx->TryGetArrayField(TEXT("murs_exclus"), Ex))
+					{
+						for (const TSharedPtr<FJsonValue>& V : *Ex)
+						{
+							Quay.MursExclus.Add(V->AsString());
+						}
+					}
+					// QUAIV2 : les VOLEES que le constructeur RECONSTRUIT en
+					// ENTAILLE entre les deux niveaux. Nominatif, exactement
+					// comme `murs_exclus` : la REGLE est nationale et vit dans
+					// la cuisson ; le moteur se contente de ne pas draper une
+					// seconde fois ce qui est deja bati.
+					const TArray<TSharedPtr<FJsonValue>>* Vo = nullptr;
+					if (QIdx->TryGetArrayField(TEXT("volees_constructeur"), Vo))
+					{
+						for (const TSharedPtr<FJsonValue>& V : *Vo)
+						{
+							Quay.VoleesConstructeur.Add(V->AsString());
+						}
+					}
+					UE_LOG(LogCityImport, Display,
+						TEXT("BUILDQUAY : constructeur de quai ACTIF ('%s', grille %d), %d murs exclus nominativement, %d volees RECONSTRUITES par la piece."),
+						*QDir, Quay.GridN, Quay.MursExclus.Num(),
+						Quay.VoleesConstructeur.Num());
+				}
+			}
+		}
 		return true;
 	}
 
@@ -971,6 +1583,12 @@ namespace
 		// Defaut true = comportement historique (un bouchon a chaque bout).
 		bool bBoutDebut = true;
 		bool bBoutFin = true;
+		// BUILDQUAY : le RANG du mur dans le side-car de sa cellule, pris AVANT
+		// tout filtrage de classe — c'est l'identifiant stable `cx_cy#rang` que
+		// la cuisson emploie (miroir `b_lib.charger_murs`). Sans lui, la liste
+		// `murs_exclus` designerait un autre mur des que `RetainingWallClasses`
+		// est renseigne.
+		int32 Rang = 0;
 	};
 
 	// =========================================================================
@@ -1246,14 +1864,17 @@ namespace
 		{
 			return true;
 		}
+		int32 RangBrut = -1;
 		for (const TSharedPtr<FJsonValue>& V : *Arr)
 		{
+			++RangBrut;
 			const TSharedPtr<FJsonObject>& O = V->AsObject();
 			if (!O.IsValid())
 			{
 				continue;
 			}
 			FRetainingWall W;
+			W.Rang = RangBrut;
 			// TryGet* et non Get* : un champ manquant est un side-car d'une version
 			// anterieure, pas une erreur — et Get* journalise, ce que l'automation
 			// eleverait en echec de test.
@@ -1605,6 +2226,20 @@ namespace
 		// la VertexColor — et c'est le seul moyen d'avoir un ecoulement qui suit le
 		// fleuve au lieu d'une constante globale, qui serait un cas particulier.
 		TArray<FVector2D> Flux;
+		// LOT FRONTIERE-Z — LES TRIANGLES VIENNENT DE LA CUISSON.
+		// Mesure (work/FRONTZ/z4, z5) : les « rayons » sur le fleuve — dont celui
+		// qui passe SOUS le Pont Saint-Pierre — ne sont ni un barrage ni une
+		// frontiere de piece : ce sont les aretes INTERIEURES du repli en EVENTAIL
+		// de `TriangulateRing` (p50 67,96 m, p90 270,91 m, max 474,60 m, contre
+		// p50 10,11 m pour les aretes de bord ; un sommet portait 40 triangles sur
+		// 47). La cote etant interpolee LINEAIREMENT sur ces triangles tres
+		// allonges, chaque arete est une cassure de la surface qui accroche la
+		// lumiere rasante. La cuisson livre desormais une triangulation de Delaunay
+		// CONTRAINTE (ear-clipping + bascules de Lawson : meme couverture exacte,
+		// meme nombre de triangles, aucun sommet ajoute) et le moteur ne fait que
+		// POSER — comme pour les murs, les ponts et la promenade.
+		// Vide = side-car anterieur : `TriangulateRing` reprend la main, bit pour bit.
+		TArray<int32> Tris;
 		FString Cleabs;
 		FString Nature;
 		double AreaM2 = 0.0;
@@ -1687,6 +2322,39 @@ namespace
 					W.Flux.Add(C.Num() >= 2
 						? FVector2D(C[0]->AsNumber(), C[1]->AsNumber())
 						: FVector2D::ZeroVector);
+				}
+			}
+			// FRONTIERE-Z : la triangulation cuite. On la REFUSE en silence si elle
+			// n'est pas exploitable (taille non multiple de 3, indice hors bornes,
+			// triangle degenere) — le repli sur `TriangulateRing` est le
+			// comportement historique, il n'y a donc rien a casser.
+			const TArray<TSharedPtr<FJsonValue>>* TriArr = nullptr;
+			if (O->TryGetArrayField(TEXT("tris"), TriArr) && TriArr->Num() >= 3
+				&& (TriArr->Num() % 3) == 0)
+			{
+				bool bOk = true;
+				TArray<int32> T;
+				T.Reserve(TriArr->Num());
+				for (const TSharedPtr<FJsonValue>& TV : *TriArr)
+				{
+					const int32 I = (int32)TV->AsNumber();
+					if (I < 0 || I >= W.PtsCm.Num())
+					{
+						bOk = false;
+						break;
+					}
+					T.Add(I);
+				}
+				for (int32 t = 0; bOk && t + 2 < T.Num(); t += 3)
+				{
+					if (T[t] == T[t + 1] || T[t + 1] == T[t + 2] || T[t + 2] == T[t])
+					{
+						bOk = false;
+					}
+				}
+				if (bOk)
+				{
+					W.Tris = MoveTemp(T);
 				}
 			}
 			if (!bAllZ)
@@ -5201,13 +5869,24 @@ namespace
 	// reste plane — son niveau est alors porte par Zcm).
 	// Surf (J3c point 2) : classe de revetement resolue — le polygone part dans son
 	// groupe dedie avec une UV0 MONDE EN METRES (pelouses, bois). Nul = historique.
+	// PreTris (FRONTIERE-Z) : triangulation LIVREE PAR LA CUISSON. Non vide = on
+	// pose ces triangles tels quels ; vide = `TriangulateRing`, comportement
+	// historique bit pour bit.
 	void BuildFlatPolygon(FCityMeshBuilder& QM, const TArray<FVector2D>& PtsCm, float Zcm,
 		const FVector3f& Tint, const TArray<float>* TerrainZ = nullptr,
 		const FResolvedSurface* Surf = nullptr,
-		const TArray<FVector3f>* VertexTints = nullptr)
+		const TArray<FVector3f>* VertexTints = nullptr,
+		const TArray<int32>* PreTris = nullptr)
 	{
 		TArray<int32> Tris;
-		TriangulateRing(PtsCm, Tris);
+		if (PreTris && PreTris->Num() >= 3)
+		{
+			Tris = *PreTris;
+		}
+		else
+		{
+			TriangulateRing(PtsCm, Tris);
+		}
 		const FVector3f Shaded = Shade(Tint, FVector3f(0, 0, 1), Zcm);
 		auto VertexZ = [&](int32 Index)
 		{
@@ -5653,6 +6332,7 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 		// desormais, et elle porte la DIRECTION DE L'ECOULEMENT (cf. FCityWaterBody).
 		const FVector3f TeinteEau(0.5f, 0.5f, 1.f);
 		int32 CellulesEau = 0, EauTailleKo = 0, WaterFlowBodies = 0;
+		int32 WaterBodiesPreTri = 0;
 		double EauTailleCuiteM = 0.0, AireEau = 0.0;
 		for (const FString& Fichier : Fichiers)
 		{
@@ -5688,11 +6368,20 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 				}
 				if (SignedArea(W.PtsCm) < 0)
 				{
+					const int32 NPts = W.PtsCm.Num();
 					Algo::Reverse(W.PtsCm);
 					Algo::Reverse(W.ZCm);
 					if (W.Flux.Num() == W.PtsCm.Num())
 					{
 						Algo::Reverse(W.Flux);
+					}
+					// FRONTIERE-Z : les indices cuits designent l'ordre D'AVANT le
+					// retournement. On les renumerote (i -> N-1-i) ; le SENS de
+					// chaque triangle est une propriete geometrique de ses trois
+					// sommets, il ne change pas.
+					for (int32& I : W.Tris)
+					{
+						I = NPts - 1 - I;
 					}
 				}
 				// BERGES : l'ecoulement voyage dans la COULEUR DE SOMMET
@@ -5714,7 +6403,12 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 				const int32 Avant = B.MeshDesc.Triangles().Num();
 				BuildFlatPolygon(B, W.PtsCm, 0.f, TeinteEau, &W.ZCm,
 					SurfEau.Material ? &SurfEau : nullptr,
-					Couleurs.Num() ? &Couleurs : nullptr);
+					Couleurs.Num() ? &Couleurs : nullptr,
+					W.Tris.Num() >= 3 ? &W.Tris : nullptr);
+				if (W.Tris.Num() >= 3)
+				{
+					++WaterBodiesPreTri;
+				}
 				const int32 Tris = B.MeshDesc.Triangles().Num() - Avant;
 				if (Tris <= 0)
 				{
@@ -5734,6 +6428,11 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 		UE_LOG(LogCityImport, Display,
 			TEXT("BERGES eau : %d surfaces sur %d portent un ECOULEMENT lu dans la donnee (couleur de sommet)."),
 			WaterFlowBodies, Summary.WaterBodies);
+		UE_LOG(LogCityImport, Display,
+			TEXT("FRONTIERE-Z eau : %d surfaces sur %d posent la TRIANGULATION CUITE "
+				 "(Delaunay contrainte du side-car) ; les autres retombent sur "
+				 "TriangulateRing (comportement historique)."),
+			WaterBodiesPreTri, Summary.WaterBodies);
 		UE_LOG(LogCityImport, Display,
 			TEXT("LOT EAU : %d cellules lues, %d surfaces posees (%d m2, %d triangles), %d ecartees ; materiau '%s' %s — dossier '%s'."),
 			CellulesEau, Summary.WaterBodies, Summary.WaterAreaM2, Summary.WaterTris,
@@ -10415,6 +11114,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		int32 CellsWithWalls = 0;
 		int32 CellsWrongSize = 0;
 		int32 GradinsWrongSize = 0;
+		int32 MursCedes = 0;      // BUILDQUAY : murs remplaces par la piece
 		double BakedCellM = 0.0;
 		const FString GradinDir = GradinsDir(Gen);
 		for (const FString& File : Files)
@@ -10447,8 +11147,24 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			LoadGradinsCell(GradinDir, CelluleMur.X, CelluleMur.Y, CellSizeM,
 				Emprises, GradinsWrongSize);
 			Summary.QuayTierEmprises += Emprises.Num();
+			const FCityQuay& QuayEx = QuaySingleton();
 			for (const FRetainingWall& W : Walls)
 			{
+				// ⭐ BUILDQUAY — EXCLUSION PAR TYPE. Un mur de classe `quai` a
+				// portee d'une chaine de frontiere typee `quai_dur` est DEJA
+				// construit par la piece (face, couronnement, gradins) : le
+				// poser une seconde fois par ruptures de sol, c'est la couture
+				// qui a fait le chaos. Le generateur C1 garde TOUT le reste de
+				// la ville — l'exclusion est nominative et vient de la cuisson.
+				if (QuayEx.bActive && QuayEx.MursExclus.Contains(
+					FString::Printf(TEXT("%d_%d#%d"), CelluleMur.X, CelluleMur.Y, W.Rang)))
+				{
+					++MursCedes;
+					UE_LOG(LogCityImport, Display,
+						TEXT("MUR CEDE AU CONSTRUCTEUR cellule=%d_%d classe=%s rang=%d — la piece de quai le porte."),
+						CelluleMur.X, CelluleMur.Y, *W.Classe, W.Rang);
+					continue;
+				}
 				// BERGES — PLANCHER DE LONGUEUR, ecarte AVEC CAUSE (jamais en silence).
 				// Defaut 0 : la mesure dit que le side-car n'a aucun mur sous son
 				// propre plancher de detection (min 12,04 m pour un plancher de 12 m).
@@ -10543,6 +11259,116 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				TEXT("Murs de soutenement : %d cellules IGNOREES — leur side-car est cuit pour des cellules de %.0f m et cet import travaille a %.0f m."),
 				CellsWrongSize, BakedCellM, CellSizeM);
 		}
+		if (MursCedes > 0)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("BUILDQUAY : %d murs de classe quai CEDES au constructeur (exclusion par TYPE ; le generateur C1 garde le reste de la ville)."),
+				MursCedes);
+		}
+	}
+
+	// =========================================================================
+	// ⭐ BUILDQUAY — LA POSE DE LA PIECE. Le moteur ne fait que POSER : la
+	// cuisson a deja balaye le profil le long de la chaine de frontiere. Meme
+	// materiau que les murs de quai (bordure, `GSurfCurb`) et meme teinte —
+	// AUCUNE classe ni matiere nouvelle. La piece va dans le mesh `SM_Ground_`
+	// de sa cellule PROPRIETAIRE (la cuisson a range chaque quad par le centre,
+	// garde `CleSol` du mode district).
+	if (Drape.IsActive())
+	{
+		FCityQuay& Quay = QuaySingleton();
+		const FResolvedSurface* QuaySurf = Surfaces.Resolve(&GSurfCurb);
+		if (Quay.bActive && QuaySurf)
+		{
+			const FVector3f QuayTint(0.85f, 0.85f, 0.80f);
+			int32 PoseQuads = 0, PoseCells = 0, TierDm = 0, TierN = 0, TierPieces = 0;
+			TArray<FString> QFiles;
+			IFileManager::Get().FindFiles(QFiles, *(Quay.Dir / TEXT("quai_*.json")), true, false);
+			{
+				for (const FString& QFile : QFiles)
+				{
+					FString QRest = FPaths::GetBaseFilename(QFile);
+					QRest.RemoveFromStart(TEXT("quai_"));
+					FString QSx, QSy;
+					if (!QRest.Split(TEXT("_"), &QSx, &QSy, ESearchCase::CaseSensitive,
+						ESearchDir::FromEnd))
+					{
+						continue;
+					}
+					const FIntPoint Key(FCString::Atoi(*QSx), FCString::Atoi(*QSy));
+					// Mode district : le side-car est deja decoupe a la cellule.
+					if (!CelluleVisee(Key))
+					{
+						continue;
+					}
+					const FCityQuay::FCell* QC = Quay.Cellule(Key);
+					if (!QC || QC->Slot.Num() == 0)
+					{
+						continue;
+					}
+					++PoseCells;
+					FCityMeshBuilder& QB = GetInKey(GroundCells, Key, bLinearColors, bWorldUVs);
+					const FPolygonGroupID Grp = QB.GetOrCreateGroup(QuaySurf->SlotName(),
+						QuaySurf->Material);
+					for (int32 q = 0; q < QC->Slot.Num(); ++q)
+					{
+						FVector3f C[4];
+						FVector2f UV[4];
+						int32 Num = 0;
+						for (int32 c = 0; c < 4; ++c)
+						{
+							const FVector3f& P = QC->Verts[q * 4 + c];
+							// Un pan degenere (largeur nulle : pas de plateforme,
+							// giron nul hors emprise de gradins) rend deux coins
+							// confondus : on retombe alors sur un TRIANGLE plutot
+							// que de livrer un polygone degenere au MeshDescription.
+							if (Num > 0 && (P - C[Num - 1]).SizeSquared() < 1.f)
+							{
+								continue;
+							}
+							C[Num] = P;
+							UV[Num] = QC->UVs[q * 4 + c];
+							++Num;
+						}
+						if (Num == 4 && (C[3] - C[0]).SizeSquared() < 1.f)
+						{
+							--Num;
+						}
+						if (Num < 3)
+						{
+							continue;
+						}
+						QB.AddPoly(Grp, C, Num, QC->Nrm[q], UV, QuayTint);
+						++PoseQuads;
+					}
+					TierDm += QC->GradinsDm;
+					if (QC->GradinsDm > 0)
+					{
+						++TierPieces;
+						TierN = FMath::Max(TierN, QC->GradinsN);
+					}
+				}
+			}
+			// LES GRADINS SONT DESORMAIS TAILLES DANS LA PIECE : ce sont ces
+			// compteurs-la que lit le verrou. Ils REMPLACENT ceux des murs de
+			// soutenement dans l'emprise (les murs y sont cedes) ; hors emprise,
+			// le mecanisme historique reste seul maitre.
+			if (TierDm > 0)
+			{
+				Summary.QuayTierDm += TierDm;
+				Summary.QuayTiers += TierN;
+				Summary.QuayTierWalls += TierPieces;
+			}
+			UE_LOG(LogCityImport, Display,
+				TEXT("BUILDQUAY : %d pans poses sur %d cellules (%d quads de dalle masques, %d triangles de tablier) ; gradins tailles dans la piece : %.1f m, %d gradins, %d pieces."),
+				PoseQuads, PoseCells, Quay.QuadsMasques, Quay.ApronTris,
+				TierDm * 0.1f, TierN, TierPieces);
+		}
+		else if (Quay.bActive)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("BUILDQUAY demande mais bSurfaceMaterials est faux : aucune piece de quai posee."));
+		}
 	}
 
 	// --- QUAIS V2 : LES ESCALIERS.
@@ -10570,6 +11396,28 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		int32 StCellsWrongSize = 0;
 		double StBakedCellM = 0.0;
 		int32 StairQuads = 0;
+		// ⭐ QUAIV2 — LA REGLE DU LOT SIMPLIFICATION EST INVERSEE.
+		// CHRONOLOGIE, a lire dans cet ordre (elle explique le code) :
+		//   02/08 (lot QUAIS)  : les deux volees du corridor sont posees par
+		//       `BuildStairs` et VERROUILLEES nominativement.
+		//   04/08 (lot SIMPLE) : « les gradins SONT l'escalier » — une volee qui
+		//       traverse une emprise `leisure=bleachers` n'est plus rendue ; le
+		//       verrou est retire.
+		//   04/08 (lot QUAIV2) : DECISION UTILISATEUR — la regle est INVERSEE.
+		//       Les volees reviennent, mais RECONSTRUITES PAR LE CONSTRUCTEUR
+		//       DE QUAI : une ENTAILLE au profil 70/45 taillee dans la meme
+		//       piece, pied sur la PROMENADE (+1,20 sur l'eau), tete sur le
+		//       COURONNEMENT — au lieu d'une rampe DRAPEE de 30 m sur la berge.
+		//       Le verrou nominatif est RESTAURE et adapte aux nouvelles cotes.
+		// Ce que le moteur fait desormais : il ne DRAPE plus une volee que la
+		// piece a deja batie. La liste est nominative et vient de la cuisson
+		// (`volees_constructeur`) — la REGLE, elle, est nationale et vit dans la
+		// cuisson : « toute volee dont l'emprise tombe dans la piece ». Liste
+		// vide (dossier Quai absent) = comportement d'avant ce lot.
+		const FString StGradinDir = GradinsDir(Gen);
+		int32 StGradinsWrongSize = 0;
+		int32 StairsInTiers = 0;
+		const FCityQuay& StQuay = QuaySingleton();
 		for (const FString& File : Files)
 		{
 			FString Rest = FPaths::GetBaseFilename(File);
@@ -10591,8 +11439,22 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			}
 			++CellsWithStairs;
 			const FIntPoint CelluleEsc(FCString::Atoi(*Sx), FCString::Atoi(*Sy));
+			TArray<FGradinEmprise> StEmprises;
+			LoadGradinsCell(StGradinDir, CelluleEsc.X, CelluleEsc.Y, CellSizeM,
+				StEmprises, StGradinsWrongSize);
 			for (const FCityStairs& St : Flights)
 			{
+				// QUAIV2 — LA VOLEE EST-ELLE DEJA BATIE PAR LA PIECE ?
+				// (cf. l'en-tete de la passe : la regle SIMPLE est inversee.)
+				if (StQuay.bActive && StQuay.VoleesConstructeur.Contains(St.Id))
+				{
+					++StairsInTiers;
+					// NOMINATIF : on dit QUELLE volee, et par qui elle est batie.
+					UE_LOG(LogCityImport, Display,
+						TEXT("VOLEE RECONSTRUITE PAR LA PIECE cellule=%d_%d source=%s id=%s — entaille 70/45 taillee entre la promenade et le couronnement ; le drapage est donc supprime."),
+						CelluleEsc.X, CelluleEsc.Y, *St.Source, *St.Id);
+					continue;
+				}
 				int32 Q = 0;
 				const int32 M = BuildStairs(
 					GetInKey(GroundCells, CleSol(St.PtsCm[0], CelluleEsc),
@@ -10614,6 +11476,9 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			TEXT("QUAIS V2 escaliers : %d cellules, %d volees posees (%d marches, %d quads), %d ecartees (pas de denivele exploitable) — dossier '%s'."),
 			CellsWithStairs, Summary.Stairs, Summary.StairSteps, StairQuads,
 			Summary.StairsSkipped, *StDir);
+		UE_LOG(LogCityImport, Display,
+			TEXT("QUAIV2 escaliers : %d volees RECONSTRUITES PAR LA PIECE (entaille 70/45 entre promenade et couronnement) et donc non drapees — la regle du lot SIMPLE est inversee (dossier gradins '%s')."),
+			StairsInTiers, *StGradinDir);
 		if (StCellsWrongSize > 0)
 		{
 			UE_LOG(LogCityImport, Display,
@@ -10784,6 +11649,11 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	// dalle reste la grille peinte historique, a l'octet pres) et nulle pour le mesh
 	// de COLLISION (jamais rendu — lui donner un slot de revetement serait du gachis).
 	const FResolvedSurface* SlabSurf = Surfaces.Resolve(&GSurfSlab);
+	// LOT SIMPLIFICATION : combien de quads de dalle ont cede la place a l'ouvrage
+	// de berge, et combien de sous-quads l'ouvrage a poses. Une ligne de journal
+	// suffit (aucun champ ajoute au resume : pas de changement de layout).
+	int32 OuvrageQuadsCedes = 0;
+	int32 OuvrageSousQuads = 0;
 	auto BuildGroundGrid = [&](FCityMeshBuilder& Builder, const FIntPoint& Key, int32 GridN, bool bPaint,
 		const FResolvedSurface* Surf)
 	{
@@ -10791,10 +11661,42 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		// Groupe de revetement cree UNE fois pour toute la dalle (pas par quad).
 		const FPolygonGroupID Group = Surf
 			? Builder.GetOrCreateGroup(Surf->SlotName(), Surf->Material) : Builder.WallGroup;
+		// ⭐ LOT SIMPLIFICATION — LES QUADS QUI ONT CEDE LA PLACE A L'OUVRAGE.
+		// Uniquement sur la grille de RENDU (celle a laquelle la cuisson est
+		// accordee) : le mesh de COLLISION, cuit a une autre maille, garde le
+		// drapage historique — il n'est jamais rendu.
+		const FCityBedCeiling::FGrilles* Ouv = nullptr;
+		if (Drape.Bed && Drape.Bed->bProfil && Drape.Bed->bActive
+			&& GridN == Drape.Bed->GridN)
+		{
+			const FCityBedCeiling::FGrilles* G = Drape.Bed->Grille(Key);
+			if (G && G->OuvrageK > 0 && G->OuvrageQuads.Num() > 0)
+			{
+				Ouv = G;
+			}
+		}
+		// ⭐ BUILDQUAY — DANS L'EMPRISE DE LA PIECE, LA DALLE N'EXISTE PLUS.
+		// Uniquement sur la grille de RENDU (celle a laquelle la cuisson est
+		// accordee) : le mesh de COLLISION, cuit a une autre maille, garde le
+		// drapage historique — il n'est jamais rendu, et c'est lui qui porte le
+		// joueur. Les quads que la piece ne recouvre qu'EN PARTIE sont rendus
+		// par le TABLIER (`Apron`), au Z que la grille aurait rendu : la couture
+		// tombe alors sur des aretes de quad entre deux noeuds, donc exacte.
+		const FCityQuay& Quay = QuaySingleton();
+		const FCityQuay::FCell* QCell =
+			(Quay.bActive && GridN == Quay.GridN) ? Quay.Cellule(Key) : nullptr;
 		for (int32 GY = 0; GY < GridN; ++GY)
 		{
 			for (int32 GX = 0; GX < GridN; ++GX)
 			{
+				if (QCell && QCell->Masque.Contains(GY * GridN + GX))
+				{
+					continue;    // la piece et son tablier rendent a sa place
+				}
+				if (Ouv && Ouv->OuvrageQuads.Contains(GY * GridN + GX))
+				{
+					continue;    // l'ouvrage le rend a sa place, au pas fin
+				}
 				const float X0 = Key.X * Cell + GX * Step, Y0 = Key.Y * Cell + GY * Step;
 				const FVector3f C[4] = {
 					FVector3f(X0, Y0, Drape.GroundZ(X0, Y0)),
@@ -10821,6 +11723,90 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				}
 				Builder.AddPolyPerVertexColors(Group, C, 4, FVector3f(0, 0, 1), UV, Cols);
 			}
+		}
+		// ⭐ BUILDQUAY — LE TABLIER DE DALLE : ce qui reste des quads masques, en
+		// DEHORS de la piece. Meme groupe, meme materiau, meme UV0 metrique monde
+		// et meme peinture de sommet que la dalle : la maquette du sol (masques)
+		// continue de s'appliquer mot pour mot HORS de l'emprise.
+		if (QCell)
+		{
+			for (int32 t = 0; t + 2 < QCell->Apron.Num(); t += 3)
+			{
+				const FVector3f C[3] = { QCell->Apron[t], QCell->Apron[t + 1],
+										 QCell->Apron[t + 2] };
+				FVector2f UV[3];
+				FVector3f Cols[3];
+				for (int32 c = 0; c < 3; ++c)
+				{
+					UV[c] = Surf ? FVector2f(C[c].X * 0.01f, C[c].Y * 0.01f)
+								 : FVector2f((float)c, 0.f);
+					const FVector3f Base2 = bPaint ? SampleGround(FVector2D(C[c].X, C[c].Y))
+												   : SlabBase;
+					Cols[c] = bBakedShade ? Shade(Base2, FVector3f(0, 0, 1), 0.f) : Base2;
+				}
+				Builder.AddPolyPerVertexColors(Group, C, 3, FVector3f(0, 0, 1), UV, Cols);
+			}
+		}
+		if (!Ouv)
+		{
+			return;
+		}
+		// L'OUVRAGE, pose tel que la cuisson l'a livre : le moteur ne fait que
+		// POSER (meme doctrine que les murs, les ponts et l'eau). Meme groupe,
+		// meme materiau, meme UV0 metrique monde et meme peinture de sommet que
+		// la dalle : aucune classe ni matiere nouvelle, et la maquette du sol
+		// (masques) continue de s'appliquer mot pour mot.
+		const int32 K = Ouv->OuvrageK;
+		const int32 NV = (K + 1) * (K + 1);
+		const float Fine = Step / (float)K;
+		for (const TPair<int32, int32>& QP : Ouv->OuvrageQuads)
+		{
+			const int32 GX = QP.Key % GridN, GY = QP.Key / GridN;
+			if (GX < 0 || GY < 0 || GX >= GridN || GY >= GridN)
+			{
+				continue;
+			}
+			const int32 Base = QP.Value * NV;
+			if (!Ouv->OuvrageZ.IsValidIndex(Base + NV - 1))
+			{
+				continue;
+			}
+			const float X0 = Key.X * Cell + GX * Step, Y0 = Key.Y * Cell + GY * Step;
+			auto ZAt = [&](int32 sx, int32 sy) -> float
+			{
+				return (float)Ouv->OuvrageZ[Base + sy * (K + 1) + sx] - Drape.AltCapCm;
+			};
+			for (int32 sy = 0; sy < K; ++sy)
+			{
+				for (int32 sx = 0; sx < K; ++sx)
+				{
+					const float XA = X0 + sx * Fine, YA = Y0 + sy * Fine;
+					const FVector3f C[4] = {
+						FVector3f(XA, YA, ZAt(sx, sy)),
+						FVector3f(XA + Fine, YA, ZAt(sx + 1, sy)),
+						FVector3f(XA + Fine, YA + Fine, ZAt(sx + 1, sy + 1)),
+						FVector3f(XA, YA + Fine, ZAt(sx, sy + 1)) };
+					FVector2f UV[4] = { FVector2f(0, 0), FVector2f(1, 0),
+										FVector2f(1, 1), FVector2f(0, 1) };
+					if (Surf)
+					{
+						for (int32 c = 0; c < 4; ++c)
+						{
+							UV[c] = FVector2f(C[c].X * 0.01f, C[c].Y * 0.01f);
+						}
+					}
+					FVector3f Cols[4];
+					for (int32 c = 0; c < 4; ++c)
+					{
+						const FVector3f Base2 = bPaint
+							? SampleGround(FVector2D(C[c].X, C[c].Y)) : SlabBase;
+						Cols[c] = bBakedShade ? Shade(Base2, FVector3f(0, 0, 1), 0.f) : Base2;
+					}
+					Builder.AddPolyPerVertexColors(Group, C, 4, FVector3f(0, 0, 1), UV, Cols);
+					++OuvrageSousQuads;
+				}
+			}
+			++OuvrageQuadsCedes;
 		}
 	};
 	// J3c maquette : l'instance de la CELLULE, resolue comme une classe de
@@ -10883,6 +11869,10 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		ApplyGroundTextureStreaming(SlabActor->GetStaticMeshComponent());
 		SlabActor->SetActorLabel(SlabName);
 	}
+	UE_LOG(LogCityImport, Display,
+		TEXT("OUVRAGE DE BERGE : %d quads de dalle ont cede la place, %d sous-quads poses au pas fin. "
+			 "Cause mesuree : la grille de noeuds ne peut pas porter une bande plate a cote d'une marche de ~6,5 m."),
+		OuvrageQuadsCedes, OuvrageSousQuads);
 
 	// --- Rubans routiers : SANS collision (films visuels 55-80 cm au-dessus de la
 	// dalle porteuse, dont la boite monte a 60 cm) et cullables a ~2 km cote runtime.
@@ -11171,6 +12161,25 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			TEXT("Maquette du sol : %d dalles peintes, %d rubans de chaussee supprimes, %d ponts, %d tirets axiaux."),
 			Summary.MaskedCells, Summary.GroundRibbonsSkipped, Summary.BridgeRibbons,
 			Summary.AxialDashes);
+	}
+	// FRONTIERE : ce que le plafond du lit a reellement lu. Un compteur, pas un
+	// recit — c'est lui qui distingue « ecrasement actif » de « side-car absent ».
+	{
+		const FCityBedCeiling& Bed = BedCeilingSingleton();
+		Summary.WaterBedCells = Bed.Charges;
+		Summary.WaterBedRejects = Bed.TailleKo;
+		Summary.QuayProfileNodes = Bed.NoeudsProfil;
+		if (Bed.bActive)
+		{
+			UE_LOG(LogCityImport, Display,
+				TEXT("FRONTIERE : plafond du lit lu sur %d cellule(s) (pas %.4f m, grille %d) ; %d refusee(s), %d sans fichier."),
+				Bed.Charges, Bed.StepCm / 100.f, Bed.GridN, Bed.TailleKo, Bed.Manquants);
+			UE_LOG(LogCityImport, Display,
+				TEXT("PROFIL : profil de berge %s — %d noeud(s) FORCE(S) (plateforme a +%.2f m "
+					 "sur la cote d'eau locale, ou esplanade)."),
+				Bed.bProfil ? TEXT("ACTIF") : TEXT("ETEINT"), Bed.NoeudsProfil,
+				Bed.PlatHeightCm / 100.f);
+		}
 	}
 	return Summary;
 }

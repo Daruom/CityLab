@@ -96,6 +96,20 @@ OCSGE_PATH = os.path.join(SRC, "ocsge_verts.json")
 # sans fichier = aucune promenade, sans erreur (comme les murs).
 PROMENADE_DIR = os.path.join(SRC, "Promenade")
 PROMENADE_ON = True        # False = rollback complet, sans re-cuire le side-car
+# --- LOT SIMPLIFICATION BERGE (2026-08-04) : LA BANDE DE QUAI NE SE PEINT PLUS.
+# DECISION UTILISATEUR, gravee : « qu'on enleve les tracages pietons (couleur
+# beige) ». Sur la bande `quai_dur` (de la frontiere d'eau a 21 m cote terre, la
+# ou un mur de quai est a portee), la peinture beige — classe `gravier`, celle ou
+# se versent les natures etroites BD TOPO et la promenade de berge — est ETEINTE :
+# la plateforme y garde sa CLASSE DE BASE, le pavage. C'est le RENDU qui s'eteint,
+# PAS la donnee : `SourceData/Promenade` n'est pas touche, et hors bande la
+# peinture des chemins reste (parcs, berges naturelles, etc.).
+# L'emprise est lue dans le side-car de frontiere (champ `bande_quai`, cuit par
+# work/SIMPLE/s2_ouvrage.py) : une seule verite geometrique, la meme que celle de
+# l'ouvrage de berge du generateur. Champ absent = aucune extinction, sans erreur.
+# Drapeau de rollback SANS re-cuisson : remettre True.
+PEINTURE_BANDE_QUAI = False
+FRONTIERE_DIR = os.path.join(SRC, "Frontiere")
 # --- LOT FINITION QUAIS : UN OUVRAGE NE SE PEINT PAS SUR LE SOL ---------------
 # REGLE NATIONALE : un troncon de route qui appartient a un OUVRAGE (la chaine
 # connexe du side-car SourceData/Ponts, celle-la meme qui porte le tablier 3D du
@@ -652,6 +666,37 @@ def charger_promenade(cx, cy):
             continue
         out.append({"pts": pts, "largeur": float(s.get("largeur_m", defaut))})
     return out
+
+
+def charger_bande_quai(cx, cy):
+    """LOT SIMPLIFICATION : l'emprise en plan de la bande de quai d'une cellule.
+
+    Meme contrat que les autres side-cars : dossier absent, cellule sans fichier
+    ou champ `bande_quai` absent = AUCUNE bande, sans erreur (et donc aucune
+    extinction de peinture — le comportement historique, mot pour mot)."""
+    path = os.path.join(FRONTIERE_DIR, "frontiere_%d_%d.json" % (cx, cy))
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as ex:  # noqa: BLE001
+        log("ATTENTION : frontiere_%d_%d.json illisible (%s) — bande ignoree"
+            % (cx, cy, ex))
+        return None
+    anneaux = data.get("bande_quai") or []
+    polys = []
+    for r in anneaux:
+        if len(r) < 4:
+            continue
+        g = Polygon([(float(a), float(b)) for a, b in r])
+        if not g.is_valid:
+            g = g.buffer(0)
+        if not g.is_empty and g.area > 0:
+            polys.append(g)
+    if not polys:
+        return None
+    return C.valide(unary_union(polys))
 
 
 def charger_verts_ocsge(fen):
@@ -1577,6 +1622,18 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
                 # retrait du bati dans classes_de_cellule).
                 privee = C.valide(privee.difference(bande))
 
+    # --- LOT SIMPLIFICATION : la BANDE DE QUAI ne porte plus de beige.
+    # Elle vient APRES la promenade, donc elle eteint aussi la promenade qui
+    # tombe dans la bande — c'est exactement ce qui est demande. Hors bande,
+    # rien ne bouge. Le retrait sur l'HERBE est plus bas (l'herbe est le
+    # complement du mineral peint : sans lui, elle reprendrait la bande).
+    bande_quai = charger_bande_quai(cx, cy) if not PEINTURE_BANDE_QUAI else None
+    aire_bande_eteinte = 0.0
+    if bande_quai is not None and not bande_quai.is_empty:
+        avant = gravier.intersection(cell_box).area
+        gravier = C.valide(gravier.difference(bande_quai))
+        aire_bande_eteinte = avant - gravier.intersection(cell_box).area
+
     # --- SOLVERT : la couche HERBE, complement de la voirie peinte.
     # herbe = union(OCS GE CS2.*) - chaussee - privee - gravier - bati - eau, puis
     # ouverture morphologique vectorielle de HERBE_OUVERTURE_M. La soustraction se
@@ -1598,6 +1655,10 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
         return g
 
     herbe = herbe_brute(zone, loc_verts, chaussee, privee, gravier, u_bati, u_eau)
+    if bande_quai is not None and not bande_quai.is_empty and not herbe.is_empty:
+        # La bande de quai garde sa CLASSE DE BASE (pavage) : eteindre le beige
+        # sans ce retrait ferait simplement reprendre la place par l'herbe.
+        herbe = C.valide(herbe.difference(bande_quai))
     boucher_trous.dernier = {"trous": 0, "combles": 0, "aire_m2": 0.0}
     regulariser_herbe.dernier = {"avant": 0, "apres": 0}
     retirer_miettes.dernier = {"fragments": 0, "retires": 0, "aire_m2": 0.0}
@@ -1718,6 +1779,8 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
         # berge. C'est LE discriminant de la passe : a 0, la promenade n'a rien
         # peint et la capture ne peut rien montrer.
         "promenadeM2": round(aire_prom, 1),
+        # LOT SIMPLIFICATION : m2 de beige ETEINTS sur la bande de quai.
+        "bandeQuaiEteinteM2": round(aire_bande_eteinte, 1),
     }
     js = os.path.join(OUT_DIR, "sols_%d_%d.json" % (cx, cy))
     with open(js, "w", encoding="utf-8") as f:
@@ -1756,6 +1819,7 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
             "pngBytes": os.path.getsize(png), "jsonBytes": os.path.getsize(js),
             "areasM2": aires, "herbeRasterM2": round(aire_herbe_png, 1),
             "promenadeM2": round(aire_prom, 1),
+            "bandeQuaiEteinteM2": round(aire_bande_eteinte, 1),
             "herbeEcartPc": round(ecart_pc, 3),
             "herbeReleveM2": round(aire_releve, 1),
             "herbeRegulM2": round(aire_regul - aire_releve, 1),

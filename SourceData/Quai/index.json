@@ -1,0 +1,22 @@
+{
+ "genere": "2026-08-04T17:55:17",
+ "cellSizeM": 500.0,
+ "grilleN": 64,
+ "recette": "QUAIV2 : DEUX NIVEAUX PARTOUT sur le lineaire `quai_dur` \u2014 esplanade en haut, PROMENADE a +1,20 sur l'eau en bas, continue, un mur entre les deux, gradins et volees BD TOPO comme liaisons. La colonne de la piece est REGULARISEE (passe-bas adaptatif, plancher 3,50 m = resolution effective du MNT, sommet d'un plateau mesure) ; la ligne d'eau ne bouge pas. Les murs herites sont COUPES a l'emprise (side-car Murs reecrit, bouts de coupe bouchonnes) : plus aucun element herite ne perce le tablier. `quads_cm` = 12 entiers par quad (4 sommets x, y, z en cm), `quads_uv_cm` 8 entiers, `quads_nrm` 3 entiers (normale x1000), `quads_slot` 0 = pan HORIZONTAL / 1 = pan VERTICAL (meme pierre, aucun materiau nouveau). `apron_cm` = 9 entiers par triangle (la dalle qui reste dans les quads masques). `masque_quads` (GY*64+GX) = les quads de dalle qui ne sont plus rendus. `volees_constructeur` = les volees BD TOPO que la piece RECONSTRUIT en entaille : le moteur ne doit plus les draper (inversion de la regle du lot SIMPLE, decision utilisateur du 04/08). `murs_exclus` est VIDE : la coupe a remplace l'exclusion. Dossier absent = aucune piece.",
+ "murs_exclus": [],
+ "volees_constructeur": [
+  "TRONROUT0000002202787566",
+  "TRONROUT0000002202787567"
+ ],
+ "totaux": {
+  "cellules": 14,
+  "quads_piece": 16095,
+  "quads_masques": 1535,
+  "tris_tablier": 13609,
+  "emprise_m2": 60246.2,
+  "gradins_m": 11.016,
+  "gradins_n": 11,
+  "volees_m": 6.081,
+  "volees_n": 2
+ }
+}

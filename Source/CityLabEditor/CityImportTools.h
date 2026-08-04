@@ -452,6 +452,92 @@ struct FCityGenProfile
 	UPROPERTY() bool bWaterFilmsHistorique = false;
 
 	/**
+	 * ⭐ CHANTIER FRONTIERE DE BERGE (03/08) — L'EAU REMPLIT, LE LIT S'ECRASE.
+	 *
+	 * DECISION UTILISATEUR : la ligne de berge est la SOURCE DE VERITE UNIQUE.
+	 * L'eau occupe TOUTE l'emprise BD TOPO (plus aucune decoupe par emergence) et
+	 * ce qui depasse dessous n'est pas du relief : c'est le MIROIR du LiDAR.
+	 *
+	 * MESURE QUI FONDE LA REGLE (work/RIVAGE, work/FRONTIERE/f2) : sur le fleuve le
+	 * MNT ne voit pas le lit mais la SURFACE de l'eau, bruitee ; la cote etant la
+	 * MOYENNE de ce miroir sur un disque de 40 m, une part importante du « lit »
+	 * est AU-DESSUS du plan par construction (mesure a la marge livree : 11,3 % de
+	 * l'emprise, 71 600 m2, dont 68,5 % de la premiere bande d'un metre). La dent
+	 * de scie et les « plaques grises » etaient le MEME artefact, seuille maille
+	 * par maille puis agglomere par la fermeture morphologique.
+	 *
+	 * LA REGLE : dans l'emprise, le sol RENDU est PLAFONNE sous le plan d'eau. Le
+	 * plafond est cuit hors moteur, aux NOEUDS DE LA DALLE (GroundGridN), et livre
+	 * dans `SourceData/Frontiere/frontiere_<x>_<y>.json` (`plafond_cm`, altitudes
+	 * NGF ; rebase ICI par AltCapCm, comme l'eau et les ponts). AUCUNE constante de
+	 * reglage n'entre dans le moteur : enfoncement, marge de rive et seuil de type
+	 * vivent dans la cuisson — le moteur ne fait que POSER (doctrine des side-cars).
+	 *
+	 * Le plafond ne s'applique QU'AUX NOEUDS de la grille de dalle : c'est
+	 * exactement ce que lisent `BuildGroundGrid` et `FRenderedGroundZ::At` (qui
+	 * discretise en floor(X/pas)*pas). La surface RENDUE est donc plafonnee de
+	 * facon continue, sans qu'aucun echantillonnage hors noeud soit invente.
+	 *
+	 * Les seuls reliefs conserves dans l'eau restent les TROUS du polygone BD TOPO
+	 * (les vraies iles) : ils ne sont pas dans l'emprise, donc jamais plafonnes.
+	 *
+	 * ROLLBACK SANS RECUISSON : false = le sol reprend le MNT tel quel.
+	 */
+	UPROPERTY() bool bWaterBedCrush = true;
+
+	/** Dossier du side-car de frontiere. Vide = <projet>/SourceData/Frontiere. */
+	UPROPERTY() FString FrontierePath;
+
+	/**
+	 * ⭐ CHANTIER PROFIL DE BERGE (04/08) — LA BANDE EST UN OUVRAGE A NIVEAUX.
+	 *
+	 * LE CONSTAT MESURE. Sur la bande esplanade -> eau, le MNT a 1 m ne resout pas
+	 * ce qu'il decrit : la face verticale du quai y est ETALEE sur ~12 m (lot
+	 * FRONTIERE-Z : le MNT monte de 0,86 m au bord a 6,07 m a 12 m puis plafonne a
+	 * 6,4-6,5 m, et le seul palier que la donnee porte est l'ESPLANADE HAUTE a
+	 * p50 7,34 m au-dessus de l'eau). C'est cette rampe fantome qui produit TOUS
+	 * les griefs : effet plage, bosses, escaliers flottants, rampe de sable sur
+	 * les gradins.
+	 *
+	 * LA REGLE. Sur les brins `quai_dur` de la frontiere, la bande cessent d'etre
+	 * du terrain drape : deux niveaux PLATS, separes par le mur de quai qui,
+	 * comme aujourd'hui, encaisse toute la denivellation (il lit son pied et sa
+	 * crete sur le sol RENDU — rien a changer chez lui).
+	 *   - de la ligne d'eau au mur : la PLATEFORME BASSE ;
+	 *   - du mur jusqu'au « loin » mesure : l'ESPLANADE (le MNT loin du bord).
+	 * `berge_naturelle` n'a PAS de plateforme : la mesure dit que le MNT y decrit
+	 * une pente douce reelle (0,26 -> 4,20 m sur 40 m).
+	 *
+	 * OU VIT QUOI. La bande, sa largeur locale, la cote d'eau locale et le Z de
+	 * l'esplanade sont de la MESURE : ils vivent dans la cuisson
+	 * (`SourceData/Frontiere/*.json`, champs `plateforme_cm` et `esplanade_cm`,
+	 * sur la MEME grille de noeuds que le plafond du lit). Le moteur ne fait que
+	 * POSER. La seule valeur qui ne se mesure pas est ci-dessous.
+	 *
+	 * ROLLBACK SANS RECUISSON : false = le sol reprend son comportement d'avant
+	 * (plafond du lit seul), bit pour bit.
+	 */
+	UPROPERTY() bool bQuayPlatform = true;
+
+	/**
+	 * ⭐ LA HAUTEUR DE LA PLATEFORME BASSE AU-DESSUS DE LA COTE D'EAU LOCALE (m).
+	 *
+	 * VALEUR DE DESIGN ASSUMEE — elle n'est PAS dans la donnee. Le MNT LiDAR HD a
+	 * 1 m ne resout aucun palier a 1-1,5 m : sur 529 profils `quai_dur`, 93 %
+	 * portent un palier, mais sa hauteur mediane sur l'eau vaut 7,34 m, c'est
+	 * l'esplanade. Le quai bas — celui du port Saint-Pierre, sur la photo de
+	 * reference — n'existe donc que comme CHOIX. 1,20 m est ce choix, arbitre par
+	 * l'utilisateur le 04/08 sur cette photo, et c'est un parametre NATIONAL de
+	 * profil : aucun cas particulier toulousain.
+	 *
+	 * Corroboration mesuree (elle ne fonde pas la valeur, elle la conforte) : les
+	 * trois grandes volees du corridor Saint-Pierre -> Daurade finissent en bas a
+	 * 134,00 / 134,19 / 133,73 m NGF, pour une cote d'eau p50 de 132,96 m — soit
+	 * un pied de volee a 0,77-1,23 m au-dessus de l'eau.
+	 */
+	UPROPERTY() float QuayPlatformHeightM = 1.2f;
+
+	/**
 	 * ⭐ LOT PIE (02/08) — LA COLLISION DE LA VEGETATION, ET POURQUOI ELLE PART.
 	 *
 	 * MESURE, pas opinion. Un `UInstancedStaticMeshComponent` cree **un corps
@@ -690,6 +776,15 @@ struct FCityStreamedSummary
 
 	/** C2 : rubans OSM `bridge=true` NON construits — remplaces par le tablier a sa cote. */
 	UPROPERTY() int32 BridgeRibbonsReplaced = 0;
+
+	/** FRONTIERE : cellules du side-car de berge dont le plafond du lit a ete LU. */
+	UPROPERTY() int32 WaterBedCells = 0;
+
+	/** FRONTIERE : cellules refusees (grille cuite incompatible). Doit valoir 0. */
+	UPROPERTY() int32 WaterBedRejects = 0;
+
+	/** PROFIL : noeuds de dalle FORCES par le profil de berge (plateforme + esplanade). */
+	UPROPERTY() int32 QuayProfileNodes = 0;
 };
 
 /** Counts of what GenerateBuildingCollisionCell produced for one cell. */

@@ -1,5 +1,5 @@
 {
- "genere": "2026-08-03T16:00:24",
+ "genere": "2026-08-03T19:48:59",
  "cellSizeM": 500.0,
  "emprise": [
   -1500.0,
@@ -8,27 +8,20 @@
   1500.0
  ],
  "recette": {
-  "regle": "un chemin qui longe (<25 m) le PIED d'un mur de classe quai, mesure du cote BAS au MNT et strictement sous son couronnement (marge 1.5 m), est une promenade de berge. Le troncon est DECOUPE sur ses morceaux mesures : ce qui n'est pas verifie n'est pas peint (correctif iteration utilisateur 2).",
-  "marge_couronnement_m": 1.5,
-  "trou_max_comble_m": 12.0,
-  "sources": [
-   "BD TOPO nature Sentier/Chemin",
-   "OSM footway/path/pedestrian"
-  ],
+  "regle": "CHANTIER FRONTIERE : la promenade est un OFFSET le long de la ligne de berge, cote terre. L'EXISTENCE reste lue dans la donnee (side-car valide) ; seule la GEOMETRIE change. Les interruptions de moins de 80 m sont comblees (continuite).",
+  "offset_bord_m": 4.0,
   "largeur_m": 4.0,
+  "portee_existence_m": 25.0,
+  "trou_comble_max_m": 80.0,
   "longueur_min_m": 15.0,
-  "classe_de_rendu": "gravier (CLS_GRAVIER=4) — classe EXISTANTE du bake, celle des natures etroites BD TOPO ; aucun materiau nouveau",
-  "gradins": {
-   "portee_m": 20.0,
-   "couverture_min": 0.35
-  }
+  "classe_de_rendu": "gravier (CLS_GRAVIER=4) — classe EXISTANTE, aucun materiau nouveau",
+  "source_existence": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Promenade.bak-20260803-frontiere",
+  "source_geometrie": "C:\\Users\\User\\Documents\\Unreal Projects\\CityLab\\SourceData\\Frontiere"
  },
  "totaux": {
-  "troncons": 110,
-  "longueur_m": 5599.9,
-  "murs_quai": 106,
-  "murs_borde_pieton": 43,
-  "morceaux": 122
+  "troncons": 28,
+  "longueur_m": 6093.0,
+  "morceaux": 46
  },
  "cellules": {
   "-3_-3": {
@@ -40,12 +33,12 @@
    "longueur_m": 0
   },
   "-3_-1": {
-   "troncons": 4,
-   "longueur_m": 283.5
+   "troncons": 2,
+   "longueur_m": 306.8
   },
   "-3_0": {
-   "troncons": 6,
-   "longueur_m": 171.9
+   "troncons": 3,
+   "longueur_m": 220.3
   },
   "-3_1": {
    "troncons": 0,
@@ -56,32 +49,32 @@
    "longueur_m": 0
   },
   "-2_-3": {
-   "troncons": 6,
-   "longueur_m": 306.5
+   "troncons": 2,
+   "longueur_m": 380.6
   },
   "-2_-2": {
    "troncons": 0,
    "longueur_m": 0
   },
   "-2_-1": {
-   "troncons": 5,
-   "longueur_m": 227.2
+   "troncons": 3,
+   "longueur_m": 358.2
   },
   "-2_0": {
-   "troncons": 19,
-   "longueur_m": 958.2
+   "troncons": 4,
+   "longueur_m": 756.9
   },
   "-2_1": {
-   "troncons": 2,
-   "longueur_m": 39.3
+   "troncons": 1,
+   "longueur_m": 65.3
   },
   "-2_2": {
-   "troncons": 7,
-   "longueur_m": 640.9
+   "troncons": 1,
+   "longueur_m": 275.1
   },
   "-1_-3": {
    "troncons": 2,
-   "longueur_m": 39.9
+   "longueur_m": 90.3
   },
   "-1_-2": {
    "troncons": 0,
@@ -92,16 +85,16 @@
    "longueur_m": 0
   },
   "-1_0": {
-   "troncons": 14,
-   "longueur_m": 658.3
+   "troncons": 1,
+   "longueur_m": 254.1
   },
   "-1_1": {
-   "troncons": 17,
-   "longueur_m": 800.5
+   "troncons": 1,
+   "longueur_m": 513.3
   },
   "-1_2": {
-   "troncons": 17,
-   "longueur_m": 555.1
+   "troncons": 4,
+   "longueur_m": 835.2
   },
   "0_-3": {
    "troncons": 0,
@@ -124,32 +117,32 @@
    "longueur_m": 0
   },
   "0_2": {
-   "troncons": 4,
-   "longueur_m": 130.3
+   "troncons": 3,
+   "longueur_m": 149.2
   },
   "1_-3": {
-   "troncons": 1,
-   "longueur_m": 20.1
+   "troncons": 2,
+   "longueur_m": 108.8
   },
   "1_-2": {
    "troncons": 2,
-   "longueur_m": 37.3
+   "longueur_m": 159.8
   },
   "1_-1": {
-   "troncons": 1,
-   "longueur_m": 16.1
+   "troncons": 4,
+   "longueur_m": 116.8
   },
   "1_0": {
-   "troncons": 3,
-   "longueur_m": 203.5
+   "troncons": 2,
+   "longueur_m": 349.6
   },
   "1_1": {
-   "troncons": 3,
-   "longueur_m": 190.0
+   "troncons": 2,
+   "longueur_m": 472.4
   },
   "1_2": {
-   "troncons": 5,
-   "longueur_m": 172.6
+   "troncons": 2,
+   "longueur_m": 402.9
   },
   "2_-3": {
    "troncons": 0,
@@ -161,11 +154,11 @@
   },
   "2_-1": {
    "troncons": 2,
-   "longueur_m": 45.2
+   "longueur_m": 129.0
   },
   "2_0": {
-   "troncons": 2,
-   "longueur_m": 48.0
+   "troncons": 3,
+   "longueur_m": 147.9
   },
   "2_1": {
    "troncons": 0,

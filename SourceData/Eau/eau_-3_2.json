@@ -1,1 +1,62 @@
-{"axes":"x = est (m), y = sud (m) ; NORD = -Y","cell":[-3,2],"cellSizeM":500.0,"cote_source":"MNT LiDAR, moyenne sur disque R=40 m RESTREINTE au masque d'eau, marge 25 cm","crs":"local_citylab_equirect_capitole","eau":[{"aire_m2":210.3,"cleabs":"SURF_EAU0000000073052196","nature":"Réservoir-bassin","pts":[[-1000.0,1167.62,139.35],[-1000.0,1133.55,139.35],[-1002.36,1134.82,139.35],[-1003.99,1137.0,139.35],[-1007.97,1138.32,139.35],[-1009.5,1141.04,139.35],[-1010.52,1146.0,139.35],[-1011.03,1146.25,139.35]],"z_max_ngf_m":139.35,"z_min_ngf_m":139.35,"flux":[[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0]]}],"millesime":"BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0) pour l'emprise ; MNT LiDAR HD (SourceData/toulouse10_mnt.png) pour la cote","origin":[-1500.0,1000.0],"z":"pts = [x_m, y_m, z_NGF_m] ; le rebase sur l'origine Unreal se fait cote C++ (AltCapCm) — seul endroit qui connaisse les deux reperes. MNT au Capitole mesure ici : 142.390 m NGF","flux":"direction unitaire de l'ecoulement AVAL par sommet, lue dans BD TOPO troncon_hydrographique (le sens de numerisation EST le sens d'ecoulement) ; [0,0] = aucun troncon a portee"}
+{
+ "axes": "x = est (m), y = sud (m) ; NORD = -Y",
+ "cell": [
+  -3,
+  2
+ ],
+ "cellSizeM": 500.0,
+ "cote_source": "MNT LiDAR, moyenne sur disque R=40 m RESTREINTE au masque d'eau, marge 25 cm",
+ "crs": "local_citylab_equirect_capitole",
+ "eau": [
+  {
+   "aire_m2": 234.4,
+   "cleabs": "SURF_EAU0000000073052196",
+   "flux": [
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     0.0
+    ]
+   ],
+   "nature": "R\u00e9servoir-bassin",
+   "pts": [
+    [
+     -1000.0,
+     1133.55,
+     139.35
+    ],
+    [
+     -1000.0,
+     1167.62,
+     139.35
+    ],
+    [
+     -1013.76,
+     1140.97,
+     139.35
+    ]
+   ],
+   "z_max_ngf_m": 139.35,
+   "z_min_ngf_m": 139.35,
+   "tris": [
+    0,
+    1,
+    2
+   ]
+  }
+ ],
+ "flux": "direction unitaire de l'ecoulement AVAL par sommet, lue dans BD TOPO troncon_hydrographique (le sens de numerisation EST le sens d'ecoulement) ; [0,0] = aucun troncon a portee",
+ "millesime": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0) pour l'emprise ; MNT LiDAR HD (SourceData/toulouse10_mnt.png) pour la cote",
+ "origin": [
+  -1500.0,
+  1000.0
+ ],
+ "z": "pts = [x_m, y_m, z_NGF_m] ; le rebase sur l'origine Unreal se fait cote C++ (AltCapCm) \u2014 seul endroit qui connaisse les deux reperes. MNT au Capitole mesure ici : 142.390 m NGF"
+}

@@ -51,3 +51,11 @@
 2026-08-03 18:33:52  side-car ecrit : 36 cellules (27 non vides), 138 objets, 603418 m2, 2654 sommets
 2026-08-03 18:33:52  ATTENTION : 6 trou(s) interieur(s) ignore(s), 74 m2 (le C++ triangule des anneaux SIMPLES)
 2026-08-03 18:33:52  chrono de cuisson : 33.6 s
+2026-08-03 19:16:58  BD TOPO : 25 polygones retenus, 0 ecartes (-)
+2026-08-03 19:17:11  champ de cote : pas 5 m, rayon 40 m, 28673 points d'eau
+2026-08-03 19:17:11  side-car ecrit : 36 cellules (27 non vides), 52 objets, 632788 m2, 1228 sommets
+2026-08-03 19:17:11  chrono de cuisson : 13.3 s
+2026-08-03 19:32:47  BD TOPO : 25 polygones retenus, 0 ecartes (-)
+2026-08-03 19:33:15  champ de cote : pas 5 m, rayon 40 m, 28673 points d'eau
+2026-08-03 19:33:15  side-car ecrit : 36 cellules (27 non vides), 52 objets, 632788 m2, 1228 sommets
+2026-08-03 19:33:15  chrono de cuisson : 28.5 s

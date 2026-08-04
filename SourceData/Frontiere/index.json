@@ -1,0 +1,253 @@
+{
+ "genere": "2026-08-03T19:41:27",
+ "cellSizeM": 500.0,
+ "emprise": [
+  -1500.0,
+  -1500.0,
+  1500.0,
+  1500.0
+ ],
+ "grilleN": 64,
+ "millesime": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0) : `surface_hydrographique` pour la ligne de berge, `construction_lineaire` (Quai / Mur de soutenement) pour le TYPE ; MNT LiDAR HD pour la cote",
+ "reglages": {
+  "enfoncement_lit_m": 0.5,
+  "marge_rive_m": 0.0,
+  "seuil_type_dur_m": 2.0,
+  "marge_eau_m": 0.25,
+  "plateforme_cap_m": 21.0,
+  "ouvrage_k": 8
+ },
+ "totaux": {
+  "cellules": 36,
+  "cellules_avec_plafond": 27,
+  "noeuds_actifs": 10703,
+  "frontiere_m": 20421.8,
+  "quai_dur_m": 3176.6,
+  "berge_naturelle_m": 17245.2,
+  "brins": 132,
+  "iles": 7,
+  "aire_iles_m2": 42838.6,
+  "coupes_cellule": 0,
+  "noeuds_plateforme": 444,
+  "noeuds_esplanade": 845,
+  "ouvrage_quads": 1408
+ },
+ "cellules": {
+  "-3_-3": {
+   "brins": 2,
+   "frontiere_m": 129.9,
+   "noeuds_plafond": 20,
+   "iles": 0
+  },
+  "-3_-2": {
+   "brins": 7,
+   "frontiere_m": 1273.4,
+   "noeuds_plafond": 230,
+   "iles": 0
+  },
+  "-3_-1": {
+   "brins": 9,
+   "frontiere_m": 1164.9,
+   "noeuds_plafond": 162,
+   "iles": 0
+  },
+  "-3_0": {
+   "brins": 10,
+   "frontiere_m": 1184.9,
+   "noeuds_plafond": 1800,
+   "iles": 0
+  },
+  "-3_1": {
+   "brins": 0,
+   "frontiere_m": 0,
+   "noeuds_plafond": 0,
+   "iles": 0
+  },
+  "-3_2": {
+   "brins": 1,
+   "frontiere_m": 45.6,
+   "noeuds_plafond": 6,
+   "iles": 0
+  },
+  "-2_-3": {
+   "brins": 7,
+   "frontiere_m": 1160.9,
+   "noeuds_plafond": 131,
+   "iles": 0
+  },
+  "-2_-2": {
+   "brins": 5,
+   "frontiere_m": 402.5,
+   "noeuds_plafond": 34,
+   "iles": 0
+  },
+  "-2_-1": {
+   "brins": 4,
+   "frontiere_m": 591.6,
+   "noeuds_plafond": 100,
+   "iles": 0
+  },
+  "-2_0": {
+   "brins": 13,
+   "frontiere_m": 1469.2,
+   "noeuds_plafond": 2034,
+   "iles": 0
+  },
+  "-2_1": {
+   "brins": 3,
+   "frontiere_m": 457.0,
+   "noeuds_plafond": 158,
+   "iles": 0
+  },
+  "-2_2": {
+   "brins": 5,
+   "frontiere_m": 909.2,
+   "noeuds_plafond": 1255,
+   "iles": 2
+  },
+  "-1_-3": {
+   "brins": 2,
+   "frontiere_m": 1047.7,
+   "noeuds_plafond": 148,
+   "iles": 0
+  },
+  "-1_-2": {
+   "brins": 0,
+   "frontiere_m": 0,
+   "noeuds_plafond": 0,
+   "iles": 0
+  },
+  "-1_-1": {
+   "brins": 0,
+   "frontiere_m": 0,
+   "noeuds_plafond": 0,
+   "iles": 0
+  },
+  "-1_0": {
+   "brins": 1,
+   "frontiere_m": 243.3,
+   "noeuds_plafond": 276,
+   "iles": 0
+  },
+  "-1_1": {
+   "brins": 3,
+   "frontiere_m": 590.3,
+   "noeuds_plafond": 1454,
+   "iles": 0
+  },
+  "-1_2": {
+   "brins": 17,
+   "frontiere_m": 2086.9,
+   "noeuds_plafond": 1626,
+   "iles": 3
+  },
+  "0_-3": {
+   "brins": 2,
+   "frontiere_m": 1091.0,
+   "noeuds_plafond": 149,
+   "iles": 0
+  },
+  "0_-2": {
+   "brins": 0,
+   "frontiere_m": 0,
+   "noeuds_plafond": 0,
+   "iles": 0
+  },
+  "0_-1": {
+   "brins": 0,
+   "frontiere_m": 0,
+   "noeuds_plafond": 0,
+   "iles": 0
+  },
+  "0_0": {
+   "brins": 0,
+   "frontiere_m": 0,
+   "noeuds_plafond": 0,
+   "iles": 0
+  },
+  "0_1": {
+   "brins": 2,
+   "frontiere_m": 145.0,
+   "noeuds_plafond": 17,
+   "iles": 0
+  },
+  "0_2": {
+   "brins": 5,
+   "frontiere_m": 178.1,
+   "noeuds_plafond": 10,
+   "iles": 1
+  },
+  "1_-3": {
+   "brins": 2,
+   "frontiere_m": 204.8,
+   "noeuds_plafond": 26,
+   "iles": 0
+  },
+  "1_-2": {
+   "brins": 6,
+   "frontiere_m": 1160.5,
+   "noeuds_plafond": 129,
+   "iles": 0
+  },
+  "1_-1": {
+   "brins": 2,
+   "frontiere_m": 812.5,
+   "noeuds_plafond": 121,
+   "iles": 0
+  },
+  "1_0": {
+   "brins": 2,
+   "frontiere_m": 350.3,
+   "noeuds_plafond": 49,
+   "iles": 0
+  },
+  "1_1": {
+   "brins": 6,
+   "frontiere_m": 1169.9,
+   "noeuds_plafond": 279,
+   "iles": 0
+  },
+  "1_2": {
+   "brins": 7,
+   "frontiere_m": 680.7,
+   "noeuds_plafond": 124,
+   "iles": 1
+  },
+  "2_-3": {
+   "brins": 0,
+   "frontiere_m": 0,
+   "noeuds_plafond": 0,
+   "iles": 0
+  },
+  "2_-2": {
+   "brins": 0,
+   "frontiere_m": 0,
+   "noeuds_plafond": 0,
+   "iles": 0
+  },
+  "2_-1": {
+   "brins": 2,
+   "frontiere_m": 275.5,
+   "noeuds_plafond": 36,
+   "iles": 0
+  },
+  "2_0": {
+   "brins": 4,
+   "frontiere_m": 661.8,
+   "noeuds_plafond": 105,
+   "iles": 0
+  },
+  "2_1": {
+   "brins": 0,
+   "frontiere_m": 0,
+   "noeuds_plafond": 0,
+   "iles": 0
+  },
+  "2_2": {
+   "brins": 3,
+   "frontiere_m": 934.5,
+   "noeuds_plafond": 224,
+   "iles": 0
+  }
+ }
+}
