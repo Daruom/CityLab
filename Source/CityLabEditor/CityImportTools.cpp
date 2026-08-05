@@ -404,30 +404,58 @@ namespace
 	// tablier, puis raccord qui rejoint la dalle a son Z EXACT — l'unique
 	// couture, propre par construction.
 	//
-	// Side-car : `SourceData/Quai/quai_<x>_<y>.json`.
-	//   `masque_quads`  : quads de dalle (GY*GridN+GX) QUI NE SONT PLUS RENDUS ;
-	//   `quads_cm`      : 12 entiers par quad (4 sommets x, y, z en cm) ;
-	//   `quads_uv_cm`   : 8 entiers (4 UV en cm : monde en plan pour un pan
+	// =========================================================================
+	// ⭐ CHANTIER SOL DE BERGE (04/08) — LE FORMAT A CHANGE DE NATURE.
+	//
+	// Ce qui precede reste vrai pour l'HISTOIRE, mais le side-car ne porte plus
+	// une PIECE posee par-dessus la dalle : il porte LA DALLE ELLE-MEME dans la
+	// bande. Un quai n'est pas un objet pose sur le terrain — un quai EST le
+	// terrain. Dans les quads traverses par la bande, la grille reguliere est
+	// remplacee par une TRIANGULATION CONTRAINTE DU QUAD ENTIER, cuite hors
+	// moteur ; les quatre coins du quad restent les NOEUDS DE LA GRILLE et les
+	// seuls autres sommets d'un bord de quad sont les traversees des lignes
+	// contraintes, pre-decoupees sur les lignes de grille — donc partagees a
+	// l'identique par les deux quads voisins. Coutures, trous et chevauchements
+	// sont IMPOSSIBLES par construction, pas corriges.
+	//
+	//   `bande_quads`   : quads de dalle (GY*GridN+GX) que la triangulation
+	//                     REMPLACE. Ce n'est PAS un masque : rien n'est cache
+	//                     derriere, la triangulation EST la couverture (la
+	//                     cuisson mesure 0,00e+00 m2 d'ecart a l'aire du quad) ;
+	//   `tris_cm`       : 9 REELS par triangle (3 sommets x, y, z en cm NGF).
+	//                     REELS et non entiers : le pas de grille vaut 781,25 cm
+	//                     et un arrondi au cm decalerait les coins de 2,5 mm —
+	//                     le partage de sommets ne serait plus EXACT ;
+	//   `tris_uv_cm`    : 6 reels (3 UV en cm : monde en plan pour un pan
 	//                     horizontal, arc x hauteur pour un pan vertical) ;
-	//   `quads_nrm`     : 3 entiers (normale sortante x 1000) ;
-	//   `quads_slot`    : 0 = pan horizontal, 1 = pan vertical (meme pierre) ;
-	//   `apron_cm`      : 9 entiers par triangle — la DALLE qui reste dans les
-	//                     quads masques, au Z que la grille aurait rendu ;
+	//   `tris_slot`     : 0 = pan horizontal (revetement de sol), 1 = pan
+	//                     VERTICAL (pierre de quai — face de quai et face de
+	//                     mur vivent dans le MEME maillage) ;
+	//   `tris_quad`     : le quad de rattachement (index de `bande_quads`) —
+	//                     c'est lui qui permet a `FRenderedGroundZ` de repondre
+	//                     JUSTE sur la nouvelle surface, sans recherche globale ;
+	//   `objets_cm` / `objets_uv_cm` : les GRADINS et les VOLEES. Ce ne sont plus
+	//                     des entailles taillees dans le sol : ce sont des OBJETS
+	//                     POSES SUR le sol, comme les batiments (ils vont dans le
+	//                     mesh `SM_Ground_` de la cellule, pas dans la dalle) ;
 	//   `murs_exclus`   : les murs BD TOPO de classe `quai` que la piece
 	//                     remplace (exclusion PAR TYPE — C1 garde la ville) ;
-	//   `gradins_dm` / `gradins_n` : ce que la piece porte, pour le resume.
-	// DOSSIER ABSENT = AUCUNE PIECE, sans erreur : c'est le contrat des autres
-	// side-cars, et c'est le rollback (effacer le dossier, aucune recompilation).
+	//   `gradins_dm` / `gradins_n` : ce que la bande porte, pour le resume.
+	// DOSSIER ABSENT = AUCUNE BANDE, sans erreur : c'est le contrat des autres
+	// side-cars, et c'est le rollback (effacer le dossier, aucune recompilation :
+	// la bande redevient du drapage regulier historique, bit pour bit).
 	struct FCityQuay
 	{
 		struct FCell
 		{
-			TSet<int32> Masque;
-			TArray<FVector3f> Verts;    // 4 par quad
-			TArray<FVector2f> UVs;      // 4 par quad
-			TArray<FVector3f> Nrm;      // 1 par quad
-			TArray<uint8> Slot;         // 1 par quad
-			TArray<FVector3f> Apron;    // 3 par triangle
+			TSet<int32> Bande;              // quads REMPLACES par la triangulation
+			TArray<FVector3f> Tris;         // 3 sommets par triangle
+			TArray<FVector2f> TriUVs;       // 3 UV par triangle
+			TArray<uint8> TriSlot;          // 1 par triangle
+			TArray<int32> TriQuad;          // 1 par triangle
+			TMap<int32, TArray<int32>> ParQuad;   // quad -> rangs de triangle
+			TArray<FVector3f> Objets;       // 3 sommets par triangle (poses)
+			TArray<FVector2f> ObjUVs;
 			int32 GradinsDm = 0;
 			int32 GradinsN = 0;
 			bool bCharge = false;
@@ -444,9 +472,10 @@ namespace
 		TSet<FString> VoleesConstructeur;
 		mutable TMap<FIntPoint, FCell> Cells;
 		mutable int32 Charges = 0;
-		mutable int32 Quads = 0;
-		mutable int32 ApronTris = 0;
-		mutable int32 QuadsMasques = 0;
+		mutable int32 Triangles = 0;
+		mutable int32 TrisVerticaux = 0;
+		mutable int32 ObjetsTris = 0;
+		mutable int32 QuadsBande = 0;
 
 		void Reset()
 		{
@@ -457,7 +486,7 @@ namespace
 			GridN = 0;
 			AltCapCm = 0.f;
 			bActive = false;
-			Charges = Quads = ApronTris = QuadsMasques = 0;
+			Charges = Triangles = TrisVerticaux = ObjetsTris = QuadsBande = 0;
 		}
 
 		static bool LireEntiers(const TSharedPtr<FJsonObject>& Root, const TCHAR* Champ,
@@ -472,6 +501,29 @@ namespace
 			for (const TSharedPtr<FJsonValue>& V : *Arr)
 			{
 				Out.Add((int32)V->AsNumber());
+			}
+			return true;
+		}
+
+		/**
+		 * SOL DE BERGE : les positions sont des REELS en cm, pas des entiers.
+		 * Le pas de la grille de dalle vaut 781,25 cm — arrondir au cm decalerait
+		 * les coins de quad de 2,5 mm et le partage de sommets avec la grille
+		 * reguliere ne serait plus EXACT. C'est toute la difference entre « une
+		 * couture propre » et « pas de couture ».
+		 */
+		static bool LireReels(const TSharedPtr<FJsonObject>& Root, const TCHAR* Champ,
+			TArray<double>& Out)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+			if (!Root->TryGetArrayField(Champ, Arr))
+			{
+				return false;
+			}
+			Out.Reserve(Arr->Num());
+			for (const TSharedPtr<FJsonValue>& V : *Arr)
+			{
+				Out.Add(V->AsNumber());
 			}
 			return true;
 		}
@@ -511,46 +563,62 @@ namespace
 					Key.X, Key.Y, (int32)G, GridN);
 				return nullptr;
 			}
-			TArray<int32> Q, U, N, S, A, M;
-			LireEntiers(Root, TEXT("masque_quads"), M);
-			LireEntiers(Root, TEXT("quads_cm"), Q);
-			LireEntiers(Root, TEXT("quads_uv_cm"), U);
-			LireEntiers(Root, TEXT("quads_nrm"), N);
-			LireEntiers(Root, TEXT("quads_slot"), S);
-			LireEntiers(Root, TEXT("apron_cm"), A);
-			const int32 NQ = S.Num();
-			if (Q.Num() != NQ * 12 || U.Num() != NQ * 8 || N.Num() != NQ * 3
-				|| (A.Num() % 9) != 0)
+			TArray<int32> B, S, QI;
+			TArray<double> T, U, O, OU;
+			LireEntiers(Root, TEXT("bande_quads"), B);
+			LireEntiers(Root, TEXT("tris_slot"), S);
+			LireEntiers(Root, TEXT("tris_quad"), QI);
+			LireReels(Root, TEXT("tris_cm"), T);
+			LireReels(Root, TEXT("tris_uv_cm"), U);
+			LireReels(Root, TEXT("objets_cm"), O);
+			LireReels(Root, TEXT("objets_uv_cm"), OU);
+			const int32 NT = S.Num();
+			if (T.Num() != NT * 9 || U.Num() != NT * 6 || QI.Num() != NT
+				|| (O.Num() % 9) != 0 || OU.Num() != (O.Num() / 9) * 6)
 			{
 				// Jamais en silence : une taille incoherente se DIT.
 				UE_LOG(LogCityImport, Display,
-					TEXT("Quai %d_%d : tailles incoherentes (quads=%d pos=%d uv=%d nrm=%d apron=%d) — PIECE IGNOREE."),
-					Key.X, Key.Y, NQ, Q.Num(), U.Num(), N.Num(), A.Num());
+					TEXT("Quai %d_%d : tailles incoherentes (tris=%d pos=%d uv=%d quad=%d objets=%d/%d) — BANDE IGNOREE."),
+					Key.X, Key.Y, NT, T.Num(), U.Num(), QI.Num(), O.Num(), OU.Num());
 				return nullptr;
 			}
-			for (const int32 V : M)
+			for (const int32 V : B)
 			{
-				Slot.Masque.Add(V);
+				Slot.Bande.Add(V);
 			}
-			Slot.Verts.Reserve(NQ * 4);
-			Slot.UVs.Reserve(NQ * 4);
-			for (int32 i = 0; i < NQ; ++i)
+			Slot.Tris.Reserve(NT * 3);
+			Slot.TriUVs.Reserve(NT * 3);
+			Slot.TriSlot.Reserve(NT);
+			Slot.TriQuad.Reserve(NT);
+			for (int32 i = 0; i < NT; ++i)
 			{
-				for (int32 c = 0; c < 4; ++c)
+				for (int32 c = 0; c < 3; ++c)
 				{
-					Slot.Verts.Add(FVector3f((float)Q[i * 12 + c * 3], (float)Q[i * 12 + c * 3 + 1],
-						(float)Q[i * 12 + c * 3 + 2] - AltCapCm));
-					Slot.UVs.Add(FVector2f((float)U[i * 8 + c * 2] * 0.01f,
-						(float)U[i * 8 + c * 2 + 1] * 0.01f));
+					Slot.Tris.Add(FVector3f((float)T[i * 9 + c * 3], (float)T[i * 9 + c * 3 + 1],
+						(float)T[i * 9 + c * 3 + 2] - AltCapCm));
+					Slot.TriUVs.Add(FVector2f((float)(U[i * 6 + c * 2] * 0.01),
+						(float)(U[i * 6 + c * 2 + 1] * 0.01)));
 				}
-				Slot.Nrm.Add(FVector3f((float)N[i * 3] * 0.001f, (float)N[i * 3 + 1] * 0.001f,
-					(float)N[i * 3 + 2] * 0.001f).GetSafeNormal());
-				Slot.Slot.Add((uint8)S[i]);
+				Slot.TriSlot.Add((uint8)S[i]);
+				Slot.TriQuad.Add(QI[i]);
+				// L'INDEX PAR QUAD : c'est ce qui rend `FRenderedGroundZ` juste
+				// sur la nouvelle surface a cout constant (un triangle appartient
+				// a UN seul quad, par construction de la cuisson).
+				if (S[i] == 0)
+				{
+					Slot.ParQuad.FindOrAdd(QI[i]).Add(i);
+				}
+				TrisVerticaux += (S[i] != 0) ? 1 : 0;
 			}
-			Slot.Apron.Reserve(A.Num() / 3);
-			for (int32 i = 0; i + 2 < A.Num(); i += 3)
+			Slot.Objets.Reserve(O.Num() / 3);
+			for (int32 i = 0; i + 2 < O.Num(); i += 3)
 			{
-				Slot.Apron.Add(FVector3f((float)A[i], (float)A[i + 1], (float)A[i + 2] - AltCapCm));
+				Slot.Objets.Add(FVector3f((float)O[i], (float)O[i + 1], (float)O[i + 2] - AltCapCm));
+			}
+			Slot.ObjUVs.Reserve(OU.Num() / 2);
+			for (int32 i = 0; i + 1 < OU.Num(); i += 2)
+			{
+				Slot.ObjUVs.Add(FVector2f((float)(OU[i] * 0.01), (float)(OU[i + 1] * 0.01)));
 			}
 			double D = 0.0;
 			Root->TryGetNumberField(TEXT("gradins_dm"), D);
@@ -563,10 +631,73 @@ namespace
 			// arriverait trop tard).
 			Slot.bCharge = true;
 			++Charges;
-			Quads += NQ;
-			ApronTris += Slot.Apron.Num() / 3;
-			QuadsMasques += Slot.Masque.Num();
+			Triangles += NT;
+			ObjetsTris += Slot.Objets.Num() / 3;
+			QuadsBande += Slot.Bande.Num();
 			return &Slot;
+		}
+
+		/**
+		 * ⭐ LE POINT DUR DU CHANTIER : LES LECTEURS DU SOL.
+		 * Z (Unreal cm) de la surface de bande sous (Xcm, Ycm), ou -inf si le
+		 * point n'est pas dans un quad de bande. Le triangle est cherche dans le
+		 * SEUL quad qui peut le contenir. Quand plusieurs pans horizontaux se
+		 * superposent en plan (jamais dans la bande : la cuisson mesure 0,00e+00
+		 * m2 de recouvrement — mais la garde reste), on rend LE PLUS HAUT : c'est
+		 * la meme regle que le lancer de rayon de la vegetation.
+		 */
+		float SurfaceZ(double Xcm, double Ycm, float CellCm) const
+		{
+			if (!bActive || GridN <= 0 || CellCm <= 0.f)
+			{
+				return TNumericLimits<float>::Lowest();
+			}
+			const double Step = (double)CellCm / (double)GridN;
+			const FIntPoint Key((int32)FMath::FloorToDouble(Xcm / (double)CellCm),
+				(int32)FMath::FloorToDouble(Ycm / (double)CellCm));
+			const FCell* C = Cellule(Key);
+			if (!C)
+			{
+				return TNumericLimits<float>::Lowest();
+			}
+			const int32 GX = (int32)FMath::FloorToDouble(
+				(Xcm - (double)Key.X * CellCm) / Step);
+			const int32 GY = (int32)FMath::FloorToDouble(
+				(Ycm - (double)Key.Y * CellCm) / Step);
+			if (GX < 0 || GY < 0 || GX >= GridN || GY >= GridN)
+			{
+				return TNumericLimits<float>::Lowest();
+			}
+			const TArray<int32>* Rangs = C->ParQuad.Find(GY * GridN + GX);
+			if (!Rangs)
+			{
+				return TNumericLimits<float>::Lowest();
+			}
+			float Best = TNumericLimits<float>::Lowest();
+			for (const int32 R : *Rangs)
+			{
+				const FVector3f& A = C->Tris[R * 3];
+				const FVector3f& B2 = C->Tris[R * 3 + 1];
+				const FVector3f& C2 = C->Tris[R * 3 + 2];
+				const double D = (double)(B2.Y - C2.Y) * (A.X - C2.X)
+					+ (double)(C2.X - B2.X) * (A.Y - C2.Y);
+				if (FMath::Abs(D) < 1e-9)
+				{
+					continue;
+				}
+				const double L1 = ((double)(B2.Y - C2.Y) * (Xcm - C2.X)
+					+ (double)(C2.X - B2.X) * (Ycm - C2.Y)) / D;
+				const double L2 = ((double)(C2.Y - A.Y) * (Xcm - C2.X)
+					+ (double)(A.X - C2.X) * (Ycm - C2.Y)) / D;
+				const double L3 = 1.0 - L1 - L2;
+				if (L1 < -1e-6 || L2 < -1e-6 || L3 < -1e-6)
+				{
+					continue;
+				}
+				Best = FMath::Max(Best,
+					(float)(L1 * A.Z + L2 * B2.Z + L3 * C2.Z));
+			}
+			return Best;
 		}
 	};
 
@@ -765,12 +896,19 @@ namespace
 	{
 		const FDrapeContext* Drape = nullptr;
 		float StepCm = 0.f;   // pas de la grille de dalle ; 0 = pas de discretisation
+		// ⭐ SOL DE BERGE : la taille de cellule, pour interroger la bande. 0 =
+		// aucune bande consultee (comportement historique, bit pour bit).
+		float CelluleCm = 0.f;
 
 		void Init(const FDrapeContext& InDrape, int32 GroundGridN, float CellCm)
 		{
 			Drape = &InDrape;
 			const int32 GridN = FMath::Clamp(GroundGridN, 1, 256);
 			StepCm = (CellCm > 0.f) ? CellCm / (float)GridN : 0.f;
+			// La bande n'est consultee que si sa cuisson est accordee a CETTE
+			// grille — sinon on ne sait pas de quoi on parle et on se tait.
+			const FCityQuay& Q = QuaySingleton();
+			CelluleCm = (Q.bActive && Q.GridN == GridN) ? CellCm : 0.f;
 		}
 
 		bool IsDiscretized() const
@@ -786,6 +924,20 @@ namespace
 
 		float At(double Xcm, double Ycm) const
 		{
+			// ⭐ SOL DE BERGE — LES LECTEURS DU SOL REPONDENT SUR LA VRAIE
+			// SURFACE. Dans la bande, la surface rendue n'est plus la grille :
+			// c'est la triangulation contrainte. Escaliers, gradins, vegetation
+			// et murs hors bande en dependent — s'ils continuaient a lire la
+			// grille, ils se poseraient sur un terrain qui n'existe plus.
+			// HORS bande, `SurfaceZ` rend -inf et rien ne change, bit pour bit.
+			if (CelluleCm > 0.f)
+			{
+				const float ZB = QuaySingleton().SurfaceZ(Xcm, Ycm, CelluleCm);
+				if (ZB > TNumericLimits<float>::Lowest())
+				{
+					return ZB;
+				}
+			}
 			if (!IsDiscretized())
 			{
 				return RawZ(Xcm, Ycm);
@@ -11302,7 +11454,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 						continue;
 					}
 					const FCityQuay::FCell* QC = Quay.Cellule(Key);
-					if (!QC || QC->Slot.Num() == 0)
+					if (!QC || QC->Objets.Num() < 3)
 					{
 						continue;
 					}
@@ -11310,35 +11462,24 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 					FCityMeshBuilder& QB = GetInKey(GroundCells, Key, bLinearColors, bWorldUVs);
 					const FPolygonGroupID Grp = QB.GetOrCreateGroup(QuaySurf->SlotName(),
 						QuaySurf->Material);
-					for (int32 q = 0; q < QC->Slot.Num(); ++q)
+					// ⭐ SOL DE BERGE — GRADINS ET VOLEES SONT DES OBJETS POSES.
+					// Ils ne decoupent plus le sol : le sol est sain, ils s'y
+					// appuient, exactement comme un batiment sur son terrain. La
+					// promenade s'est elargie sous eux (le mur a recule de
+					// nu x 0,70 m) et le bloc remplit la difference.
+					for (int32 t = 0; t + 2 < QC->Objets.Num(); t += 3)
 					{
-						FVector3f C[4];
-						FVector2f UV[4];
-						int32 Num = 0;
-						for (int32 c = 0; c < 4; ++c)
+						const FVector3f C[3] = { QC->Objets[t], QC->Objets[t + 1],
+												 QC->Objets[t + 2] };
+						FVector3f Nor = FVector3f::CrossProduct(C[1] - C[0], C[2] - C[0]);
+						if (Nor.SizeSquared() < 1e-6f)
 						{
-							const FVector3f& P = QC->Verts[q * 4 + c];
-							// Un pan degenere (largeur nulle : pas de plateforme,
-							// giron nul hors emprise de gradins) rend deux coins
-							// confondus : on retombe alors sur un TRIANGLE plutot
-							// que de livrer un polygone degenere au MeshDescription.
-							if (Num > 0 && (P - C[Num - 1]).SizeSquared() < 1.f)
-							{
-								continue;
-							}
-							C[Num] = P;
-							UV[Num] = QC->UVs[q * 4 + c];
-							++Num;
+							continue;    // marche degeneree : rien a poser
 						}
-						if (Num == 4 && (C[3] - C[0]).SizeSquared() < 1.f)
-						{
-							--Num;
-						}
-						if (Num < 3)
-						{
-							continue;
-						}
-						QB.AddPoly(Grp, C, Num, QC->Nrm[q], UV, QuayTint);
+						Nor.Normalize();
+						const FVector2f UV[3] = { QC->ObjUVs[t], QC->ObjUVs[t + 1],
+												  QC->ObjUVs[t + 2] };
+						QB.AddPoly(Grp, C, 3, Nor, UV, QuayTint);
 						++PoseQuads;
 					}
 					TierDm += QC->GradinsDm;
@@ -11360,9 +11501,9 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				Summary.QuayTierWalls += TierPieces;
 			}
 			UE_LOG(LogCityImport, Display,
-				TEXT("BUILDQUAY : %d pans poses sur %d cellules (%d quads de dalle masques, %d triangles de tablier) ; gradins tailles dans la piece : %.1f m, %d gradins, %d pieces."),
-				PoseQuads, PoseCells, Quay.QuadsMasques, Quay.ApronTris,
-				TierDm * 0.1f, TierN, TierPieces);
+				TEXT("SOL DE BERGE : %d triangles d'OBJET poses sur %d cellules (gradins et volees, %.1f m, %d assises, %d pieces) ; la BANDE, elle, est le sol : %d quads triangules, %d triangles dont %d de face verticale, %d quads masques (le mecanisme a disparu)."),
+				PoseQuads, PoseCells, TierDm * 0.1f, TierN, TierPieces,
+				Quay.QuadsBande, Quay.Triangles, Quay.TrisVerticaux, 0);
 		}
 		else if (Quay.bActive)
 		{
@@ -11654,6 +11795,11 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	// suffit (aucun champ ajoute au resume : pas de changement de layout).
 	int32 OuvrageQuadsCedes = 0;
 	int32 OuvrageSousQuads = 0;
+	// ⭐ SOL DE BERGE : la PIERRE DE QUAI des faces verticales. C'est le materiau
+	// des bordures et des murs (`GSurfCurb`) — aucune matiere nouvelle, une seule
+	// grammaire minerale. Nul (bSurfaceMaterials faux) = les faces retombent dans
+	// le groupe de la dalle plutot que de disparaitre.
+	const FResolvedSurface* QuayStone = Surfaces.Resolve(&GSurfCurb);
 	auto BuildGroundGrid = [&](FCityMeshBuilder& Builder, const FIntPoint& Key, int32 GridN, bool bPaint,
 		const FResolvedSurface* Surf)
 	{
@@ -11675,13 +11821,15 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				Ouv = G;
 			}
 		}
-		// ⭐ BUILDQUAY — DANS L'EMPRISE DE LA PIECE, LA DALLE N'EXISTE PLUS.
+		// ⭐ SOL DE BERGE — DANS LA BANDE, LE QUAD N'EST PLUS UNE GRILLE : C'EST
+		// UNE TRIANGULATION CONTRAINTE. Ce n'est PAS un masquage — il n'y a rien
+		// derriere : la triangulation couvre le quad ENTIER (la cuisson mesure
+		// 0,00e+00 m2 d'ecart a l'aire du quad), coins compris, et ses coins SONT
+		// les noeuds de la grille au meme Z. La couture n'est pas propre : elle
+		// n'existe pas.
 		// Uniquement sur la grille de RENDU (celle a laquelle la cuisson est
 		// accordee) : le mesh de COLLISION, cuit a une autre maille, garde le
-		// drapage historique — il n'est jamais rendu, et c'est lui qui porte le
-		// joueur. Les quads que la piece ne recouvre qu'EN PARTIE sont rendus
-		// par le TABLIER (`Apron`), au Z que la grille aurait rendu : la couture
-		// tombe alors sur des aretes de quad entre deux noeuds, donc exacte.
+		// drapage historique — il n'est jamais rendu.
 		const FCityQuay& Quay = QuaySingleton();
 		const FCityQuay::FCell* QCell =
 			(Quay.bActive && GridN == Quay.GridN) ? Quay.Cellule(Key) : nullptr;
@@ -11689,9 +11837,9 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		{
 			for (int32 GX = 0; GX < GridN; ++GX)
 			{
-				if (QCell && QCell->Masque.Contains(GY * GridN + GX))
+				if (QCell && QCell->Bande.Contains(GY * GridN + GX))
 				{
-					continue;    // la piece et son tablier rendent a sa place
+					continue;    // la triangulation contrainte rend ce quad
 				}
 				if (Ouv && Ouv->OuvrageQuads.Contains(GY * GridN + GX))
 				{
@@ -11724,28 +11872,48 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				Builder.AddPolyPerVertexColors(Group, C, 4, FVector3f(0, 0, 1), UV, Cols);
 			}
 		}
-		// ⭐ BUILDQUAY — LE TABLIER DE DALLE : ce qui reste des quads masques, en
-		// DEHORS de la piece. Meme groupe, meme materiau, meme UV0 metrique monde
-		// et meme peinture de sommet que la dalle : la maquette du sol (masques)
-		// continue de s'appliquer mot pour mot HORS de l'emprise.
-		if (QCell)
+		// ⭐ SOL DE BERGE — LA TRIANGULATION CONTRAINTE, dans le MEME maillage de
+		// dalle. Les pans HORIZONTAUX vont dans le groupe de la cellule (meme
+		// materiau, meme UV0 metrique monde, meme peinture de sommet : la
+		// maquette du sol continue de s'appliquer mot pour mot) ; les pans
+		// VERTICAUX — face de quai et face de mur — vont dans le groupe de la
+		// PIERRE DE QUAI, celui des bordures et des murs. Aucune classe, aucune
+		// matiere nouvelle, et UNE SEULE SURFACE.
+		if (QCell && QCell->TriSlot.Num() > 0)
 		{
-			for (int32 t = 0; t + 2 < QCell->Apron.Num(); t += 3)
+			const FPolygonGroupID Pierre = QuayStone
+				? Builder.GetOrCreateGroup(QuayStone->SlotName(), QuayStone->Material)
+				: Group;
+			const FVector3f PierreTeinte(0.85f, 0.85f, 0.80f);
+			for (int32 t = 0; t < QCell->TriSlot.Num(); ++t)
 			{
-				const FVector3f C[3] = { QCell->Apron[t], QCell->Apron[t + 1],
-										 QCell->Apron[t + 2] };
+				const bool bVertical = (QCell->TriSlot[t] != 0);
+				const FVector3f C[3] = { QCell->Tris[t * 3], QCell->Tris[t * 3 + 1],
+										 QCell->Tris[t * 3 + 2] };
+				// La normale vient de l'ENROULEMENT (la cuisson l'a ordonne) :
+				// aucun test de cote dans le moteur.
+				FVector3f Nor = FVector3f::CrossProduct(C[1] - C[0], C[2] - C[0]);
+				if (Nor.SizeSquared() < 1e-6f)
+				{
+					continue;    // triangle degenere : rien a poser
+				}
+				Nor.Normalize();
 				FVector2f UV[3];
 				FVector3f Cols[3];
 				for (int32 c = 0; c < 3; ++c)
 				{
-					UV[c] = Surf ? FVector2f(C[c].X * 0.01f, C[c].Y * 0.01f)
-								 : FVector2f((float)c, 0.f);
-					const FVector3f Base2 = bPaint ? SampleGround(FVector2D(C[c].X, C[c].Y))
-												   : SlabBase;
-					Cols[c] = bBakedShade ? Shade(Base2, FVector3f(0, 0, 1), 0.f) : Base2;
+					UV[c] = Surf || bVertical ? QCell->TriUVs[t * 3 + c]
+											  : FVector2f((float)c, 0.f);
+					const FVector3f Base2 = bVertical
+						? PierreTeinte
+						: (bPaint ? SampleGround(FVector2D(C[c].X, C[c].Y)) : SlabBase);
+					Cols[c] = bBakedShade ? Shade(Base2, Nor, 0.f) : Base2;
 				}
-				Builder.AddPolyPerVertexColors(Group, C, 3, FVector3f(0, 0, 1), UV, Cols);
+				Builder.AddPolyPerVertexColors(bVertical ? Pierre : Group, C, 3, Nor,
+					UV, Cols);
+				++OuvrageSousQuads;
 			}
+			OuvrageQuadsCedes += QCell->Bande.Num();
 		}
 		if (!Ouv)
 		{
@@ -11870,8 +12038,8 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		SlabActor->SetActorLabel(SlabName);
 	}
 	UE_LOG(LogCityImport, Display,
-		TEXT("OUVRAGE DE BERGE : %d quads de dalle ont cede la place, %d sous-quads poses au pas fin. "
-			 "Cause mesuree : la grille de noeuds ne peut pas porter une bande plate a cote d'une marche de ~6,5 m."),
+		TEXT("SOL DE BERGE : %d quads de dalle sont rendus par la TRIANGULATION CONTRAINTE (%d triangles poses dans le meme maillage de dalle). "
+			 "Ce ne sont pas des quads masques : la triangulation couvre le quad ENTIER, coins compris, et ses coins SONT les noeuds de la grille."),
 		OuvrageQuadsCedes, OuvrageSousQuads);
 
 	// --- Rubans routiers : SANS collision (films visuels 55-80 cm au-dessus de la

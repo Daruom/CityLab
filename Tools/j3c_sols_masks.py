@@ -110,6 +110,15 @@ PROMENADE_ON = True        # False = rollback complet, sans re-cuire le side-car
 # Drapeau de rollback SANS re-cuisson : remettre True.
 PEINTURE_BANDE_QUAI = False
 FRONTIERE_DIR = os.path.join(SRC, "Frontiere")
+# --- LOT ZONE / A2 : LE POLYGONE D'EAU GAGNE (regle NATIONALE, 2026-08-05).
+# « A l'interieur de `surface_hydrographique`, aucune classe de sol TERRESTRE
+# n'est peinte. » `corridor`/`chaussee` et `herbe` soustrayaient deja l'eau ;
+# `gravier` et `privee`, calcules sur la ZONE, ne la soustrayaient PAS — et la
+# promenade de berge en etait explicitement exemptee. Un tampon de voie etroite
+# ou de voirie privee pouvait donc etre peint en plein fleuve (mesure du lot
+# NOEUD sur `TRAV_22_O`). Soustraction VECTORIELLE, avant toute rasterisation.
+# False = rollback complet, sans re-cuire quoi que ce soit d'autre.
+EAU_GAGNE = True
 # --- LOT FINITION QUAIS : UN OUVRAGE NE SE PEINT PAS SUR LE SOL ---------------
 # REGLE NATIONALE : un troncon de route qui appartient a un OUVRAGE (la chaine
 # connexe du side-car SourceData/Ponts, celle-la meme qui porte le tablier 3D du
@@ -1622,6 +1631,33 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
                 # retrait du bati dans classes_de_cellule).
                 privee = C.valide(privee.difference(bande))
 
+    # --- LOT ZONE / A2 : LE POLYGONE D'EAU GAGNE. REGLE NATIONALE.
+    # « A l'interieur de `surface_hydrographique`, aucune classe de sol TERRESTRE
+    # n'est peinte. » Le conflit etait un conflit de SOURCES jamais arbitre :
+    # `corridor` (donc `chaussee`) et `herbe` soustrayaient deja l'eau, mais
+    # `gravier` et `privee` se calculent sur la ZONE (`b_etroite ∩ zone`,
+    # `b_large ∩ zone - corridor`) — un tampon de voie etroite ou de voirie privee
+    # pouvait donc etre peint EN PLEIN FLEUVE. Mesure du lot NOEUD : sur
+    # `TRAV_22_O`, un pavage se lit a l'interieur du polygone d'eau BD TOPO.
+    # La soustraction est VECTORIELLE et PRECEDE toute rasterisation, comme celle
+    # de `bande_quai` : le residu dans l'eau est 0 par construction, pas par
+    # arrondi de pixel.
+    # Elle vient APRES la promenade : la promenade de berge etait explicitement
+    # exemptee (« c'est le polygone d'eau qui doit ceder au bord ») — cette
+    # exemption TOMBE, c'est l'objet de la regle. Elle vient AVANT `bande_quai`
+    # (deux soustractions, l'ordre est sans effet sur le resultat).
+    # Drapeau de rollback SANS re-cuisson : remettre False.
+    loc_verts = [v for v in (verts or []) if v.intersects(zone)]
+    u_eau = C.valide(unary_union(loc_eau)) if loc_eau else None
+    eau_retiree = {"gravier": 0.0, "privee": 0.0}
+    if EAU_GAGNE and u_eau is not None and not u_eau.is_empty:
+        av_g = gravier.intersection(cell_box).area
+        av_p = privee.intersection(cell_box).area
+        gravier = C.valide(gravier.difference(u_eau))
+        privee = C.valide(privee.difference(u_eau))
+        eau_retiree["gravier"] = av_g - gravier.intersection(cell_box).area
+        eau_retiree["privee"] = av_p - privee.intersection(cell_box).area
+
     # --- LOT SIMPLIFICATION : la BANDE DE QUAI ne porte plus de beige.
     # Elle vient APRES la promenade, donc elle eteint aussi la promenade qui
     # tombe dans la bande — c'est exactement ce qui est demande. Hors bande,
@@ -1638,8 +1674,6 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
     # herbe = union(OCS GE CS2.*) - chaussee - privee - gravier - bati - eau, puis
     # ouverture morphologique vectorielle de HERBE_OUVERTURE_M. La soustraction se
     # fait contre LA GEOMETRIE MEME qui sera peinte : deborder est impossible.
-    loc_verts = [v for v in (verts or []) if v.intersects(zone)]
-    u_eau = C.valide(unary_union(loc_eau)) if loc_eau else None
 
     def herbe_brute(emprise, verts_loc, ch, pr, gr, ub, eau, ouvrir=True):
         """Herbe telle que la donne le RELEVE : union OCS GE moins tout ce qui est
@@ -1781,6 +1815,8 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
         "promenadeM2": round(aire_prom, 1),
         # LOT SIMPLIFICATION : m2 de beige ETEINTS sur la bande de quai.
         "bandeQuaiEteinteM2": round(aire_bande_eteinte, 1),
+        # LOT ZONE / A2 : m2 de classe TERRESTRE retires du polygone d'eau.
+        "eauGagneM2": {k: round(v, 1) for k, v in eau_retiree.items()},
     }
     js = os.path.join(OUT_DIR, "sols_%d_%d.json" % (cx, cy))
     with open(js, "w", encoding="utf-8") as f:
@@ -1820,6 +1856,7 @@ def cuire_cellule(cx, cy, parcelles, eaux, routes, noeuds_pp, batis=None, verts=
             "areasM2": aires, "herbeRasterM2": round(aire_herbe_png, 1),
             "promenadeM2": round(aire_prom, 1),
             "bandeQuaiEteinteM2": round(aire_bande_eteinte, 1),
+            "eauGagneM2": {k: round(v, 1) for k, v in eau_retiree.items()},
             "herbeEcartPc": round(ecart_pc, 3),
             "herbeReleveM2": round(aire_releve, 1),
             "herbeRegulM2": round(aire_regul - aire_releve, 1),
@@ -2647,6 +2684,15 @@ def main():
     log("QUAIS V3 : %d m2 de PROMENADE DE BERGE dans la classe gravier, sur %d cellules"
         % (sum(r.get("promenadeM2", 0.0) for r in resume),
            sum(1 for r in resume if r.get("promenadeM2", 0.0) > 0.0)))
+    log("EAU GAGNE (lot ZONE / A2, regle nationale) : %.1f m2 de classe "
+        "TERRESTRE retires du polygone d'eau BD TOPO -- gravier %.1f m2, "
+        "voirie privee %.1f m2 -- sur %d cellules concernees (drapeau "
+        "EAU_GAGNE=%s)"
+        % (sum(sum(r.get("eauGagneM2", {}).values()) for r in resume),
+           sum(r.get("eauGagneM2", {}).get("gravier", 0.0) for r in resume),
+           sum(r.get("eauGagneM2", {}).get("privee", 0.0) for r in resume),
+           sum(1 for r in resume
+               if sum(r.get("eauGagneM2", {}).values()) > 0.0), EAU_GAGNE))
     log("PEINT   : %d m2 de chaussee, %d m2 de voirie privee, %d m2 de gravier, "
         "%d m2 d'HERBE (ecart raster max %.2f %%)"
         % (sum(r["areasM2"]["chaussee"] for r in resume),

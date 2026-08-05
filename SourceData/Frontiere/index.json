@@ -10,7 +10,7 @@
  "grilleN": 64,
  "millesime": "BD TOPO 3.5 GPKG LAMB93 D031 ED2026-06-15 (IGN, Licence Ouverte 2.0) : `surface_hydrographique` pour la ligne de berge, `construction_lineaire` (Quai / Mur de soutenement) pour le TYPE ; MNT LiDAR HD pour la cote",
  "reglages": {
-  "enfoncement_lit_m": 0.5,
+  "enfoncement_lit_m": 2.5,
   "marge_rive_m": 0.0,
   "seuil_type_dur_m": 2.0,
   "marge_eau_m": 0.25,
