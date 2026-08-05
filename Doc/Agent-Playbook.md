@@ -364,6 +364,25 @@ avant une spec d'automation · avant toute campagne de mesure · après une sér
 dès qu'un comportement devient inexplicable. Cycle scripté : `work/VELOCITE/vel_cycle.ps1`
 (`-Fermer -Builder -Ouvrir`, chronos écrits dans `chronos.log`).
 
+### 11.3 ter ⭐ LA VOIE LA PLUS RAPIDE : ne pas toucher au C++ du tout
+**Doctrine (chantiers PONTS/QUAI/BLOC, 03-05/08) : la CUISSON livre la géométrie, le
+MOTEUR ne fait que POSER.** Le side-car porte les triangles/quads/cotes déjà calculés ;
+le C++ lit, valide, instancie. Conséquence mesurée : les itérations 1 à 3 du chantier BLOC
+ont tourné **sans aucun build ET sans Live Coding** — boucle complète **1 min 36**
+(cuisson 3-11 s + bake des masques 22-24 s + régé district 21-23 s).
+
+| type de changement | voie | coût |
+|---|---|---|
+| **règle géométrique, seuil, profil, emprise, matériau d'ouvrage** | **cuisson Python + régé district** | **~1 min 30** |
+| corps de fonction C++ | Live Coding (§11.3) | ~2 min |
+| layout / `.h` / champ de profil | cycle complet (§11.3 bis) | ~2 min 20 |
+
+**À la CONCEPTION d'un chantier, pousser le maximum de logique dans la cuisson** : c'est ce
+qui transforme un réglage en itération de 90 s au lieu d'un cycle éditeur. Corollaire de
+sûreté : le C++ reste un poseur bête (lecture + validation + instanciation), donc beaucoup
+plus difficile à casser — et la loi §13.1 (aucune nappe lissée) se vérifie par relecture
+d'un seul fichier Python.
+
 ### 11.4 Les chronos à attendre (proto 3×3, 36 cellules, 1,25 M d'instances)
 
 | itération | chrono mesuré |
