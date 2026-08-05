@@ -477,3 +477,110 @@ n'a été demandé. Rollback **sans rebuild** : `FCityGenProfile::bVegCollisionH
   les blocs lointains disparaissent en vol haut). Ce que le lot PIE lui apprend : le budget de
   streaming se compte en **instances physiques**, pas en acteurs ni en sous-niveaux — 16
   sous-niveaux chargés en permanence ne coûtent rien par eux-mêmes.
+
+---
+
+## 13. ⭐⭐ DOCTRINE DE CONSTRUCTION GÉOMÉTRIQUE (04-05/08 — payée par 14 tentatives sur la berge)
+
+> Contexte : la bande de berge Saint-Pierre → Daurade a demandé **14 chantiers en 36 h**
+> alors que bâtiments (20 780), sols (9 km²) et arbres n'ont eu **qu'une règle chacun**.
+> Les six lois ci-dessous sont l'écart entre les deux. **Les lire AVANT tout chantier
+> de géométrie.**
+
+### 13.1 ⛔ LOI DES NAPPES — aucune nappe lissée ne raccorde deux choses. JAMAIS.
+Une nappe tendue entre deux courbes non parallèles est une **surface réglée gauche** :
+courbe **par construction**, quels que soient les réglages. C'est la cause n°1 des
+« bosses », « terrain curvé », « ondulations » signalés 6 fois par l'utilisateur.
+Deux coupables identifiés et supprimés : la région *esplanade* (sol de ville régénéré,
+41 ha) et la *pente lissée* `berge_naturelle`.
+- **Interdit** : interpoler/lisser **en Z** entre deux valeurs mesurées.
+- **Permis** : des **CONSTANTES par zone** — promenade plate **par bief**, **un seul jeu
+  de marches par emprise**, niveau 0 constant par emprise. Une constante n'est pas une nappe.
+- **Permis** : régulariser le **contour EN PLAN** (patron `q1_regul`) — ça ne crée aucune
+  surface gauche. *Le plan oui, le Z non.*
+- **Acceptation structurelle** : dans la zone construite, **toute face est HORIZONTALE ou
+  VERTICALE** (mesuré sur le maillage exporté) + **0 appel de lissage en Z** (relecture).
+  La courbure devient *impossible*, pas *corrigée*.
+
+### 13.2 ⛔ LOI DE COMPOSITION — le sol ne cède jamais ; les objets se POSENT
+Deux façons de composer un objet avec le sol :
+- **SOUSTRACTIVE** (ce qui a échoué 10 fois) : l'objet remplace un morceau de sol (quads
+  masqués, découpes, zones cédées). Chaque frontière de responsabilité est une couture
+  vivante → 1 cm de désaccord = trou (on voit le ciel) ou chevauchement.
+- **ADDITIVE** (ce qui n'a jamais failli : les bâtiments) : le sol reste **complet dessous**,
+  l'objet se pose et s'enterre un peu (patron `SocleCm`). **Le recouvrement est bénin,
+  le vide est fatal.**
+**Exception unique** : ce qui passe SOUS le sol (tunnels, trémie Saint-Cyprien) exige une
+vraie découpe → chantier à part entière, avec cette conscience-là.
+
+### 13.3 ⛔ LOI D'ORIENTATION — le côté se décide par POINT-DANS-POLYGONE
+Sur une **emprise FERMÉE** (contour d'eau, cour de bâtiment), jamais par une **normale de
+segment** : une normale se retourne dans les virages serrés (3 occurrences payées, dont
+73 murs/239 et « la promenade construite dans le sens contraire »).
+**Acceptation** : 0 test de normale directionnelle dans le code de côté (prouvé par
+relecture) + échantillonnage point-in-polygon des faces (0 à l'envers).
+
+### 13.4 ⛔ LOI DES BORNES — ne régénérer QUE ce qui n'existe pas
+Le sol de ville et l'eau **existent déjà et fonctionnent** : on **borne dessus**, on ne les
+refait pas. Inventer un niveau intermédiaire (« esplanade ») a coûté 5 lots.
+Formulation utilisateur, qui fait autorité : *« Niveau 0 = le sol habituel, il existe déjà.
+Niveau −1 = la promenade, un long bloc plat. Niveau −2 = l'eau. »* → **un seul objet à
+fabriquer**, borné en haut et en bas par de l'existant.
+
+### 13.5 ⛔ LOI DES EXTRÉMITÉS — toute extrémité libre reçoit une face de fermeture
+Sinon on voit l'intérieur (« espaces ouverts, pas de mur »). Bouchons aux **VRAIS bouts**,
+jamais aux coupes de cellule (piège déjà payé sur les murs : 4 bouchons au lieu de 2, dont
+deux dos à dos au milieu d'un mur).
+
+### 13.6 ⛔ RÈGLE D'EXISTENCE — « pas de donnée, pas d'objet », appliquée aussi au RELIEF
+Le bloc de quai n'existe que là où le sol de ville domine le niveau −1 d'au moins 0,50 m
+(**52,8 % du linéaire n'a rien à générer** : la berge y est naturellement basse).
+⚠️ Ne se retourne PAS en « ouvrage présent, plus d'objet » : le chevauchement d'une fosse
+d'arbre par un couronnement se corrige en **rétrécissant l'ouvrage**, pas en supprimant
+l'arbre (version implémentée, mesurée, puis **rejetée sur capture** — elle vidait la
+promenade de ses platanes).
+
+---
+
+## 14. ⭐⭐ ITÉRATION VISUELLE — le workflow avec l'utilisateur dans la boucle (05/08)
+
+### 14.1 L'acceptation est l'ŒIL de l'utilisateur, jamais une métrique
+Les métriques servent à **ne rien casser** (verrous), pas à déclarer un succès. Six lots
+d'affilée ont livré « toutes acceptations vertes » sur des scènes que l'utilisateur a
+jugées chaotiques.
+
+### 14.2 ⭐ PÉRIMÈTRE D'ACCEPTATION = PÉRIMÈTRE DE JUGEMENT
+Mesurer dans le champ des **caméras de jugement** (FOV 90°, 150 m), **jamais** dans le
+périmètre que le système couvre. Défaut découvert le 05/08 : le système ne produisait que
+**2,1 %** de ce que voyait la caméra (3 poses sur 6 à **0 %**) pendant que tous les
+rapports étaient verts. **Un chantier ne se déclare pas vert sur un sous-ensemble qu'il a
+choisi lui-même.**
+
+### 14.3 Le coordinateur OUVRE les captures lui-même
+Avant toute transmission à l'utilisateur, et il dit ce qu'il voit — pas ce que le rapport
+en dit. Les 2 fois où ça a été fait, l'auto-validation « aucune image chaotique » de
+l'agent a été **démentie**.
+
+### 14.4 L'agent ne rend AUCUN verdict
+Description **factuelle** par capture + **signalement explicite** des images douteuses
+(consigne de brief). Vertu à exiger : l'auto-rejet sur capture *avant* livraison.
+
+### 14.5 ⏱️ LES COÛTS RÉELS D'UNE ITÉRATION (mesurés, 05/08) — ne plus les confondre
+| poste | coût | verdict |
+|---|---|---|
+| **boucle machine** (cuisson → bake → régé district) | **1 min 36** | ✅ |
+| **démarrage à froid d'un agent NEUF** (relire brief/rapports/code) | **10-15 min** | ❌ **ÉVITABLE** |
+| travelling 50 captures | 11-23 min | ❌ réservé à la validation finale |
+| batterie complète verrous + exports | ~8 min | ⚠️ fin de série seulement |
+| **itération de bout en bout, agent neuf** | **~40 min** | mesuré |
+
+**Correctifs** : ① **reprendre le MÊME agent par `SendMessage`** (doctrine du 30/07,
+non appliquée le 05/08 — d'où la régression) ; ② une itération = **3 captures aux poses du
+grief**, pas le travelling ; ③ **ne jamais annoncer la boucle machine comme si c'était le
+tour complet** (« 2 min » annoncé, 1 h vécue → l'utilisateur l'a relevé, à juste titre).
+**Cible : 10-15 min de bout en bout.**
+
+### 14.6 Piège du watchdog : `progress.log` partagé entre itérations
+Le compteur de silence part du dernier écrit — donc d'une **ligne héritée de l'itération
+précédente** → fausse alerte à la minute 0. Et un motif de fin trop large (`TERMINEE`)
+coupe le guetteur sur un jalon interne : **exiger `TERMINE:` avec les deux-points**.
