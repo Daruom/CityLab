@@ -357,6 +357,10 @@ d'un HISM global par mesh — le district ne rebâtirait alors que sa part.
 * ⚠️ La règle « jamais de passe LOURDE sous patch Live Coding » (crash D3D12) **tient toujours**.
   Une passe **district** (14-40 s) a tourné sans incident sous patch ; une régé complète, non
   testée sous patch — ne la tente pas.
+* ⚠️ **La PREMIÈRE régé lancée juste après un patch Live Coding est AVALÉE** (payé 10 min le
+  06/08) : le guetteur consomme le `.py`, aucun `.done`, aucune ligne dans `CityLab.log`, aucun
+  heartbeat — mais l'éditeur reste vivant et répond au ping en 2 s. **Parade : relancer le même
+  `.py`, la 2ᵉ passe s'exécute normalement (~24 s). Ne JAMAIS attendre 600 s.**
 
 ### 11.3 bis Quand un VRAI build s'impose
 Changement de layout (`UPROPERTY`, `USTRUCT`, `.h`) · ajout/retrait d'un champ de profil ·
