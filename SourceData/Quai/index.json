@@ -1,8 +1,8 @@
 {
- "genere": "2026-08-06T11:46:29",
+ "genere": "2026-08-06T12:48:59",
  "cellSizeM": 500.0,
  "grilleN": 64,
- "recette": "CHANTIER BLOC : le bloc est le SEUL objet fabrique. Trois regions et pas une de plus : OUT = sol de ville RENDU intact ; BLOC = dessus HORIZONTAL a bief + 1,20, CONSTANT PAR BIEF (fonction en escalier, marche contrainte au changement de bief) ; LIT = min(sol rendu, bief - 2,50). Les faces VERTICALES tombent de la couture sans exception : face fleuve entre le dessus et le lit, face ville de hauteur Z0 - Z(-1) PAR CONSTRUCTION (son voisin est le sol de ville rendu). Etendue D = debut du plateau terminal du profil BRUT (|pente| < 0,10 m/m jusqu'au cap 21,0 m), PAR STATION. Le bloc n'existe que la ou Z0 - Z(-1) >= 0,50 m ; ailleurs RIEN. AUCUN lissage dans le chemin de code du bloc : ni esplanade, ni pente de berge, ni anneau, ni dalle, ni jupe. Gradins seulement dans les emprises OSM bleachers, sur toute la hauteur de la face. Rollback : effacer SourceData/Quai. ITER1 : cap 21.0 m (mesure : a 21 m, 17,9 % des stations etaient tronquees et Z0 tombait a 136 au lieu de 141,5 = la place Saint-Pierre ; a 40 m, 8,6 %) ; contour REGULARISE EN PLAN (mediane 0.0 m + gaussienne sigma 0.0 m sur la LARGEUR D, jamais sur Z ; patron QUAIS/q1_regul) ; suites de moins de 0.0 m otees (ouverture morphologique en plan). ITER2 : UN SEUL JEU DE MARCHES PAR EMPRISE bleachers (un seul Z0, un seul Z(-1), medianes de l'emprise : des CONSTANTES par emprise, comme la promenade plate par bief) ; et LE BLOC PASSE SOUS LE PONT (la cession de l'emprise tablier + culees est retiree : promenade et faces s'y construisent comme ailleurs).",
+ "recette": "CHANTIER BLOC : le bloc est le SEUL objet fabrique. Trois regions et pas une de plus : OUT = sol de ville RENDU intact ; BLOC = dessus HORIZONTAL a bief + 1,20, CONSTANT PAR BIEF (fonction en escalier, marche contrainte au changement de bief) ; LIT = min(sol rendu, bief - 2,50). Les faces VERTICALES tombent de la couture sans exception : face fleuve entre le dessus et le lit, face ville de hauteur Z0 - Z(-1) PAR CONSTRUCTION (son voisin est le sol de ville rendu). Etendue D = debut du plateau terminal du profil BRUT (|pente| < 0,10 m/m jusqu'au cap 21,0 m), PAR STATION. Le bloc n'existe que la ou Z0 - Z(-1) >= 0,50 m ; ailleurs RIEN. AUCUN lissage dans le chemin de code du bloc : ni esplanade, ni pente de berge, ni anneau, ni dalle, ni jupe. Gradins seulement dans les emprises OSM bleachers, sur toute la hauteur de la face. Rollback : effacer SourceData/Quai. ANCRAGE : le NIVEAU 0 est lu sur le DRAPAGE MNT D'ORIGINE (toulouse10_mnt.png) plafonne par le lit (Frontiere/plafond_cm), jamais sur une sortie de la cuisson \u2014 garde d'empreinte a chaque passe ; les quatre reglages ci-dessous sont des DEFAUTS DU CODE, plus des arguments de ligne de commande. ITER1 : cap 40.0 m (mesure : a 21 m, 17,9 % des stations etaient tronquees et Z0 tombait a 136 au lieu de 141,5 = la place Saint-Pierre ; a 40 m, 8,0 %) ; contour REGULARISE EN PLAN (mediane 9.0 m + gaussienne sigma 0.0 m sur la LARGEUR D, jamais sur Z ; patron QUAIS/q1_regul) ; suites de moins de 10.0 m otees (ouverture morphologique en plan). ITER2 : UN SEUL JEU DE MARCHES PAR EMPRISE bleachers (un seul Z0, un seul Z(-1), medianes de l'emprise : des CONSTANTES par emprise, comme la promenade plate par bief) ; et LE BLOC PASSE SOUS LE PONT (la cession de l'emprise tablier + culees est retiree : promenade et faces s'y construisent comme ailleurs).",
  "murs_exclus": [],
  "volees_constructeur": [
   "TRONROUT0000000073500905",
@@ -10,14 +10,14 @@
   "TRONROUT0000002202787567"
  ],
  "totaux": {
-  "cellules": 30,
-  "quads_bande": 6537,
-  "triangles": 128750,
-  "triangles_verticaux": 55776,
+  "cellules": 29,
+  "quads_bande": 7287,
+  "triangles": 125123,
+  "triangles_verticaux": 53367,
   "masque_quads": 0,
   "tris_tablier": 0,
-  "bande_m2": 236101.4,
-  "gradins_m": 66.997,
-  "gradins_n": 6
+  "bande_m2": 285617.9,
+  "gradins_m": 69.997,
+  "gradins_n": 16
  }
 }
