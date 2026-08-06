@@ -4600,6 +4600,23 @@ namespace
 		const FVector3f Up(0, 0, 1);
 		const FVector3f Down(0, 0, -1);
 		const FVector3f DeckTint(1.f, 1.f, 1.f);
+		// ⭐ LE PAREMENT VERTICAL D'UN TABLIER EST POSE DES DEUX COTES.
+		// Meme regle que la cuisson du quai (« un quad dont l'exterieur n'est pas
+		// PROUVE est pose des DEUX cotes »). Ici l'`Outward` fourni est deduit du
+		// SENS DE PARCOURS du trace : ce n'est pas une preuve, et le juge de
+		// visibilite (2026-08-06) mesure des milliers de pixels ou l'oeil traverse
+		// un parement parce que sa face unique tourne le dos a la camera.
+		// L'ajout est PUREMENT ADDITIF : chaque quad garde son enroulement et
+		// recoit son miroir — aucune face ne peut disparaitre, aucun materiau
+		// neuf, aucune constante locale, aucun champ d'en-tete.
+		int32 TwoSidedQuads = 0;
+		auto AddStoneTwoSided = [&](const FVector3f* C4, const FVector3f& Nout,
+			const FVector2f* UV4)
+		{
+			QM.AddPoly(StoneGroup, C4, 4, Nout, UV4, StoneTint);
+			QM.AddPoly(StoneGroup, C4, 4, -Nout, UV4, StoneTint);
+			++TwoSidedQuads;
+		};
 		const float HalfW = B.WidthCm * 0.5f;
 		auto V3 = [](const FVector2D& P, float Zc) { return FVector3f((float)P.X, (float)P.Y, Zc); };
 		auto WorldUV = [](const FVector3f& P) { return FVector2f(P.X * 0.01f, P.Y * 0.01f); };
@@ -4673,10 +4690,10 @@ namespace
 					FVector2f(S[0], 0.f), FVector2f((float)(BL - AL).Size() * 0.01f, 0.f),
 					FVector2f((float)(BL - AL).Size() * 0.01f, (ZB - SB) * 0.01f),
 					FVector2f(0.f, (ZA - SA) * 0.01f) };
-				QM.AddPoly(StoneGroup, G, 4, NG.GetSafeNormal(), UVG, StoneTint);
+				AddStoneTwoSided(G, NG.GetSafeNormal(), UVG);
 				const FVector3f ND((float)Nrm[i].X, (float)Nrm[i].Y, 0.f);
 				const FVector3f D[4] = { V3(BR, ZB), V3(AR, ZA), V3(AR, SA), V3(BR, SB) };
-				QM.AddPoly(StoneGroup, D, 4, ND.GetSafeNormal(), UVG, StoneTint);
+				AddStoneTwoSided(D, ND.GetSafeNormal(), UVG);
 				OutQuads += 2;
 			}
 			// (d) LES PARAPETS, seulement la ou l'ouvrage est REELLEMENT en l'air.
@@ -4708,7 +4725,7 @@ namespace
 						FVector2f(0.f, 0.f), FVector2f((float)(EB - EA).Size() * 0.01f, 0.f),
 						FVector2f((float)(EB - EA).Size() * 0.01f, GBridgeParapetHCm * 0.01f),
 						FVector2f(0.f, GBridgeParapetHCm * 0.01f) };
-					QM.AddPoly(StoneGroup, Ext, 4, NExt.GetSafeNormal(), UVE, StoneTint);
+					AddStoneTwoSided(Ext, NExt.GetSafeNormal(), UVE);
 					// COURONNEMENT
 					const FVector3f Cour[4] = { V3(IA, TA), V3(IB, TB), V3(EB, TB), V3(EA, TA) };
 					const FVector2f UVC[4] = { WorldUV(Cour[0]), WorldUV(Cour[1]),
@@ -4717,7 +4734,7 @@ namespace
 					// face INTERIEURE (celle que voit l'automobiliste)
 					const FVector3f NInt(-(float)(Nrm[i].X * Sgn), -(float)(Nrm[i].Y * Sgn), 0.f);
 					const FVector3f Int[4] = { V3(IB, ZB), V3(IA, ZA), V3(IA, TA), V3(IB, TB) };
-					QM.AddPoly(StoneGroup, Int, 4, NInt.GetSafeNormal(), UVE, StoneTint);
+					AddStoneTwoSided(Int, NInt.GetSafeNormal(), UVE);
 					OutQuads += 3;
 				}
 			}
@@ -4750,7 +4767,7 @@ namespace
 			}
 			const FVector2f UV[4] = { FVector2f(0.f, 0.f), FVector2f(B.WidthCm * 0.01f, 0.f),
 				FVector2f(B.WidthCm * 0.01f, (Zt - Zs) * 0.01f), FVector2f(0.f, (Zt - Zs) * 0.01f) };
-			QM.AddPoly(StoneGroup, Q, 4, N, UV, StoneTint);
+			AddStoneTwoSided(Q, N, UV);
 			++OutQuads;
 		}
 
@@ -4758,10 +4775,11 @@ namespace
 		// aucune enquete n'est possible (lecon payee par une enquete entiere au lot
 		// QUAIS : un compte agrege ne nomme personne).
 		UE_LOG(LogCityImport, Display,
-			TEXT("PONTS C2 tablier POSE id=%s nom='%s' pos=%+d long=%.1f m larg=%.1f m z=%.2f..%.2f m hauteur_libre_max=%.2f m z_source=%s quads=%d."),
+			TEXT("PONTS C2 tablier POSE id=%s nom='%s' pos=%+d long=%.1f m larg=%.1f m z=%.2f..%.2f m hauteur_libre_max=%.2f m z_source=%s quads=%d parement_pose_des_DEUX_COTES=%d."),
 			*B.Id, *B.Nom, B.Pos, RunCm * 0.01f, B.WidthCm * 0.01f,
 			FMath::Min(Z[0], Z[NSeg]) * 0.01f, FMath::Max(Z[0], Z[NSeg]) * 0.01f,
-			ClearMax * 0.01f, B.bHasZ ? TEXT("bdtopo3d") : TEXT("REPLI_RIVES"), OutQuads);
+			ClearMax * 0.01f, B.bHasZ ? TEXT("bdtopo3d") : TEXT("REPLI_RIVES"), OutQuads,
+			TwoSidedQuads);
 		return RunCm * 0.01f;
 	}
 
