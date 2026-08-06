@@ -603,6 +603,18 @@ grief**, pas le travelling ; ③ **ne jamais annoncer la boucle machine comme si
 tour complet** (« 2 min » annoncé, 1 h vécue → l'utilisateur l'a relevé, à juste titre).
 **Cible : 10-15 min de bout en bout.**
 
+### 14.5 bis Pièges d'éditeur payés les 05-06/08 (session berge)
+- ⛔ **`CaptureViewport` sur un éditeur NON FOCALISÉ bloque TOUT le serveur MCP**
+  (même `initialize` expire — ressemble exactement à un agent mort). 9 min payées.
+  → **`v6_focus.ps1` AVANT toute série de captures**, systématique.
+- `EditorLoadingAndSavingUtils.reload_packages` **tue la frame Python du guetteur**
+  (TIMEOUT sans `.done`, l'éditeur survit) et peut ouvrir une **modale de
+  rechargement** qui gèle MCP jusqu'au clic de l'utilisateur.
+- `sed -i` (Git Bash) convertit un `.cpp` **CRLF → LF** : le fichier entier paraît
+  modifié dans git. Rétablir CRLF avant de mesurer un diff.
+- **PIE fantôme** (~6 occurrences, cause jamais élucidée) : vérifier `pie=false`
+  au démarrage de CHAQUE lot ; `BERGES/py/b0_stop.py` l'arrête en 2 s.
+
 ### 14.6 Piège du watchdog : `progress.log` partagé entre itérations
 Le compteur de silence part du dernier écrit — donc d'une **ligne héritée de l'itération
 précédente** → fausse alerte à la minute 0. Et un motif de fin trop large (`TERMINEE`)

@@ -41,6 +41,10 @@
   toute réécriture · aucune nouvelle classe de sol ni matériau.
 
 ## ⚠️ ACCEPTATIONS
+- ⭐ **L'acceptation d'un grief utilisateur = un ZOOM A/B sur ses coordonnées
+  EXACTES, jamais un agrégat.** Le grief reste ouvert tant que l'utilisateur ne
+  l'a pas fermé. (Payé le 06/08 : « part pont 637 → 83 » annoncé « corrigé »
+  alors que la brèche listée de 12 px n'était pas traitée.)
 - Formulées **à l'échelle du JUGEMENT** (le champ des caméras), jamais du périmètre
   d'implémentation (Playbook §14.2).
 - Au moins une **structurelle** qui rend la classe de bug impossible (ex. « 0 face
