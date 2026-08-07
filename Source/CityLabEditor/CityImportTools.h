@@ -625,8 +625,19 @@ struct FCityGenProfile
 	 * AUCUN effet, sans erreur : le generateur se comporte exactement comme
 	 * avant, bit pour bit (meme convention que le constructeur de quai).
 	 * false = rollback total sans rebuild.
+	 *
+	 * ⛔ E2-a ETEINT EN ATTENDANT L'ARBITRAGE E2-a-bis — voir
+	 * `Doc/Chantier-Partition-Sol.md`.
+	 * Retour utilisateur sur capture : la vegetation se retrouvait DEBOUT SUR
+	 * les rubans neufs (le semis n'est exclu que de l'emprise de l'OUVRAGE, pas
+	 * des 65 083 m2 de bandes annexees — 1 531 instances mesurees dans du dur,
+	 * dont 254 ARBRES), et 52,7 % du lineaire cousu par la loi d'interface
+	 * tombe DANS un polygone vert (35 860 m), y laissant des traits MINERAUX en
+	 * plein gazon. Le defaut passe donc a `false` : le code reste en place et
+	 * reste mesure, mais il ne pose plus rien tant que la re-pose corrigee
+	 * n'est pas arbitree. `true` restitue exactement le comportement livre.
 	 */
-	UPROPERTY() bool bPartition = true;
+	UPROPERTY() bool bPartition = false;
 
 	/** Dossier de la carte. Vide = <ProjectDir>/SourceData/Partition. */
 	UPROPERTY() FString PartitionPath;
