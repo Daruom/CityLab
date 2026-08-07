@@ -180,7 +180,35 @@ mince (0,05-3 m) restante » — le tour non collé résiduel doit être exclusi
 VRAIE frontière (terrain ≥ 3 m).
 → É0-ter proposé : variante morphologique + acceptation re-calée (arbitrage ci-dessous).
 
-## 12. Références
+## 12. É0-ter & É0-quater — LA CLÔTURE D'É0 (2026-08-07, sous mandat d'autonomie)
+
+**É0-ter (morphologique, 40 min)** : la découpe par tampon ferme les lacunes (cratère 0
+lacune organique) MAIS invente **102 987 m (15,3 %) de frontières en arcs** → BLOQUE de
+doctrine (P2). Au passage : juge de tour CORRIGÉ (une lacune n'existe que si de
+l'organique est réellement posé sur le segment — l'ancien comptait des trajets traversant
+le corps des zones concaves), rabotage itératif jeté (se nourrit de ses propres découpes),
+forme fermée v4 non livrée (5 474 m² inexpliqués = intégrité d'abord).
+**É0-quater (prolongements, ~75 min)** : la voie (c) testée au banc des 10 pires
+sandwichs, 3 dessins, 3 causes nommées. Elle **tient P2 à la lettre** (0 m de bord
+illégitime) mais **trahit son esprit** : 2,35 m de frontière neuve par m² annexé =
+**4,8× pire que la voie (b) refusée pour cette raison même**, rendement plafonné ~43 %
+(la lacune a des bords en arcs qu'aucune droite n'épouse). Voie NON généralisée.
+**Résultat mesuré trois fois : aucune découpe de carte ne ferme les lacunes sans
+inventer de la frontière.**
+
+### La décision de sortie (coordinateur, dans le mandat — le repli (a) déjà arbitré)
+> **La carte officielle d'É0 est la v2** (`part/v2`, empreinte `51b88070…`) : complète,
+> idempotente, invariants exacts, **0 m de frontière inventée**, 69 241 m² de bandes
+> isolées annexées. **Les 106 855 m² de sandwichs restants (0,87 % du domaine) ne sont
+> pas des défauts de la carte : ce sont des COUTURES**, transférées au cahier des charges
+> d'É1 — la loi d'interface (P3) devra traiter les frontières zone/organique ≤ 3 m comme
+> des coutures (11,77 % du tour des zones). La carte dit QUI possède ; la couture dit
+> COMMENT deux propriétaires se rencontrent. P2 et P3 restent intacts tous les deux.
+**« CARTE PRÊTE POUR É1 : OUI »** sous cette définition — l'engagement d'É1 est chiffré
+ci-dessus et devra figurer dans son brief. Fin du mandat d'autonomie : **É1 = GO
+utilisateur explicite** (premier changement réel du rendu).
+
+## 13. Références
 
 Saga et nommages : `Reprise-Etat-Projet.md` (v3) + commits `6f5c3414..a8671110`.
 Doctrine : Playbook §13 (lois), §11 (boucle), Brief-Template.md (workflow agents).
