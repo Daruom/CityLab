@@ -12884,12 +12884,28 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	const FResolvedSurface* SurfPlanVegetal = Surfaces.Resolve(&GSurfGrassCut);
 	const FResolvedSurface* SurfPlanEau = Surfaces.Resolve(&GSurfWater);
 	const FResolvedSurface* SurfPlanOuvrage = Surfaces.Resolve(&GSurfCurb);
+	// LA CHAUSSEE. Materiau MESURE sur le monde existant, pas choisi : les 45
+	// rubans SM_Ground_ du proto portent le slot `asphalt_road_tiggcjdo` ->
+	// M_Surf_asphalt_road_tiggcjdo (16/45 meshes ; les classes fine_road_* du
+	// catalogue ne sont jamais resolues sur ce proto). Aucun materiau nouveau.
+	const FResolvedSurface* SurfPlanRoute = Surfaces.Resolve(&GSurfAsphalt);
 	const FVector3f TintPlanMineral = SlabBase;
 	const FVector3f TintPlanVegetal(0.35f, 0.48f, 0.22f);
 	const FVector3f TintPlanEau(0.16f, 0.30f, 0.38f);
 	auto ClassePlanDe = [](const FPlanParcelle& P) -> int32
 	{
 		if (P.Proprietaire == EPlanProprio::Ouvrage) { return 3; }
+		// LA CHAUSSEE = voirie qui n est PAS une bande annexee. La distinction
+		// SORT DU PLAN (champ `bande`), elle n est pas devinee : le trottoir
+		// annexe garde la dalle, la chaussee et les carrefours prennent
+		// l asphalte. Mesure sur le district v2 : 2 994 parcelles / 183 941 m2
+		// de chaussee (dont 1 336 en loi constante = les plateaux) contre 502
+		// parcelles / 8 664 m2 de bande.
+		if (P.Proprietaire == EPlanProprio::Voirie && !P.bBande
+			&& P.Matiere == EPlanMatiere::Mineral)
+		{
+			return 4;
+		}
 		switch (P.Matiere)
 		{
 		case EPlanMatiere::Vegetal: return 1;
@@ -12906,6 +12922,7 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			if (Lot.Classe == 1) { Surf = SurfPlanVegetal; Tint = TintPlanVegetal; }
 			else if (Lot.Classe == 2) { Surf = SurfPlanEau; Tint = TintPlanEau; }
 			else if (Lot.Classe == 3) { Surf = SurfPlanOuvrage; Tint = TintPlanMineral; }
+			else if (Lot.Classe == 4) { Surf = SurfPlanRoute; Tint = TintPlanMineral; }
 			const FPolygonGroupID Group = Surf
 				? Builder.GetOrCreateGroup(Surf->SlotName(), Surf->Material) : Builder.WallGroup;
 			const FVector3f Col = bBakedShade ? Shade(Tint, FVector3f(0, 0, 1), 0.f) : Tint;

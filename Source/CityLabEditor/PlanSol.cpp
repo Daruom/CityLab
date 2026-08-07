@@ -160,6 +160,9 @@ bool ConstruirePlanSol(
 		return OutLots[I];
 	};
 
+	// Parcelles sauvees par le repli de remplissage `Solid` : journalisees en fin
+	// de passe (aucun champ de structure, pour rester patchable a chaud).
+	int32 NbRemplissageSolide = 0;
 	const double PasCm = FMath::Max(PasM, 0.25) * 100.0;
 	const double PasCm2 = PasCm * PasCm;
 
@@ -315,6 +318,24 @@ bool ConstruirePlanSol(
 		}
 		if (!bOk || Tris.Num() == 0)
 		{
+			// REPLI DE REMPLISSAGE — pas une approximation : le MEME jeu d aretes
+			// contraintes, rempli par la regle `Solid` (est retenu tout triangle
+			// qu on ne peut atteindre depuis l exterieur sans traverser une arete
+			// contrainte) au lieu du nombre de tours. Elle ignore l ORIENTATION
+			// des anneaux, et c est exactement ce qui manque aux polygones de
+			// carrefour du v2, dont les anneaux se touchent. Le contour reste
+			// celui du plan, sommet pour sommet.
+			TArray<FIndex3i> Repli;
+			if (Delaunay.GetFilledTriangles(Repli, Aretes, FDelaunay2::EFillMode::Solid)
+				&& Repli.Num() > 0)
+			{
+				Tris = MoveTemp(Repli);
+				bOk = true;
+				++NbRemplissageSolide;
+			}
+		}
+		if (!bOk || Tris.Num() == 0)
+		{
 			// Aucun repli, aucune approximation : la parcelle est REFUSEE et
 			// nommee. Un sol devine serait pire qu'un sol manquant.
 			++Stats.Refusees;
@@ -447,5 +468,12 @@ bool ConstruirePlanSol(
 		}
 	}
 
+	if (NbRemplissageSolide > 0)
+	{
+		UE_LOG(LogPlanVille, Display,
+			TEXT("PLAN SOL : %d parcelle(s) rendue(s) par le repli de remplissage Solid ")
+			TEXT("(le remplissage par nombre de tours avait echoue sur leurs anneaux)."),
+			NbRemplissageSolide);
+	}
 	return Stats.Refusees == 0;
 }

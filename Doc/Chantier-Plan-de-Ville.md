@@ -247,9 +247,35 @@ au vert (couverture 100,000000 %, interstices 0, recouvrements 0, résolutions 1
   sauver programmatiquement avant toute fermeture ; sémantique du contrat : deux
   sommets < 1 mm (la précision déclarée) = LE MÊME sommet (dette : c8 doit
   dédupliquer à l'export) ; 7 parcelles d'aire NULLE au contrat (dette c8).
-- **Prochaines étapes** : verdict utilisateur sur le sol É2-1 (il vole dans le
-  district en mode plan) → É2-2 (pièces d'interface : bordures/murs/emmarchements)
-  → A/B 3D du coteau (cellule (2,−2)) pour trancher les 5 arbitrages → É2-3 semis
+- **NIVEAUX v2 + RECONSTRUCTION FAITS (07/08 23h46)** — verdict utilisateur sur
+  É2-1 (« marches en travers des rues, patchwork des places, tranchée du quai ») →
+  diagnostic : la couche NIVEAUX v1 cotait chaque parcelle INDÉPENDAMMENT. v2 =
+  la SOLIDARITÉ : graphe NOUÉ (13 493 nœuds, **1 120 franchissements EXCLUS** —
+  jamais nouer un croisement dénivelé), une cote par nœud, **carrefours = 11 585
+  parcelles à CONSTANTE** (l'option (b), physiquement vraie, district-first sauf),
+  trottoirs en OFFSET du porteur, **224 communautés de nivellement** (minéral
+  piéton + végétal contigu), ancrage aux cotes déclarées des ouvrages. 3 invariants
+  nouveaux à 0. District reconstruit sur v2 : réseau de rues À NOUVEAU LISIBLE
+  (voirie mappée sur `M_Surf_asphalt_road_tiggcjdo`, MESURÉ sur les rubans du monde
+  A — aucun matériau nouveau), 0 marche en travers de chaussée, 7 774 parcelles /
+  1,1 M triangles, hors-district 0 + idempotence prouvées. Les falaises du coteau :
+  DISSOUTES (artefact des profils v1) — l'A/B différé du coteau est SANS OBJET.
+- **EN ATTENTE UTILISATEUR** : ① re-vol dans le district v2 (poses P1-P7, captures
+  Bv2) ; ② **le NOUVEL A/B 3D : aplanir-vs-draper les communautés à fort relief**
+  (max mesuré 21,96 m, les 12 pires en signets — remplace l'A/B coteau) ; ③ les
+  **11 frontières d'arbitrage** (−3_0 ×5, −2_0 ×5, −2_1 ×1, 2_−2 ×1 — cellules
+  REFUSÉES à la construction ; **Saint-Pierre est en −2_0** : son verdict 3D
+  attend cette résolution ; zoom visualiseur `_PLAN_SAINT_PIERRE.png` en attendant).
+- **Leçons v2** : graphe source non noué (14 562 paires croisées, 7 298 sans
+  extrémité commune) ; C1/C3 doivent partager UNE source d'axes ; bords de plateau
+  insérés exactement (échantillonnage 5 m = pente 11 643 % sans garde) ; le TERMINE
+  d'un agent se rédige APRÈS la dernière écriture disque (rapport ≠ passe
+  antérieure : 60 969 vs 60 835) ; la garde C++ a attrapé en premier un défaut de
+  convention (porteuse sans pièce, `bnd/11487#0`) → juge compilateur ajouté
+  (`porteuse_sans_piece_n = 0`, comptabilité fermée 60 969 = 60 835 émises + 134
+  lamelles exclues) — la garde ne doit jamais être la première à voir.
+- **Prochaines étapes** : verdicts utilisateur ①②③ → É2-2 (pièces d'interface :
+  bordures/murs/emmarchements — habiller les marches déclarées) → É2-3 semis
   exécutant → É2-4 généralisation.
 
 ## 13. Références

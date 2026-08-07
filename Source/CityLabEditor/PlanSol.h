@@ -83,6 +83,7 @@ struct FPlanSolStats
 	 *  precision declaree). Compte, jamais tu. */
 	int32 PointsFondus = 0;
 
+
 	/**
 	 * ⭐ LA MESURE DE COPLANARITE — le risque de z-fighting, chiffre, jamais
 	 * suppose. A chaque sommet pose, l'ecart entre le Z que le PLAN prescrit et
