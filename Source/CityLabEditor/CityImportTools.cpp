@@ -30,6 +30,8 @@
 #include "Materials/MaterialInterface.h"
 #include "MeshDescription.h"
 #include "Misc/FileHelper.h"
+#include "PlanSol.h"
+#include "PlanVille.h"
 #include "Misc/Paths.h"
 // PARTITION : l'empreinte md5 de la carte, verifiee au chargement.
 #include "Misc/SecureHash.h"
@@ -12843,6 +12845,86 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	// change d'une cellule a l'autre, donc elle se resout dans la boucle.
 	FResolvedSurface MaskedSurf;
 	MaskedSurf.Class = &GSurfMaskedGround;
+
+	// =========================================================================
+	// E2-1 — LE SOL DU DISTRICT CONSTRUIT DEPUIS LE PLAN (`bPlan`).
+	//
+	// `Doc/Chantier-Plan-de-Ville.md` S8. Quand l'interrupteur est allume, la
+	// dalle d'une cellule VISEE n'est plus la grille drapee : ce sont les
+	// PARCELLES du plan, chacune a la cote de SA loi de Z. Le reste de la passe
+	// (nom d'asset, acteur, collision, streaming) ne change pas d'une virgule —
+	// c'est ce qui rend l'A/B lisible.
+	//
+	// Le plan FAIT FOI : rien n'est infere ici. Un plan absent, incomplet ou a
+	// l'empreinte fausse ARRETE la passe (garde E2-0), il ne la degrade pas.
+	// =========================================================================
+	FPlanVille Plan;
+	bool bPlanActif = false;
+	FPlanSolStats PlanTotal;
+	if (Gen.bPlan)
+	{
+		FPlanRapport R;
+		if (!Plan.Ouvrir(FPlanVille::DossierParDefaut(), R))
+		{
+			RaiseError(FString::Printf(
+				TEXT("bPlan=true mais le plan de ville est REFUSE : %s"), *R.Texte(8)));
+			return Summary;
+		}
+		bPlanActif = true;
+		UE_LOG(LogCityImport, Display,
+			TEXT("PLAN : sol du district construit DEPUIS LE PLAN (%d cellules au domaine, ")
+			TEXT("%d parcelles distinctes au manifeste)."),
+			Plan.Index().Cellules.Num(), Plan.Index().ParcellesDistinctes);
+	}
+	// LES TROIS SOLS — ceux qui existent deja, aucun de plus. La MATIERE du plan
+	// choisit le revetement ; l'OUVRAGE garde la PIERRE DE QUAI, exactement la
+	// table `ClasseDeProprio` de ce fichier. Les teintes sont celles que la passe
+	// peint deja (SlabBase, le vert de `green`, le bleu de `water`).
+	const FResolvedSurface* SurfPlanMineral = SlabSurf;
+	const FResolvedSurface* SurfPlanVegetal = Surfaces.Resolve(&GSurfGrassCut);
+	const FResolvedSurface* SurfPlanEau = Surfaces.Resolve(&GSurfWater);
+	const FResolvedSurface* SurfPlanOuvrage = Surfaces.Resolve(&GSurfCurb);
+	const FVector3f TintPlanMineral = SlabBase;
+	const FVector3f TintPlanVegetal(0.35f, 0.48f, 0.22f);
+	const FVector3f TintPlanEau(0.16f, 0.30f, 0.38f);
+	auto ClassePlanDe = [](const FPlanParcelle& P) -> int32
+	{
+		if (P.Proprietaire == EPlanProprio::Ouvrage) { return 3; }
+		switch (P.Matiere)
+		{
+		case EPlanMatiere::Vegetal: return 1;
+		case EPlanMatiere::Eau:     return 2;
+		default:                    return 0;
+		}
+	};
+	auto PosePlan = [&](FCityMeshBuilder& Builder, const TArray<FPlanSolLot>& Lots)
+	{
+		for (const FPlanSolLot& Lot : Lots)
+		{
+			const FResolvedSurface* Surf = SurfPlanMineral;
+			FVector3f Tint = TintPlanMineral;
+			if (Lot.Classe == 1) { Surf = SurfPlanVegetal; Tint = TintPlanVegetal; }
+			else if (Lot.Classe == 2) { Surf = SurfPlanEau; Tint = TintPlanEau; }
+			else if (Lot.Classe == 3) { Surf = SurfPlanOuvrage; Tint = TintPlanMineral; }
+			const FPolygonGroupID Group = Surf
+				? Builder.GetOrCreateGroup(Surf->SlotName(), Surf->Material) : Builder.WallGroup;
+			const FVector3f Col = bBakedShade ? Shade(Tint, FVector3f(0, 0, 1), 0.f) : Tint;
+			for (const FPlanSolTri& T : Lot.Tris)
+			{
+				const FVector3f P3[3] = { T.A, T.B, T.C };
+				FVector2f UV[3];
+				for (int32 i = 0; i < 3; ++i)
+				{
+					// Meme langue que la dalle actuelle : UV0 en METRES MONDE des
+					// que le revetement est resolu, sinon l'echelle historique.
+					UV[i] = Surf ? FVector2f(P3[i].X * 0.01f, P3[i].Y * 0.01f)
+								 : FVector2f(P3[i].X * 0.0025f, P3[i].Y * 0.0025f);
+				}
+				Builder.AddPoly(Group, P3, 3, FVector3f(0, 0, 1), UV, Col);
+			}
+		}
+	};
+
 	// Garde de sortie du mode district (doit toujours valoir 0 grace a CleSol) : on ne
 	// cree ni n'ecrase JAMAIS l'asset d'une cellule qu'on n'a pas purgee.
 	int32 CellulesHorsFiltre = 0;
@@ -12869,7 +12951,93 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				++Summary.MaskedCells;
 			}
 		}
-		BuildGroundGrid(SlabBuilder, Key, SlabGrid, /*bPaint=*/true, CellSurf);
+		bool bSolDuPlan = false;
+		if (bPlanActif)
+		{
+			FPlanCellule PC;
+			FPlanRapport RC;
+			if (!Plan.ChargerCellule(Key, PC, RC))
+			{
+				RaiseError(FString::Printf(
+					TEXT("bPlan=true : la cellule (%d, %d) est REFUSEE par le plan — %s"),
+					Key.X, Key.Y, *RC.Texte(8)));
+				return Summary;
+			}
+			if (!PC.bConstructible)
+			{
+				// SECTEUR NON TRANCHE (S12) : on ne batit pas a la place de
+				// l'utilisateur. La cellule garde son sol actuel, et on le DIT.
+				++Summary.PlanCellulesRefusees;
+				UE_LOG(LogCityImport, Display,
+					TEXT("PLAN : cellule (%d, %d) NON CONSTRUCTIBLE (%d interface(s) en ")
+					TEXT("attente d'arbitrage) — son sol reste celui d'aujourd'hui."),
+					Key.X, Key.Y, PC.ArbitragesN);
+			}
+			else
+			{
+				// Le pas de subdivision vient de la MAILLE DE SOL EXISTANTE
+				// (cote de cellule / GroundGridN) : aucune constante neuve.
+				const double PasM = (double)CellSizeM / FMath::Max(SlabGrid, 1);
+				TArray<FPlanSolLot> Lots;
+				FPlanSolStats St;
+				auto ZDrape = [&Drape](double Xcm, double Ycm) -> float
+				{
+					return Drape.GroundZ(Xcm, Ycm);
+				};
+				ConstruirePlanSol(PC, Drape.IsActive() ? Drape.AltCapCm : 0.f,
+					ZDrape, PasM, FPlanSolPerimetre(), ClassePlanDe, Lots, St);
+				PosePlan(SlabBuilder, Lots);
+				bSolDuPlan = true;
+
+				++Summary.PlanCellules;
+				Summary.PlanParcelles += St.Parcelles;
+				Summary.PlanTriangles += St.Triangles;
+				Summary.PlanAireM2 += (int32)FMath::RoundToInt(St.AireM2);
+				Summary.PlanConstante += St.Constante;
+				Summary.PlanProfilTroncon += St.ProfilTroncon;
+				Summary.PlanDrapage += St.Drapage;
+				Summary.PlanVoirie += St.ParProprio[(int32)EPlanProprio::Voirie];
+				Summary.PlanZone += St.ParProprio[(int32)EPlanProprio::Zone];
+				Summary.PlanOrganique += St.ParProprio[(int32)EPlanProprio::Organique];
+				Summary.PlanBatiment += St.ParProprio[(int32)EPlanProprio::Batiment];
+				Summary.PlanOuvrage += St.ParProprio[(int32)EPlanProprio::Ouvrage];
+				Summary.PlanTrous += St.AvecTrous;
+				Summary.PlanRefusees += St.Refusees;
+
+				// COPLANARITE : l'ecart entre le Z du plan et la surface RENDUE
+				// d'aujourd'hui, agrege par proprietaire. C'est la mesure du risque
+				// de z-fighting — chiffree, jamais supposee.
+				for (int32 K = 0; K < 6; ++K)
+				{
+					PlanTotal.EcartN[K] += St.EcartN[K];
+					PlanTotal.EcartSommeCm[K] += St.EcartSommeCm[K];
+					PlanTotal.EcartSous2cm[K] += St.EcartSous2cm[K];
+					PlanTotal.EcartMaxCm[K] = FMath::Max(PlanTotal.EcartMaxCm[K], St.EcartMaxCm[K]);
+				}
+				PlanTotal.PointsFondus += St.PointsFondus;
+
+				for (const FString& D : St.IdsRefuses)
+				{
+					UE_LOG(LogCityImport, Display,
+						TEXT("PLAN : cellule (%d, %d) — parcelle NON CONSTRUITE : %s"),
+						Key.X, Key.Y, *D);
+				}
+				UE_LOG(LogCityImport, Display,
+					TEXT("PLAN : cellule (%d, %d) — %d parcelles (%d const / %d profil / %d drapage ; ")
+					TEXT("voirie %d, zone %d, organique %d, batiment %d, ouvrage %d), %d trous, ")
+					TEXT("%d triangles, %.0f m2, %d refusees."),
+					Key.X, Key.Y, St.Parcelles, St.Constante, St.ProfilTroncon, St.Drapage,
+					St.ParProprio[(int32)EPlanProprio::Voirie], St.ParProprio[(int32)EPlanProprio::Zone],
+					St.ParProprio[(int32)EPlanProprio::Organique],
+					St.ParProprio[(int32)EPlanProprio::Batiment],
+					St.ParProprio[(int32)EPlanProprio::Ouvrage],
+					St.AvecTrous, St.Triangles, St.AireM2, St.Refusees);
+			}
+		}
+		if (!bSolDuPlan)
+		{
+			BuildGroundGrid(SlabBuilder, Key, SlabGrid, /*bPaint=*/true, CellSurf);
+		}
 		const FString SlabName = FString::Printf(TEXT("SM_Slab_%d_%d"), Key.X, Key.Y);
 		UStaticMesh* SlabMesh = nullptr;
 		if (Drape.IsActive() && Gen.GroundCollisionGridN > 0)
@@ -12896,6 +13064,30 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		SlabActor->GetStaticMeshComponent()->SetStaticMesh(SlabMesh);
 		ApplyGroundTextureStreaming(SlabActor->GetStaticMeshComponent());
 		SlabActor->SetActorLabel(SlabName);
+	}
+	if (bPlanActif)
+	{
+		const int32 OI = (int32)EPlanProprio::Ouvrage;
+		Summary.PlanOuvrageSommetsN = PlanTotal.EcartN[OI];
+		Summary.PlanOuvrageCoplanaireN = PlanTotal.EcartSous2cm[OI];
+		Summary.PlanOuvrageEcartMoyenMm = PlanTotal.EcartN[OI] > 0
+			? (int32)FMath::RoundToInt(10.0 * PlanTotal.EcartSommeCm[OI] / PlanTotal.EcartN[OI]) : 0;
+		Summary.PlanOuvrageEcartMaxMm = (int32)FMath::RoundToInt(10.0 * PlanTotal.EcartMaxCm[OI]);
+		Summary.PlanPointsFondus = PlanTotal.PointsFondus;
+		static const TCHAR* NomsProprio[6] =
+			{ TEXT("inconnu"), TEXT("batiment"), TEXT("voirie"), TEXT("ouvrage"),
+			  TEXT("zone"), TEXT("organique") };
+		for (int32 K = 0; K < 6; ++K)
+		{
+			if (PlanTotal.EcartN[K] == 0) { continue; }
+			UE_LOG(LogCityImport, Display,
+				TEXT("PLAN COPLANARITE %s : %d sommets, ecart au sol rendu moyen %.1f cm, ")
+				TEXT("max %.1f cm, dont %d (%.1f %%) sous 2 cm (seuil du socle anti-z-fight)."),
+				NomsProprio[K], PlanTotal.EcartN[K],
+				PlanTotal.EcartSommeCm[K] / PlanTotal.EcartN[K], PlanTotal.EcartMaxCm[K],
+				PlanTotal.EcartSous2cm[K],
+				100.0 * PlanTotal.EcartSous2cm[K] / PlanTotal.EcartN[K]);
+		}
 	}
 	UE_LOG(LogCityImport, Display,
 		TEXT("SOL DE BERGE : %d quads de dalle sont rendus par la TRIANGULATION CONTRAINTE (%d triangles poses dans le meme maillage de dalle). "
@@ -13185,6 +13377,20 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		if (!CelluleVisee(Pair.Key))
 		{
 			++CellulesHorsFiltre;
+			continue;
+		}
+		// E2-1 — EN MODE PLAN, LE RUBAN ROUTIER NE SE POSE PAS.
+		// Le ruban est un film pose 55-80 cm au-dessus de la DALLE DRAPEE ; le
+		// plan, lui, publie la chaussee comme une PARCELLE `voirie` a la cote de
+		// son profil regularise. Les deux ensemble donneraient, selon l endroit,
+		// un ruban COLLE (la contre-preuve Z du plan mesure une mediane de
+		// 0,3 mm entre profil et MNT : z-fighting garanti) ou un ruban EN L AIR
+		// (p95 = 2,05 m, max 9,56 m). Ce n est pas une fonction supprimee :
+		// c est la meme chaussee, DITE par le plan au lieu d etre deduite.
+		// Hors mode plan, RIEN ne change.
+		if (bPlanActif)
+		{
+			++Summary.PlanRubansOmis;
 			continue;
 		}
 		const FString Name = FString::Printf(TEXT("SM_Ground_%d_%d"), Pair.Key.X, Pair.Key.Y);

@@ -231,9 +231,26 @@ au vert (couverture 100,000000 %, interstices 0, recouvrements 0, résolutions 1
   les interfaces n'ont pas de `cellule_porteuse` (identité = couple (a,b), compte
   distinct GLOBAL, comptes par cellule = pièces) ; UE 5.8 : clés de `FJsonObject`
   en `UE::FSharedString`.
-- **Prochaine étape : É2-1** — le SOL d'un district construit depuis le plan
-  (district 100 % résolu d'abord), puis l'A/B 3D du coteau pour l'arbitrage
-  utilisateur (p50 vs éligibilité au relief).
+- **É2-1 FAIT (07/08 21h53), EN ATTENTE DU VERDICT UTILISATEUR** — sol du district
+  (-2_-2/-2_-1/-1_-2/-1_-1, bloc L_T10_B_-1_-1) construit DEPUIS LE PLAN
+  (`PlanSol.h/.cpp`) et laissé en mode plan dans l'éditeur (disque compris — le
+  Témoin est l'assurance) : 6 116/6 123 parcelles, 365 780 triangles, végétation
+  re-posée de plan_semis (120 921 instances). PREUVES : zéro bit-identique A1,
+  chemin de retour 118/118 (18 s), idempotence B4, hors-district 0 partout.
+  Captures A/B 4 poses + zénith : `C:\LidarPoC\work\E2\captures\`.
+  ATTENDU À CE STADE (ne pas juger comme des défauts) : marches nues aux frontières
+  (faces bleues en vue rasante — les pièces = É2-2) ; chaussée au matériau trottoir
+  et 4 rubans routiers omis (le plan met la chaussée à sa cote ; légibilité route =
+  mapping matériau voirie à traiter) ; 13 parcelles eau en matériau de repli.
+  Leçons : ImportCityStreamed SAUVEGARDE lui-même (« map non sauvegardée »
+  impossible) ; modale native de save = fermeture bloquée INVISIBLE à l'agent →
+  sauver programmatiquement avant toute fermeture ; sémantique du contrat : deux
+  sommets < 1 mm (la précision déclarée) = LE MÊME sommet (dette : c8 doit
+  dédupliquer à l'export) ; 7 parcelles d'aire NULLE au contrat (dette c8).
+- **Prochaines étapes** : verdict utilisateur sur le sol É2-1 (il vole dans le
+  district en mode plan) → É2-2 (pièces d'interface : bordures/murs/emmarchements)
+  → A/B 3D du coteau (cellule (2,−2)) pour trancher les 5 arbitrages → É2-3 semis
+  exécutant → É2-4 généralisation.
 
 ## 13. Références
 

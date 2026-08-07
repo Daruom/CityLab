@@ -24,7 +24,11 @@ public class CityLabEditor : ModuleRules
 			"MeshDescription",
 			"StaticMeshDescription",
 			// Lecture des sommets de rendu (empattement des arbres -> taille des fosses).
-			"RenderCore"
+			"RenderCore",
+			// E2-1 (sol du plan) : triangulation contrainte AVEC TROUS (`FDelaunay2`).
+			// 145 parcelles de SOL du seul district de test ont des trous (voirie 27,
+			// organique 110, zone 8) ; l'ear clipping maison n'en gere aucun.
+			"GeometryCore"
 		});
 	}
 }

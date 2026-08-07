@@ -1009,6 +1009,74 @@ struct FCityStreamedSummary
 
 	/** PARTITION : ecart max, en mm, entre le profil de Z PUBLIE et celui relu. Doit valoir 0. */
 	UPROPERTY() int32 ProfilEcartMaxMm = 0;
+
+	// -------------------------------------------------------------------------
+	// PLAN DE VILLE (E2-1) — LE SOL CONSTRUIT DEPUIS LE PLAN.
+	// Tous nuls quand `bPlan` est faux : ce sont les compteurs d'un chemin qui
+	// n'a pas ete pris. Ils rendent le lot REVOCABLE ET MESURABLE.
+	// -------------------------------------------------------------------------
+
+	/** Cellules dont le sol vient du PLAN (et non de la grille drapee). */
+	UPROPERTY() int32 PlanCellules = 0;
+
+	/** Parcelles du plan effectivement construites. */
+	UPROPERTY() int32 PlanParcelles = 0;
+
+	/** Triangles de sol poses depuis le plan. */
+	UPROPERTY() int32 PlanTriangles = 0;
+
+	/** Aire des parcelles construites, en m2 (temoin de couverture du district). */
+	UPROPERTY() int32 PlanAireM2 = 0;
+
+	/** Par LOI DE Z (les trois formes du plan, S3 ②). */
+	UPROPERTY() int32 PlanConstante = 0;
+	UPROPERTY() int32 PlanProfilTroncon = 0;
+	UPROPERTY() int32 PlanDrapage = 0;
+
+	/** Par PROPRIETAIRE — le compteur qui rend le perimetre du sol revocable. */
+	UPROPERTY() int32 PlanVoirie = 0;
+	UPROPERTY() int32 PlanZone = 0;
+	UPROPERTY() int32 PlanOrganique = 0;
+	UPROPERTY() int32 PlanBatiment = 0;
+	UPROPERTY() int32 PlanOuvrage = 0;
+
+	/** Parcelles a TROU construites (anneaux multiples). */
+	UPROPERTY() int32 PlanTrous = 0;
+
+	/**
+	 * ⛔ Parcelles que le lot n'a PAS su construire. DOIT valoir 0 : toute autre
+	 * valeur est une dette nommee dans le journal, jamais un silence.
+	 */
+	UPROPERTY() int32 PlanRefusees = 0;
+
+	/**
+	 * Cellules VISEES mais REFUSEES a la construction parce qu'elles portent une
+	 * interface `arbitrage_demande` (secteur non tranche, S12). Doit valoir 0
+	 * sur un district choisi 100 % resolu.
+	 */
+	UPROPERTY() int32 PlanCellulesRefusees = 0;
+
+	/**
+	 * COPLANARITE mesuree sur les parcelles OUVRAGE : sommets dont le Z du plan
+	 * est a moins de 2 cm de la surface rendue actuelle — le risque de
+	 * z-fighting, chiffre plutot que suppose.
+	 */
+	UPROPERTY() int32 PlanOuvrageCoplanaireN = 0;
+	UPROPERTY() int32 PlanOuvrageSommetsN = 0;
+	/** Ecart MOYEN et MAX (en mm) sur les parcelles ouvrage. */
+	UPROPERTY() int32 PlanOuvrageEcartMoyenMm = 0;
+	UPROPERTY() int32 PlanOuvrageEcartMaxMm = 0;
+
+	/**
+	 * Rubans routiers NON poses parce que le plan dit deja la chaussee (mode
+	 * plan seulement). Le compteur rend la substitution visible : ce n est pas
+	 * une perte, c est un transfert d autorite.
+	 */
+	UPROPERTY() int32 PlanRubansOmis = 0;
+
+	/** Sommets FONDUS a la lecture parce que le plan ne les distingue pas
+	 *  (moins d'un millimetre, sa propre precision declaree). */
+	UPROPERTY() int32 PlanPointsFondus = 0;
 };
 
 /** Counts of what GenerateBuildingCollisionCell produced for one cell. */
