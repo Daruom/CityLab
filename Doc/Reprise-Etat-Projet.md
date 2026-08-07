@@ -1,5 +1,14 @@
 # REPRISE — État du projet (v3, réécrite le 2026-08-06 après la saga BERGE)
 
+> ⚠️⭐ **2026-08-07 soir — VIRAGE D'ARCHITECTURE : le travail en cours est le chantier
+> PLAN DE VILLE → `Chantier-Plan-de-Ville.md` est LE point d'entrée actuel** (le
+> pourquoi, l'architecture 2 étages compilateur/constructeur, l'output `plan_ville/v1`,
+> le visualiseur web, l'état hérité §9, les arbitrages actés §10). Le présent document
+> reste valable pour : la vision, l'état du proto, la saga berge et le workflow agents.
+> Chemin du jour : griefs berge (limons ✔, cratère ✔ via règle p50) → chantier
+> partition (É0→É2-a, absorbé) → PLAN DE VILLE. É2-a est éteinte par défaut dans le
+> code (`bPartition=false`) ; map SAINE, état visuel validé.
+
 > **LE document d'entrée.** Réécrit après 3 jours de chantier berge (04-06/08,
 > ~25 lots d'agents). v2 archivée : `Archive/2026-08-06_Reprise-Etat-Projet-v2.md`.
 > Compléments obligatoires : `Agent-Playbook.md` (outillage + doctrine §13-14) et

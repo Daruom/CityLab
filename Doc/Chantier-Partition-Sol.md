@@ -1,5 +1,12 @@
 # Chantier PARTITION DU SOL — brief de conception (soumis à arbitrage)
 
+> ⚠️ **2026-08-07 soir : chantier ABSORBÉ par `Chantier-Plan-de-Ville.md`** — le nouveau
+> point d'entrée. Ses acquis (carte v2.1, contrat de Z, leçons, machinerie de preuve)
+> deviennent les couches/entrées du PLAN DE VILLE ; É2-a est ÉTEINTE PAR DÉFAUT dans le
+> code (`bPartition=false`, commit `ddfdb6cb`, prouvée inerte) ; É2-b/É3 et les
+> arbitrages « É2-a-bis » sont SUPERSÉDÉS par le plan (matière + catalogue d'interfaces).
+> Ce document reste la référence historique des verdicts É0→É2-a.
+
 > **Statut : CONCEPTION — aucune exécution avant arbitrage utilisateur** (§8).
 > Rédigé le 2026-08-07 après la saga berge (voir `Reprise-Etat-Projet.md` et les
 > commits `6f5c3414..a8671110`). Objectif produit inchangé : *un rendu sans défauts,
