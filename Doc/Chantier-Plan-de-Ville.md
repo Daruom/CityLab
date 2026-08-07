@@ -187,7 +187,45 @@ d'arrêt. Leçons du 07/08 à ne pas re-payer : un attendu auto-référent ne pr
 acceptations d'INTÉGRATION ; le juge final reste l'œil utilisateur — le visualiseur le
 fait intervenir AVANT la 3D, plus après.
 
-## 12. Références
+## 12. ÉTAGE 1 LIVRÉ (2026-08-07 soir) — état pour la reprise
+
+**Le plan est compilé, exporté, installé et commité.** Chiffres finaux (après les 2
+corrections de mesure ci-dessous) : 49 cellules / 12,25 km² (domaine = carte v2.1,
+les 3 cellules disque hors carte écartées et chiffrées), **46 424 parcelles,
+96 986 interfaces, 990 061 instances de semis retenues (81,0 %)** ; les 9 invariants
+au vert (couverture 100,000000 %, interstices 0, recouvrements 0, résolutions 100 %,
+ΔZ borné, 0 minéral sur végétal|végétal, 0 semis sur dur, idempotence bit-identique).
+- **Installé** : `SourceData/PlanVille/` (manifestes + `data/` = 147 side-cars PAR
+  CELLULE + `plan_index.json` avec double empreinte de chaque fichier — `data/` est
+  gitignoré : 297,6 Mo régénérables bit-identiques par `Tools/PlanVille/c8_export.py`).
+- **Compilateur commité** : `Tools/PlanVille/c0..c8` (venv `C:\LidarPoC\venv`) ;
+  visualiseur : `Tools/PlanVille/visualiseur/index.html` (données .js régénérées par
+  c6 dans `C:\LidarPoC\work\PLAN\visualiseur\`, double-clic, fond ortho IGN).
+- **Convention du contrat** : parcelles/frontières DÉCOUPÉES par cellule (lecteur
+  district-first : une cellule se construit sans lire les autres) ; `cellule_porteuse`
+  + `entiere` + totaux pour reconstituer les entités distinctes.
+- **Arbitrage DIFFÉRÉ (décision utilisateur)** : les 5 frontières hors catalogue du
+  coteau SE (dZ 12,1-16,6 m, 217,6 m, toutes contre `bnd/8730`) = artefact de la loi
+  CONSTANTE p50 appliquée à des parcelles à fort relief (13-16 m sous la parcelle).
+  L'utilisateur tranchera **en A/B 3D à É2-1** (variante p50 vs éligibilité au relief
+  ~2,5 m) — il ne pouvait pas juger sur la 2D. Le lecteur C++ REFUSE ce secteur tant
+  que non résolu ; le premier district d'É2-1 sera un secteur 100 % résolu.
+- **Leçons de la passe export** (payées, corrigées à la racine) : ① lecture par
+  tranches avec report d'octets = instances comptées 2× aux jointures → lecteur
+  unique partagé juges/export ; ② frontière prise sur `A∩B` = 546 polygones dégénérés
+  (`.length` = périmètre, longueur ~2×) → `A.boundary ∩ B.boundary`, linéaire par
+  définition. Les comptes manifeste↔export se reconstituent désormais exactement.
+- **Témoin gelé frais** : `/Game/Dev/ProtoE2Sol2/L_ProtoSols_E2_Sol2_Temoin`
+  (183,8 Mo, dupliqué+vérifié le 07/08 20h01 ; Sol1 = archive historique). Les maps
+  ne sont PAS dans git — la vérité committée = données + code.
+- **Dettes conservées** : queue de contre-preuve Z inexpliquée (p95 2,05 m — hypothèse
+  non prouvée : points le long des bandes, là où le monde construit s'écarte du MNT) ;
+  787 tronçons > plafond de pente 12 % (signets) ; masques 36/49 cellules (344
+  parcelles en règle de repli) ; enquête g6 antérieure.
+- **Prochaine étape : É2-0** — lecteur-validateur C++ (garde d'empreintes, refuse un
+  plan incomplet, recompte = manifeste, API par cellule pour É2-1, `bPlan=false`).
+
+## 13. Références
 
 `Chantier-Partition-Sol.md` (préhistoire : É0→É2-a, verdicts et leçons) ·
 `Reprise-Etat-Projet.md` (v3, la saga berge) · `Agent-Playbook.md` · `Brief-Template.md`.

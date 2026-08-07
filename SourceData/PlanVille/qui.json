@@ -1,0 +1,148 @@
+{
+ "annexion": {
+  "BANDE_MAX_M": 3.0,
+  "COLLIER_M": 0.02,
+  "heritee": true,
+  "preseance_dur": [
+   "ouvrage",
+   "voirie",
+   "batiment"
+  ],
+  "regle": "E0-bis (work/PART/p5_snap.py)"
+ },
+ "couche": "QUI",
+ "domaine_cellules": [
+  "-4_-2",
+  "-3_-3",
+  "-3_-2",
+  "-3_-1",
+  "-3_0",
+  "-3_1",
+  "-3_2",
+  "-3_3",
+  "-2_-3",
+  "-2_-2",
+  "-2_-1",
+  "-2_0",
+  "-2_1",
+  "-2_2",
+  "-2_3",
+  "-1_-3",
+  "-1_-2",
+  "-1_-1",
+  "-1_0",
+  "-1_1",
+  "-1_2",
+  "-1_3",
+  "0_-3",
+  "0_-2",
+  "0_-1",
+  "0_0",
+  "0_1",
+  "0_2",
+  "0_3",
+  "1_-3",
+  "1_-2",
+  "1_-1",
+  "1_0",
+  "1_1",
+  "1_2",
+  "1_3",
+  "2_-3",
+  "2_-2",
+  "2_-1",
+  "2_0",
+  "2_1",
+  "2_2",
+  "2_3",
+  "3_-3",
+  "3_-2",
+  "3_-1",
+  "3_0",
+  "3_1",
+  "3_2"
+ ],
+ "domaine_ecart_disque": {
+  "cellules_disque_n": 52,
+  "hors_carte": [
+   "-4_-1",
+   "-2_4",
+   "3_3"
+  ],
+  "manquantes_sur_disque": []
+ },
+ "domaine_m2": 12250000.0,
+ "domaine_source": "cellules citees par carte_v2.json (bandes + frontieres) — la carte fait autorite",
+ "empreintes_identiques": true,
+ "empreintes_sources": {
+  "bati_3x3_json": "a419a841b7890fa1cd66aa09b4cf1066",
+  "bl2_emprise_wkt": "72e39d421bb1f2dbda270c90a2bc76de",
+  "ocsge_verts_json": "a6f07e8a2b4dbcca0826d483201aa1d1",
+  "routes_3x3_json": "5e9cb2c87b4b0a19dd3266db5c16597a"
+ },
+ "empreintes_sources_carte_v21": {
+  "bati_3x3_json": "a419a841b7890fa1cd66aa09b4cf1066",
+  "bl2_emprise_wkt": "72e39d421bb1f2dbda270c90a2bc76de",
+  "ocsge_verts_json": "a6f07e8a2b4dbcca0826d483201aa1d1",
+  "routes_3x3_json": "5e9cb2c87b4b0a19dd3266db5c16597a"
+ },
+ "juges": {
+  "attribue_m2": 12250000.0,
+  "couverture_pc": 100.0,
+  "domaine_m2": 12250000.0,
+  "interstices_m2": 0.0,
+  "interstices_n": 0,
+  "interstices_seuil_m": 0.05,
+  "parcelles_n": 46424,
+  "recouvrements_m2": 0.0,
+  "recouvrements_n": 0,
+  "reparations_2e_passe_n": 0,
+  "reparations_m2": 78.520347,
+  "reparations_n": 1,
+  "trous_m2": 78.520347,
+  "trous_n": 1
+ },
+ "par_proprietaire": {
+  "batiment": {
+   "aire_m2": 3200976.9,
+   "bandes_annexees_m2": 8596.2,
+   "bandes_annexees_n": 2420,
+   "objets": 20780,
+   "parcelles": 24271
+  },
+  "organique": {
+   "aire_m2": 5861364.0,
+   "objets": 4964,
+   "parcelles": 4964
+  },
+  "ouvrage": {
+   "aire_m2": 219720.6,
+   "bandes_annexees_m2": 2559.9,
+   "bandes_annexees_n": 239,
+   "objets": 216,
+   "parcelles": 474
+  },
+  "voirie": {
+   "aire_m2": 1898286.6,
+   "bandes_annexees_m2": 57527.3,
+   "bandes_annexees_n": 3900,
+   "objets": 9373,
+   "parcelles": 14611
+  },
+  "zone": {
+   "aire_m2": 1069651.8,
+   "bandes_annexees_m2": 29.6,
+   "bandes_annexees_n": 14,
+   "objets": 712,
+   "parcelles": 2104
+  }
+ },
+ "preseance": [
+  "ouvrage",
+  "voirie",
+  "batiment",
+  "zone",
+  "organique"
+ ],
+ "regle_emprise_ouvrage": "axe du side-car tamponne de largeur_m/2, bouts francs (largeur_m = donnee BD TOPO)"
+}

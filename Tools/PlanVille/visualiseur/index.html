@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>PLAN DE VILLE — plan_ville/v1 — visualiseur</title>
+<style>
+  html,body{margin:0;height:100%;font:13px/1.45 system-ui,Segoe UI,Roboto,sans-serif;
+            background:#14161a;color:#e8e8ea;overflow:hidden}
+  #map{position:absolute;inset:0;cursor:crosshair}
+  canvas{position:absolute;inset:0}
+  #tiles{position:absolute;inset:0;overflow:hidden}
+  #tiles img{position:absolute;width:256px;height:256px;image-rendering:auto}
+  .panel{position:absolute;background:rgba(20,22,26,.93);border:1px solid #333842;
+         border-radius:8px;padding:10px 12px;backdrop-filter:blur(4px);
+         box-shadow:0 6px 24px rgba(0,0,0,.45)}
+  #ctl{top:10px;left:10px;width:262px;max-height:calc(100% - 20px);overflow:auto}
+  #fiche{top:10px;right:10px;width:320px;max-height:calc(100% - 20px);
+         overflow:auto;display:none}
+  h1{font-size:14px;margin:0 0 6px;letter-spacing:.02em}
+  h2{font-size:11px;margin:12px 0 5px;color:#8d97a6;text-transform:uppercase;
+     letter-spacing:.08em;font-weight:600}
+  label{display:flex;align-items:center;gap:7px;padding:2px 0;cursor:pointer}
+  input[type=radio],input[type=checkbox]{accent-color:#5a9bd8}
+  .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto}
+  .leg{display:flex;align-items:center;gap:6px;font-size:11.5px;padding:1px 0;
+       color:#c3c9d2}
+  .kv{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;
+      padding:1px 0;border-bottom:1px solid #23272e}
+  .kv b{font-weight:600;color:#fff}
+  select,button{background:#20242b;color:#e8e8ea;border:1px solid #39404b;
+                border-radius:5px;padding:4px 6px;font:inherit;width:100%}
+  button{cursor:pointer;margin-top:5px}
+  button:hover{background:#2b313a}
+  #tour{max-height:190px;overflow:auto;margin-top:4px}
+  .sig{padding:4px 6px;border-radius:4px;cursor:pointer;font-size:11.5px;
+       border-left:2px solid #5a9bd8;margin-bottom:3px;background:#1b1f25}
+  .sig:hover{background:#262c34}
+  .sig i{color:#8d97a6;font-style:normal;display:block;font-size:10.5px}
+  #load{position:absolute;inset:0;display:flex;align-items:center;
+        justify-content:center;background:#14161a;z-index:9;flex-direction:column;
+        gap:10px}
+  #bar{width:280px;height:5px;background:#262c34;border-radius:3px;overflow:hidden}
+  #bar i{display:block;height:100%;width:0;background:#5a9bd8}
+  #hud{position:absolute;bottom:8px;left:10px;font-size:11px;color:#8d97a6;
+       background:rgba(20,22,26,.8);padding:3px 8px;border-radius:5px}
+  small{color:#8d97a6}
+  .warn{color:#ffb454}
+</style>
+</head>
+<body>
+<div id="map"><div id="tiles"></div><canvas id="cv"></canvas></div>
+
+<div id="ctl" class="panel">
+  <h1>PLAN DE VILLE <small>plan_ville/v1</small></h1>
+  <div id="stat"></div>
+
+  <h2>Couche affichee</h2>
+  <label><input type="radio" name="cou" value="qui" checked> ① QUI (proprietaire)</label>
+  <label><input type="radio" name="cou" value="niv"> ② NIVEAUX (loi de Z)</label>
+  <label><input type="radio" name="cou" value="mat"> ③ MATIERE</label>
+  <div id="leg"></div>
+
+  <h2>Superpositions</h2>
+  <label><input type="checkbox" id="cif"> ④ INTERFACES (frontieres)</label>
+  <label><input type="checkbox" id="csem"> semis retenu par le plan</label>
+  <label><input type="checkbox" id="cfond" checked> fond orthophoto IGN</label>
+  <label><input type="checkbox" id="ccont" checked> contours des parcelles</label>
+
+  <h2>Tournee des pires cas</h2>
+  <select id="regle"></select>
+  <div id="tour"></div>
+
+  <h2>Compteurs de revue</h2>
+  <div id="cpt"></div>
+  <button id="btnres">Resume chiffre du plan</button>
+</div>
+
+<div id="fiche" class="panel"></div>
+<div id="hud"></div>
+
+<div id="load"><div>chargement du plan…</div><div id="bar"><i></i></div>
+  <small id="lmsg"></small></div>
+
+<script src="data/meta.js"></script>
+<script>
+"use strict";
+// ---------------------------------------------------------------- chargement
+var PARC = [], FRONT = [], SEMIS = null, SEM_ON = false;
+function charge(list, done){
+  var i = 0, bar = document.querySelector('#bar i'), msg = document.getElementById('lmsg');
+  (function next(){
+    if (i >= list.length){ done(); return; }
+    var s = document.createElement('script');
+    s.src = list[i].src;
+    s.onload = s.onerror = function(){
+      if (list[i].cb) list[i].cb();
+      i++;
+      bar.style.width = (100*i/list.length)+'%';
+      msg.textContent = i+' / '+list.length+' fichiers';
+      setTimeout(next, 0);
+    };
+    document.body.appendChild(s);
+  })();
+}
+var files = [];
+for (var i=0;i<META.lots_parcelles;i++)(function(i){
+  var n='PARC_'+String(i).padStart(3,'0');
+  files.push({src:'data/parc_'+String(i).padStart(3,'0')+'.js',
+              cb:function(){ PARC = PARC.concat(window[n]); window[n]=null; }});
+})(i);
+for (var i=0;i<META.lots_frontieres;i++)(function(i){
+  var n='FRONT_'+String(i).padStart(3,'0');
+  files.push({src:'data/front_'+String(i).padStart(3,'0')+'.js',
+              cb:function(){ FRONT = FRONT.concat(window[n]); window[n]=null; }});
+})(i);
+
+// ------------------------------------------------------------- projection PM
+var TS = 256;
+function lon2wx(lon, z){ return (lon+180)/360 * TS * Math.pow(2,z); }
+function lat2wy(lat, z){
+  var s = Math.sin(lat*Math.PI/180);
+  return (0.5 - Math.log((1+s)/(1-s))/(4*Math.PI)) * TS * Math.pow(2,z);
+}
+function wx2lon(wx, z){ return wx/(TS*Math.pow(2,z))*360 - 180; }
+function wy2lat(wy, z){
+  var n = Math.PI - 2*Math.PI*wy/(TS*Math.pow(2,z));
+  return 180/Math.PI*Math.atan(0.5*(Math.exp(n)-Math.exp(-n)));
+}
+var view = {z: 14, lon: META.centre[0], lat: META.centre[1]};
+var cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+var W=0, H=0;
+function resize(){ W=cv.width=innerWidth; H=cv.height=innerHeight; dessine(); }
+addEventListener('resize', resize);
+
+function sx(lon){ return (lon2wx(lon,view.z) - lon2wx(view.lon,view.z)) + W/2; }
+function sy(lat){ return (lat2wy(lat,view.z) - lat2wy(view.lat,view.z)) + H/2; }
+
+// --------------------------------------------------------------- fond IGN
+var TUILE = 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0'
+          + '&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&TILEMATRIXSET=PM'
+          + '&FORMAT=image/jpeg&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
+var cacheT = {};
+function fond(){
+  var box = document.getElementById('tiles');
+  if (!document.getElementById('cfond').checked){ box.innerHTML=''; return; }
+  var z = Math.min(19, Math.max(0, Math.round(view.z)));
+  var k = Math.pow(2, view.z - z);
+  var ox = lon2wx(view.lon, z) - (W/2)/k, oy = lat2wy(view.lat, z) - (H/2)/k;
+  var x0 = Math.floor(ox/TS), x1 = Math.floor((ox + W/k)/TS);
+  var y0 = Math.floor(oy/TS), y1 = Math.floor((oy + H/k)/TS);
+  var vus = {}, frag = document.createDocumentFragment();
+  for (var x=x0;x<=x1;x++) for (var y=y0;y<=y1;y++){
+    var id = z+'/'+x+'/'+y; vus[id]=1;
+    var im = cacheT[id];
+    if (!im){
+      im = new Image(); im.decoding='async'; im.loading='eager';
+      im.src = TUILE.replace('{z}',z).replace('{x}',x).replace('{y}',y);
+      im.onerror = function(){ this.style.display='none'; };
+      cacheT[id] = im;
+    }
+    im.style.width = im.style.height = (TS*k)+'px';
+    im.style.left = ((x*TS - ox)*k)+'px';
+    im.style.top  = ((y*TS - oy)*k)+'px';
+    frag.appendChild(im);
+  }
+  box.innerHTML=''; box.appendChild(frag);
+}
+
+// ----------------------------------------------------------------- couleurs
+var C_PROP = ['#ce584c','#5a5a60','#9680b0','#6ca868','#cbb98c'];
+var C_MAT  = ['#96928c','#56984c','#3a6eb2'];
+var C_LOI  = ['#e0b74a','#e0703a','#4a90c0'];
+var C_TYPE = ['#4caf50','#8bc34a','#ff9800','#9e9e9e','#2196f3','#f44336','#ff00ff'];
+var LEG = {
+  qui:  {t:'proprietaire', n:META.props, c:C_PROP},
+  mat:  {t:'matiere',      n:META.mats,  c:C_MAT},
+  niv:  {t:'loi de Z',     n:META.lois,  c:C_LOI}
+};
+function couche(){ return document.querySelector('input[name=cou]:checked').value; }
+function coulParc(p){
+  var c = couche();
+  if (c==='qui') return C_PROP[p[1]];
+  if (c==='mat') return C_MAT[p[2]];
+  return p[3]>=0 ? C_LOI[p[3]] : '#555';
+}
+
+// -------------------------------------------------------------- index bbox
+function bbox(p){
+  if (p.__b) return p.__b;
+  var r = p[8], a=1e9,b=1e9,c=-1e9,d=-1e9;
+  for (var i=0;i<r.length;i++){ var f=r[i];
+    for (var j=0;j<f.length;j+=2){
+      if(f[j]<a)a=f[j]; if(f[j]>c)c=f[j];
+      if(f[j+1]<b)b=f[j+1]; if(f[j+1]>d)d=f[j+1];
+    } }
+  return p.__b=[a,b,c,d];
+}
+function bboxF(f){
+  if (f.__b) return f.__b;
+  var r=f[7],a=1e9,b=1e9,c=-1e9,d=-1e9;
+  for (var i=0;i<r.length;i++){ var g=r[i];
+    for (var j=0;j<g.length;j+=2){
+      if(g[j]<a)a=g[j]; if(g[j]>c)c=g[j];
+      if(g[j+1]<b)b=g[j+1]; if(g[j+1]>d)d=g[j+1];
+    } }
+  return f.__b=[a,b,c,d];
+}
+
+// ------------------------------------------------------------------ dessin
+var nvu = 0;
+function dessine(){
+  ctx.clearRect(0,0,W,H);
+  var lo0 = wx2lon(lon2wx(view.lon,view.z)-W/2, view.z);
+  var lo1 = wx2lon(lon2wx(view.lon,view.z)+W/2, view.z);
+  var la1 = wy2lat(lat2wy(view.lat,view.z)-H/2, view.z);
+  var la0 = wy2lat(lat2wy(view.lat,view.z)+H/2, view.z);
+  var contours = document.getElementById('ccont').checked;
+  nvu = 0;
+  ctx.globalAlpha = document.getElementById('cfond').checked ? 0.72 : 1;
+  ctx.lineWidth = 0.6; ctx.strokeStyle = 'rgba(10,12,16,.65)';
+  for (var i=0;i<PARC.length;i++){
+    var p = PARC[i], b = bbox(p);
+    if (b[2]<lo0||b[0]>lo1||b[3]<la0||b[1]>la1) continue;
+    var w = sx(b[2])-sx(b[0]), h = sy(b[1])-sy(b[3]);
+    if (w<1.2 && h<1.2) continue;
+    nvu++;
+    ctx.fillStyle = coulParc(p);
+    ctx.beginPath();
+    var r = p[8];
+    for (var k=0;k<r.length;k++){
+      var f = r[k];
+      ctx.moveTo(sx(f[0]), sy(f[1]));
+      for (var j=2;j<f.length;j+=2) ctx.lineTo(sx(f[j]), sy(f[j+1]));
+      ctx.closePath();
+    }
+    ctx.fill('evenodd');
+    if (contours && (w>6||h>6)) ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  if (document.getElementById('cif').checked){
+    ctx.lineWidth = Math.max(1, Math.min(4, (view.z-13)));
+    for (var i=0;i<FRONT.length;i++){
+      var f = FRONT[i], b = bboxF(f);
+      if (b[2]<lo0||b[0]>lo1||b[3]<la0||b[1]>la1) continue;
+      ctx.strokeStyle = C_TYPE[f[0]];
+      ctx.beginPath();
+      var g = f[7];
+      for (var k=0;k<g.length;k++){
+        var s = g[k];
+        ctx.moveTo(sx(s[0]), sy(s[1]));
+        for (var j=2;j<s.length;j+=2) ctx.lineTo(sx(s[j]), sy(s[j+1]));
+      }
+      ctx.stroke();
+    }
+  }
+  if (SEM_ON && SEMIS){
+    ctx.fillStyle = '#7ee081';
+    var rr = view.z>=17?2:1;
+    for (var i=0;i<SEMIS.length;i+=2){
+      var lo=SEMIS[i], la=SEMIS[i+1];
+      if (lo<lo0||lo>lo1||la<la0||la>la1) continue;
+      ctx.fillRect(sx(lo)-rr/2, sy(la)-rr/2, rr, rr);
+    }
+  }
+  fond();
+  document.getElementById('hud').textContent =
+    'zoom '+view.z.toFixed(1)+' · '+nvu+' parcelles dessinees · '
+    + view.lat.toFixed(5)+', '+view.lon.toFixed(5);
+}
+
+// --------------------------------------------------------- interactions
+var drag=null;
+cv.addEventListener('mousedown', function(e){ drag={x:e.clientX,y:e.clientY,m:0}; });
+addEventListener('mouseup', function(e){
+  if (drag && drag.m<4) clic(e);
+  drag=null;
+});
+addEventListener('mousemove', function(e){
+  if (!drag) return;
+  var dx=e.clientX-drag.x, dy=e.clientY-drag.y;
+  drag.m += Math.abs(dx)+Math.abs(dy);
+  view.lon = wx2lon(lon2wx(view.lon,view.z)-dx, view.z);
+  view.lat = wy2lat(lat2wy(view.lat,view.z)-dy, view.z);
+  drag.x=e.clientX; drag.y=e.clientY;
+  dessine();
+});
+cv.addEventListener('wheel', function(e){
+  e.preventDefault();
+  var lo = wx2lon(lon2wx(view.lon,view.z)+(e.clientX-W/2), view.z);
+  var la = wy2lat(lat2wy(view.lat,view.z)+(e.clientY-H/2), view.z);
+  var nz = Math.max(11, Math.min(20, view.z + (e.deltaY<0?0.5:-0.5)));
+  view.z = nz;
+  view.lon = wx2lon(lon2wx(lo,nz)-(e.clientX-W/2), nz);
+  view.lat = wy2lat(lat2wy(la,nz)-(e.clientY-H/2), nz);
+  dessine();
+}, {passive:false});
+
+function dansAnneaux(r, lo, la){
+  var d = false;
+  for (var k=0;k<r.length;k++){
+    var f = r[k];
+    for (var i=0, j=f.length-2; i<f.length; j=i, i+=2){
+      var yi=f[i+1], yj=f[j+1];
+      if ((yi>la)!==(yj>la) &&
+          lo < (f[j]-f[i])*(la-yi)/(yj-yi)+f[i]) d = !d;
+    }
+  }
+  return d;
+}
+function clic(e){
+  var lo = wx2lon(lon2wx(view.lon,view.z)+(e.clientX-W/2), view.z);
+  var la = wy2lat(lat2wy(view.lat,view.z)+(e.clientY-H/2), view.z);
+  // frontiere d'abord si la couche est active (elles sont fines)
+  if (document.getElementById('cif').checked){
+    var best=null, bd=1e18, tol = 6;
+    for (var i=0;i<FRONT.length;i++){
+      var f=FRONT[i], b=bboxF(f);
+      if (lo<b[0]-1e-4||lo>b[2]+1e-4||la<b[1]-1e-4||la>b[3]+1e-4) continue;
+      var g=f[7];
+      for (var k=0;k<g.length;k++){ var s=g[k];
+        for (var j=0;j<s.length-2;j+=2){
+          var d = distSeg(e.clientX,e.clientY, sx(s[j]),sy(s[j+1]),
+                          sx(s[j+2]),sy(s[j+3]));
+          if (d<bd){ bd=d; best=f; }
+        } }
+    }
+    if (best && bd<tol){ ficheFront(best); return; }
+  }
+  for (var i=PARC.length-1;i>=0;i--){
+    var p=PARC[i], b=bbox(p);
+    if (lo<b[0]||lo>b[2]||la<b[1]||la>b[3]) continue;
+    if (dansAnneaux(p[8], lo, la)){ ficheParc(p); return; }
+  }
+  document.getElementById('fiche').style.display='none';
+}
+function distSeg(px,py,x1,y1,x2,y2){
+  var dx=x2-x1, dy=y2-y1, l=dx*dx+dy*dy;
+  var t = l>0 ? Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/l)) : 0;
+  var qx=x1+t*dx, qy=y1+t*dy;
+  return Math.hypot(px-qx,py-qy);
+}
+function kv(k,v){ return '<div class="kv"><span>'+k+'</span><b>'+v+'</b></div>'; }
+function ficheParc(p){
+  var f = document.getElementById('fiche');
+  var h = '<h1>Parcelle</h1>' + kv('identifiant', p[0])
+        + kv('proprietaire', META.props[p[1]])
+        + kv('matiere', META.mats[p[2]])
+        + kv('loi de Z', p[3]>=0?META.lois[p[3]]:'—')
+        + (p[4]!==null ? kv('cote (m NGF)', p[4]) : '')
+        + kv('surface (m2)', p[5])
+        + (p[6]!==null&&p[6]!==undefined ? kv('pixels herbe (%)', p[6]) : '');
+  if (p[7]) h += '<div class="warn" style="margin-top:6px">valeur HERITEE d\'un '
+              + 'lot anterieur (voir plan_ville/v1/qui.json)</div>';
+  f.innerHTML = h; f.style.display='block';
+}
+function ficheFront(f){
+  var d = document.getElementById('fiche');
+  d.innerHTML = '<h1>Interface</h1>'
+    + kv('resolution', META.types[f[0]])
+    + kv('dZ (m)', f[1]) + kv('longueur (m)', f[2])
+    + kv('matieres', META.mats[f[3]]+' | '+META.mats[f[4]])
+    + kv('parcelle A', f[5]) + kv('parcelle B', f[6]);
+  d.style.display='block';
+}
+
+// ------------------------------------------------------------- panneaux
+function legende(){
+  var c = couche(), L = LEG[c], h = '';
+  for (var i=0;i<L.n.length;i++)
+    h += '<div class="leg"><span class="sw" style="background:'+L.c[i]
+       + '"></span>'+L.n[i]+'</div>';
+  if (document.getElementById('cif').checked){
+    h += '<h2>interfaces</h2>';
+    for (var i=0;i<META.types.length;i++)
+      h += '<div class="leg"><span class="sw" style="background:'+C_TYPE[i]
+         + ';height:3px"></span>'+META.types[i]+'</div>';
+  }
+  document.getElementById('leg').innerHTML = h;
+}
+function tournee(){
+  var sel = document.getElementById('regle'), r = sel.value, h='';
+  META.tournee.forEach(function(s, i){
+    if (r!=='*' && s.regle!==r) return;
+    h += '<div class="sig" data-i="'+i+'"><b>'+s.titre+'</b><i>'+s.detail
+       + '</i></div>';
+  });
+  document.getElementById('tour').innerHTML = h || '<small>aucun cas</small>';
+  Array.prototype.forEach.call(document.querySelectorAll('.sig'), function(el){
+    el.onclick = function(){
+      var s = META.tournee[+el.dataset.i];
+      view.lon = s.lon; view.lat = s.lat; view.z = 18.5; dessine();
+    };
+  });
+}
+document.getElementById('btnres').onclick = function(){
+  var R = META.resume, f = document.getElementById('fiche');
+  var h = '<h1>Resume chiffre</h1>';
+  h += '<h2>① QUI</h2>' + kv('domaine', R.qui.domaine_m2+' m2 / '
+     + R.qui.domaine_cellules.length + ' cellules')
+     + kv('parcelles', R.qui.juges.parcelles_n)
+     + kv('couverture', R.qui.juges.couverture_pc+' %')
+     + kv('interstices', R.qui.juges.interstices_n+' / '
+        + R.qui.juges.interstices_m2+' m2')
+     + kv('recouvrements', R.qui.juges.recouvrements_n);
+  h += '<h2>③ MATIERE</h2>';
+  Object.keys(R.matiere.aires_m2).forEach(function(k){
+    h += kv(k, R.matiere.aires_m2[k]+' m2'); });
+  Object.keys(R.conflits).forEach(function(k){
+    h += kv('conflit '+k, R.conflits[k].parcelles+' parc. / '
+          + R.conflits[k].m2+' m2'); });
+  h += '<h2>② NIVEAUX</h2>';
+  Object.keys(R.niveaux.parcelles_par_loi).forEach(function(k){
+    h += kv(k, R.niveaux.parcelles_par_loi[k]); });
+  h += kv('contre-preuve Z, ecart median',
+          R.niveaux.contre_preuve_z.ecart_median_m+' m')
+     + kv('… sous 1 cm', R.niveaux.contre_preuve_z.sous_1cm_pc+' %');
+  h += '<h2>④ INTERFACES</h2>';
+  Object.keys(R.interfaces.par_type).forEach(function(k){
+    h += kv(k, R.interfaces.par_type[k].n+' / '
+          + R.interfaces.par_type[k].m+' m'); });
+  h += kv('hors catalogue (arbitrage)', R.arbitrage.n+' / '+R.arbitrage.m+' m');
+  h += '<h2>JUGES</h2>'
+     + kv('semis brut', R.juges.semis.brut_n)
+     + kv('semis retenu', R.juges.semis.retenues_n+' ('
+        + R.juges.semis.retenues_pc+' %)')
+     + kv('retenu sur du dur', R.juges.semis.invariant_retenues_sur_dur_n);
+  f.innerHTML = h; f.style.display='block';
+};
+document.getElementById('csem').onchange = function(){
+  SEM_ON = this.checked;
+  if (SEM_ON && !SEMIS){
+    var s=document.createElement('script'); s.src='data/semis.js';
+    s.onload=function(){ SEMIS=window.SEMIS; dessine(); };
+    document.body.appendChild(s); return;
+  }
+  dessine();
+};
+['cif','cfond','ccont'].forEach(function(id){
+  document.getElementById(id).onchange = function(){ legende(); dessine(); };
+});
+Array.prototype.forEach.call(document.querySelectorAll('input[name=cou]'),
+  function(r){ r.onchange = function(){ legende(); dessine(); }; });
+document.getElementById('regle').onchange = tournee;
+
+// --------------------------------------------------------------- demarrage
+charge(files, function(){
+  document.getElementById('load').style.display='none';
+  var s = META.resume;
+  document.getElementById('stat').innerHTML =
+      kv('parcelles', META.parcelles_affichees + ' dessinees')
+    + kv('frontieres', META.frontieres_affichees)
+    + kv('couverture', s.qui.juges.couverture_pc + ' %')
+    + kv('arbitrages', s.arbitrage.n);
+  var regles = {}; META.tournee.forEach(function(t){ regles[t.regle]=1; });
+  var sel = document.getElementById('regle');
+  sel.innerHTML = '<option value="*">toutes les regles</option>'
+    + Object.keys(regles).sort().map(function(k){
+        return '<option>'+k+'</option>'; }).join('');
+  var c = '';
+  Object.keys(META.compteurs).sort().forEach(function(k){
+    var v = META.compteurs[k];
+    c += kv(k, v.revue_n+' revus / '+v.appliquee_n);
+  });
+  document.getElementById('cpt').innerHTML = c;
+  legende(); tournee(); resize();
+});
+</script>
+</body>
+</html>

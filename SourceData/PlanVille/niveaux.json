@@ -1,0 +1,150 @@
+{
+ "bandes_heritees": 6574,
+ "constantes_de_norme": {
+  "PAS_PROFIL_M": 5.0,
+  "PENTE_MAX_CHEMINEMENT_PC": 5.0,
+  "PENTE_MAX_VOIRIE_PC": 12.0,
+  "RESSAUT_MAX_M": 0.02,
+  "TOL_PROFIL_M": 0.15
+ },
+ "contre_preuve_z": {
+  "desaccord_5cm_repartition_pc": {
+   "batiment": 0.09,
+   "organique": 43.68,
+   "ouvrage": 4.2,
+   "voirie": 2.05,
+   "zone": 41.3
+  },
+  "ecart_max_m": 9.563375,
+  "ecart_median_m": 0.000279,
+  "ecart_moyen_m": 0.203144,
+  "ecart_p95_m": 2.047195,
+  "ecart_p99_m": 3.524232,
+  "hors_bornes_n": 0,
+  "points": 93887,
+  "runs": 5028,
+  "sous_1cm_pc": 89.954,
+  "sous_5cm_pc": 90.218
+ },
+ "couche": "NIVEAUX",
+ "formes": [
+  "constante",
+  "profil_troncon",
+  "drapage"
+ ],
+ "lecteur": "work/BERGES/b_lib.py::SolRendu (bilineaire FTerrainSampler + enveloppe des deux triangulations)",
+ "parcelles_par_loi": {
+  "constante": 27218,
+  "drapage": 4908,
+  "profil_troncon": 14298
+ },
+ "pente_voirie": {
+  "hors_plafond_cheminement_n": 1927,
+  "hors_plafond_voirie_n": 787,
+  "max_pc": 75.942,
+  "mediane_pc": 1.269,
+  "p95_pc": 16.884,
+  "pires": [
+   {
+    "L_m": 5.837,
+    "id": "voi/8172#0",
+    "pente_pc": 75.942
+   },
+   {
+    "L_m": 18.014,
+    "id": "voi/4334#0",
+    "pente_pc": 75.505
+   },
+   {
+    "L_m": 18.014,
+    "id": "voi/4334#1",
+    "pente_pc": 75.505
+   },
+   {
+    "L_m": 2.081,
+    "id": "voi/8179#0",
+    "pente_pc": 74.531
+   },
+   {
+    "L_m": 21.835,
+    "id": "voi/9319#0",
+    "pente_pc": 70.105
+   },
+   {
+    "L_m": 21.835,
+    "id": "voi/9319#1",
+    "pente_pc": 70.105
+   },
+   {
+    "L_m": 11.187,
+    "id": "voi/5339#0",
+    "pente_pc": 69.777
+   },
+   {
+    "L_m": 28.328,
+    "id": "voi/7749#0",
+    "pente_pc": 69.667
+   },
+   {
+    "L_m": 28.328,
+    "id": "voi/7749#1",
+    "pente_pc": 69.667
+   },
+   {
+    "L_m": 106.506,
+    "id": "voi/9315#0",
+    "pente_pc": 66.371
+   },
+   {
+    "L_m": 29.607,
+    "id": "voi/7922#0",
+    "pente_pc": 63.83
+   },
+   {
+    "L_m": 225.139,
+    "id": "voi/2167#0",
+    "pente_pc": 62.962
+   },
+   {
+    "L_m": 225.139,
+    "id": "voi/2167#1",
+    "pente_pc": 62.962
+   },
+   {
+    "L_m": 225.139,
+    "id": "voi/2167#2",
+    "pente_pc": 62.962
+   },
+   {
+    "L_m": 225.139,
+    "id": "voi/2167#3",
+    "pente_pc": 62.962
+   },
+   {
+    "L_m": 225.139,
+    "id": "voi/2167#5",
+    "pente_pc": 62.962
+   },
+   {
+    "L_m": 28.721,
+    "id": "voi/8168#0",
+    "pente_pc": 62.712
+   },
+   {
+    "L_m": 133.861,
+    "id": "voi/3117#0",
+    "pente_pc": 62.384
+   },
+   {
+    "L_m": 133.861,
+    "id": "voi/3117#1",
+    "pente_pc": 62.384
+   },
+   {
+    "L_m": 5.805,
+    "id": "voi/474#0",
+    "pente_pc": 61.723
+   }
+  ]
+ }
+}

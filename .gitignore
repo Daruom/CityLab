@@ -34,3 +34,8 @@ SourceData/*.avant_interstices.json
 
 *.bak-*
 *.essai-*-KO
+
+# Plan de Ville : contrat machine regenerable bit-identique (Tools/PlanVille/c8_export.py ; empreintes dans data/plan_index.json)
+SourceData/PlanVille/data/plan_qui_*.json
+SourceData/PlanVille/data/plan_interfaces_*.json
+SourceData/PlanVille/data/plan_semis_*.json

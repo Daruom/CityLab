@@ -1,0 +1,246 @@
+{
+ "arbitrage": {
+  "cas": [
+   {
+    "a": "voi/7745#1",
+    "b": "bnd/8730#0",
+    "dz_m": 16.569,
+    "dz_max_m": 16.569,
+    "longueur_m": 2.185,
+    "mat": [
+     "mineral",
+     "mineral"
+    ],
+    "motif": "dZ = 16.57 m au-dessus du plafond de mur (12.0 m)",
+    "type": null,
+    "x": 1156.83,
+    "y": -880.72
+   },
+   {
+    "a": "voi/8081#0",
+    "b": "bnd/8730#0",
+    "dz_m": 16.569,
+    "dz_max_m": 16.569,
+    "longueur_m": 1.25,
+    "mat": [
+     "mineral",
+     "mineral"
+    ],
+    "motif": "dZ = 16.57 m au-dessus du plafond de mur (12.0 m)",
+    "type": null,
+    "x": 1156.8,
+    "y": -880.76
+   },
+   {
+    "a": "voi/8082#0",
+    "b": "bnd/8730#0",
+    "dz_m": 15.707,
+    "dz_max_m": 16.3963,
+    "longueur_m": 26.441,
+    "mat": [
+     "mineral",
+     "mineral"
+    ],
+    "motif": "dZ = 15.71 m au-dessus du plafond de mur (12.0 m)",
+    "type": null,
+    "x": 1175.7,
+    "y": -899.22
+   },
+   {
+    "a": "voi/7740#0",
+    "b": "bnd/8730#0",
+    "dz_m": 13.1766,
+    "dz_max_m": 15.7861,
+    "longueur_m": 98.148,
+    "mat": [
+     "mineral",
+     "mineral"
+    ],
+    "motif": "dZ = 13.18 m au-dessus du plafond de mur (12.0 m)",
+    "type": null,
+    "x": 1158.19,
+    "y": -880.71
+   },
+   {
+    "a": "zon/445#1",
+    "b": "bnd/8730#0",
+    "dz_m": 12.106,
+    "dz_max_m": 12.106,
+    "longueur_m": 89.559,
+    "mat": [
+     "vegetal",
+     "mineral"
+    ],
+    "motif": "dZ = 12.11 m au-dessus du plafond de mur (12.0 m)",
+    "type": null,
+    "x": 1223.36,
+    "y": -941.15
+   }
+  ],
+  "m": 217.6,
+  "n": 5
+ },
+ "couches": {
+  "interfaces.json": {
+   "md5_logique": "0907919b7bd9aa549b61dc7426352a2e",
+   "md5_octets": "0907919b7bd9aa549b61dc7426352a2e",
+   "octets": 2713
+  },
+  "juges.json": {
+   "md5_logique": "5b4c8bc2e58eff1cb17a0832b4114fb1",
+   "md5_octets": "5b4c8bc2e58eff1cb17a0832b4114fb1",
+   "octets": 18313
+  },
+  "matiere.json": {
+   "md5_logique": "442eb3c1e7d89e0adcef6dcbee0259f6",
+   "md5_octets": "442eb3c1e7d89e0adcef6dcbee0259f6",
+   "octets": 4150
+  },
+  "niveaux.json": {
+   "md5_logique": "04b0de70dd8ba426059dd16fc1da6753",
+   "md5_octets": "04b0de70dd8ba426059dd16fc1da6753",
+   "octets": 2613
+  },
+  "qui.json": {
+   "md5_logique": "926cfd3826c5cf129197d66e0e4ec262",
+   "md5_octets": "926cfd3826c5cf129197d66e0e4ec262",
+   "octets": 2817
+  }
+ },
+ "domaine": {
+  "cellules": [
+   "-4_-2",
+   "-3_-3",
+   "-3_-2",
+   "-3_-1",
+   "-3_0",
+   "-3_1",
+   "-3_2",
+   "-3_3",
+   "-2_-3",
+   "-2_-2",
+   "-2_-1",
+   "-2_0",
+   "-2_1",
+   "-2_2",
+   "-2_3",
+   "-1_-3",
+   "-1_-2",
+   "-1_-1",
+   "-1_0",
+   "-1_1",
+   "-1_2",
+   "-1_3",
+   "0_-3",
+   "0_-2",
+   "0_-1",
+   "0_0",
+   "0_1",
+   "0_2",
+   "0_3",
+   "1_-3",
+   "1_-2",
+   "1_-1",
+   "1_0",
+   "1_1",
+   "1_2",
+   "1_3",
+   "2_-3",
+   "2_-2",
+   "2_-1",
+   "2_0",
+   "2_1",
+   "2_2",
+   "2_3",
+   "3_-3",
+   "3_-2",
+   "3_-1",
+   "3_0",
+   "3_1",
+   "3_2"
+  ],
+  "m2": 12250000.0,
+  "source": "cellules citees par carte_v2.json (bandes + frontieres) — la carte fait autorite"
+ },
+ "ecarts_chiffres": {
+  "conflits_donnee_visible": {
+   "dur_peint_vegetal": {
+    "m2": 114330.4,
+    "parcelles": 1366
+   },
+   "zone_verte_minerale": {
+    "m2": 936.1,
+    "parcelles": 133
+   }
+  },
+  "contre_preuve_z": {
+   "desaccord_5cm_repartition_pc": {
+    "batiment": 0.09,
+    "organique": 43.68,
+    "ouvrage": 4.2,
+    "voirie": 2.05,
+    "zone": 41.3
+   },
+   "ecart_max_m": 9.563375,
+   "ecart_median_m": 0.000279,
+   "ecart_moyen_m": 0.203144,
+   "ecart_p95_m": 2.047195,
+   "ecart_p99_m": 3.524232,
+   "hors_bornes_n": 0,
+   "points": 93887,
+   "runs": 5028,
+   "sous_1cm_pc": 89.954,
+   "sous_5cm_pc": 90.218
+  },
+  "domaine_disque_hors_carte": {
+   "cellules_disque_n": 52,
+   "hors_carte": [
+    "-4_-1",
+    "-2_4",
+    "3_3"
+   ],
+   "manquantes_sur_disque": []
+  },
+  "emprise_des_masques": {
+   "cellules_masque": 36,
+   "cellules_plan": 49,
+   "m2": 615898.3,
+   "parcelles": 344
+  }
+ },
+ "empreintes_sources": {
+  "bati_3x3_json": "a419a841b7890fa1cd66aa09b4cf1066",
+  "bl2_emprise_wkt": "72e39d421bb1f2dbda270c90a2bc76de",
+  "ocsge_verts_json": "a6f07e8a2b4dbcca0826d483201aa1d1",
+  "routes_3x3_json": "5e9cb2c87b4b0a19dd3266db5c16597a"
+ },
+ "garde_etage_2": "un plan incomplet ou a l'empreinte fausse = build REFUSE, jamais devine (double empreinte octets + contenu logique LF)",
+ "index_donnees": {
+  "convention_decoupe": "parcelle et frontiere DECOUPEES PAR CELLULE",
+  "fichier": "data/plan_index.json",
+  "md5_logique": "679a274b851ce4474871d0a43e392d9a",
+  "md5_octets": "679a274b851ce4474871d0a43e392d9a",
+  "octets": 29739,
+  "totaux": {
+   "instances": 990061,
+   "interfaces_distinctes": 96986,
+   "interfaces_pieces": 99909,
+   "parcelles_distinctes": 46424,
+   "parcelles_pieces": 49934
+  }
+ },
+ "invariants": {
+  "couverture_pc": 100.0,
+  "dz_hors_bornes_n": 0,
+  "frontieres_sans_resolution_ni_arbitrage_n": 0,
+  "idempotence_2_compilations_bit_identiques": true,
+  "interstices_m2": 0.0,
+  "interstices_n": 0,
+  "mineral_sur_frontiere_vegetal_vegetal_n": 0,
+  "recouvrements_n": 0,
+  "semis_retenu_sur_dur_n": 0
+ },
+ "produit_par": "work/PLAN/c1..c7 (Python pur, zero Unreal)",
+ "version": "plan_ville/v1",
+ "visualiseur": "work/PLAN/visualiseur/index.html (double-clic)"
+}
