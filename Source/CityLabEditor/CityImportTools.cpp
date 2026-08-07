@@ -31,6 +31,8 @@
 #include "MeshDescription.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+// PARTITION : l'empreinte md5 de la carte, verifiee au chargement.
+#include "Misc/SecureHash.h"
 #include "PhysicsEngine/BodySetup.h"
 // Empattement des arbres : lecture des sommets du mesh (donnees de rendu LOD0).
 #include "StaticMeshResources.h"
@@ -707,6 +709,298 @@ namespace
 		return Quay;
 	}
 
+	// =========================================================================
+	// ⭐ CHANTIER PARTITION DU SOL (E2-a) — LA CARTE DE PROPRIETE DU SOL.
+	//
+	// Jusqu'ici le sol etait « le reste » : tout ce que personne ne reclamait
+	// retombait dans le drapage du MNT, et les frontieres etaient EMERGENTES,
+	// donc defectueuses (c'est la cause unique des 5 griefs de la saga berge).
+	// La carte `carte/v2.1`, cuite hors moteur et figee par son md5, dit QUI
+	// possede chaque m2.
+	//
+	// Ce que le moteur en fait, et RIEN d'autre (Playbook S11.3 ter — la
+	// cuisson livre, le moteur pose) :
+	//   * il VERIFIE l'empreinte du fichier (une carte qui a bouge sans qu'on
+	//     le sache serait pire qu'une carte absente) ;
+	//   * il pose les BANDES en RUBANS sur leur LIGNE PORTEUSE, au Z de la
+	//     surface RENDUE, avec une classe de revetement EXISTANTE ;
+	//   * il COUD les FRONTIERES ou la surface presente une marche.
+	//
+	// Absent / illisible / empreinte fausse = AUCUN effet, sans erreur : le
+	// generateur se comporte exactement comme avant, bit pour bit. C'est la
+	// meme convention que le plafond du lit et le constructeur de quai.
+	// =========================================================================
+	struct FCityPartition
+	{
+		enum class EProprio : uint8 { Ouvrage, Voirie, Batiment, Zone, Inconnu };
+
+		struct FBande
+		{
+			EProprio Proprio = EProprio::Inconnu;
+			FIntPoint Cellule = FIntPoint::ZeroValue;
+			double AireM2 = 0.0;
+			// Anneau exterieur, en cm monde. Les trous ne sont pas portes : une
+			// bande de 10 m2 n'en a pas (mesure : 0 trou sur 6 589 bandes).
+			TArray<FVector2D> Ext;
+			// Les LIGNES PORTEUSES : le contact avec le proprietaire. Le ruban
+			// se pose SUR elles — c'est ce qui garantit qu'il part du bon bord.
+			TArray<TArray<FVector2D>> Lignes;
+		};
+
+		struct FFrontiere
+		{
+			FIntPoint Cellule = FIntPoint::ZeroValue;
+			bool bEngagee = false;      // le dur est a moins de 3 m (engagement d'E0)
+			double LongueurM = 0.0;
+			TArray<FVector2D> Poly;     // cm monde
+		};
+
+		bool bActive = false;
+		FString Fichier;
+		FString Version;
+		FString Md5Fichier;
+		FString Md5Geometries;
+		float CelluleM = 0.f;
+		// LA REGLE, telle que la CARTE la publie — pas une constante moteur. C'est
+		// elle qui borne la largeur d'une bande : le C++ ne redecide rien.
+		float BandeMaxM = 0.f;
+		float CollierM = 0.f;
+		TArray<FBande> Bandes;
+		TArray<FFrontiere> Frontieres;
+
+		void Reset()
+		{
+			bActive = false;
+			Fichier.Empty();
+			Version.Empty();
+			Md5Fichier.Empty();
+			Md5Geometries.Empty();
+			CelluleM = 0.f;
+			Bandes.Reset();
+			Frontieres.Reset();
+		}
+
+		static EProprio ProprioDe(const FString& S)
+		{
+			if (S == TEXT("ouvrage")) { return EProprio::Ouvrage; }
+			if (S == TEXT("voirie")) { return EProprio::Voirie; }
+			if (S == TEXT("batiment")) { return EProprio::Batiment; }
+			if (S == TEXT("zone")) { return EProprio::Zone; }
+			return EProprio::Inconnu;
+		}
+
+		static const TCHAR* NomDe(EProprio P)
+		{
+			switch (P)
+			{
+			case EProprio::Ouvrage:  return TEXT("ouvrage");
+			case EProprio::Voirie:   return TEXT("voirie");
+			case EProprio::Batiment: return TEXT("batiment");
+			case EProprio::Zone:     return TEXT("zone");
+			default:                 return TEXT("inconnu");
+			}
+		}
+
+		// Les coordonnees de la carte sont en METRES (comme toutes les cuissons
+		// du projet) ; le moteur travaille en cm. Une seule conversion, ici.
+		static void LirePoly(const TArray<TSharedPtr<FJsonValue>>& In, TArray<FVector2D>& Out)
+		{
+			Out.Reset(In.Num());
+			for (const TSharedPtr<FJsonValue>& V : In)
+			{
+				const TArray<TSharedPtr<FJsonValue>>* C = nullptr;
+				if (V->TryGetArray(C) && C->Num() >= 2)
+				{
+					Out.Add(FVector2D((*C)[0]->AsNumber() * 100.0, (*C)[1]->AsNumber() * 100.0));
+				}
+			}
+		}
+
+		/**
+		 * Charge la carte et VERIFIE son empreinte. Le md5 attendu vit dans le
+		 * fichier `.md5` depose a cote par la cuisson : c'est la cuisson qui
+		 * fait autorite sur ce qu'elle a produit, pas une constante moteur qu'il
+		 * faudrait recompiler a chaque recuisson. Empreinte absente = on
+		 * journalise et on charge quand meme (la garde protege de la CORRUPTION,
+		 * elle n'interdit pas de travailler sans elle) ; empreinte PRESENTE ET
+		 * FAUSSE = refus net.
+		 */
+		bool Charger(const FString& Dir)
+		{
+			Reset();
+			const FString Chemin = FPaths::Combine(Dir, TEXT("carte_v2.json"));
+			FString Texte;
+			if (!FFileHelper::LoadFileToString(Texte, *Chemin))
+			{
+				return false;   // pas de carte : pas d'objet, et pas d'erreur
+			}
+			// L'empreinte se calcule SUR LES OCTETS **et** sur le contenu LOGIQUE
+			// (fins de ligne normalisees en LF), et l'attendu doit egaler l'une des
+			// deux. Ce n'est pas une complaisance : c'est le seul moyen qu'une
+			// empreinte survive a une TRADUCTION DE FINS DE LIGNE, que le systeme
+			// fait dans le dos de tout le monde (`open(..., 'w')` de Python sur
+			// Windows, `git core.autocrlf`, un editeur qui resauve). Cas paye ici
+			// meme : la carte publiee etait empreintee AVANT sa traduction CRLF —
+			// 660 913 fins de ligne changees, fichier INTACT, empreinte fausse.
+			// Ce qu'on veut garantir, c'est que le CONTENU n'a pas bouge.
+			auto Md5De = [](const uint8* Donnees, int32 Taille)
+			{
+				FMD5 H;
+				H.Update(Donnees, Taille);
+				uint8 D[16];
+				H.Final(D);
+				FString S;
+				for (int32 i = 0; i < 16; ++i) { S += FString::Printf(TEXT("%02x"), D[i]); }
+				return S;
+			};
+			TArray<uint8> Octets;
+			FString CalculeOctets, CalculeLogique;
+			if (FFileHelper::LoadFileToArray(Octets, *Chemin))
+			{
+				CalculeOctets = Md5De(Octets.GetData(), Octets.Num());
+				TArray<uint8> Normalise;
+				Normalise.Reserve(Octets.Num());
+				for (int32 i = 0; i < Octets.Num(); ++i)
+				{
+					if (Octets[i] == '\r' && i + 1 < Octets.Num() && Octets[i + 1] == '\n')
+					{
+						continue;   // CRLF -> LF
+					}
+					Normalise.Add(Octets[i]);
+				}
+				CalculeLogique = Md5De(Normalise.GetData(), Normalise.Num());
+			}
+			const FString Calcule = CalculeOctets;
+			FString Attendu;
+			if (FFileHelper::LoadFileToString(Attendu, *(Chemin + TEXT(".md5"))))
+			{
+				Attendu = Attendu.TrimStartAndEnd().ToLower();
+				// Le fichier peut porter « <md5>  <nom> » (format md5sum).
+				FString G, D;
+				if (Attendu.Split(TEXT(" "), &G, &D)) { Attendu = G.TrimStartAndEnd(); }
+				if (!Attendu.IsEmpty() && Attendu != CalculeOctets && Attendu != CalculeLogique)
+				{
+					UE_LOG(LogCityImport, Display,
+						TEXT("PARTITION : carte REFUSEE — md5 attendu %s ; calcule sur les octets %s, "
+							 "sur le contenu logique %s ('%s'). "
+							 "Aucune bande, aucune couture : le sol reste EXACTEMENT ce qu'il etait."),
+						*Attendu, *CalculeOctets, *CalculeLogique, *Chemin);
+					return false;
+				}
+				if (!Attendu.IsEmpty() && Attendu != CalculeOctets)
+				{
+					UE_LOG(LogCityImport, Display,
+						TEXT("PARTITION : empreinte VERIFIEE sur le CONTENU LOGIQUE (%s) — les octets "
+							 "du fichier donnent %s (fins de ligne traduites depuis la cuisson). "
+							 "Le contenu n'a pas bouge."),
+						*CalculeLogique, *CalculeOctets);
+				}
+			}
+			else
+			{
+				UE_LOG(LogCityImport, Display,
+					TEXT("PARTITION : pas de '%s.md5' — carte chargee SANS garde d'empreinte."),
+					*Chemin);
+			}
+			TSharedPtr<FJsonObject> Root;
+			if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Texte), Root) || !Root.IsValid())
+			{
+				UE_LOG(LogCityImport, Display,
+					TEXT("PARTITION : '%s' n'est pas un JSON valide — carte IGNOREE."), *Chemin);
+				return false;
+			}
+			Root->TryGetStringField(TEXT("version"), Version);
+			Root->TryGetStringField(TEXT("empreinte_geometries_v2"), Md5Geometries);
+			double CellM = 0.0;
+			Root->TryGetNumberField(TEXT("cellule_m"), CellM);
+			CelluleM = (float)CellM;
+			const TSharedPtr<FJsonObject>* Regle = nullptr;
+			if (Root->TryGetObjectField(TEXT("regle"), Regle) && Regle && Regle->IsValid())
+			{
+				double V = 0.0;
+				if ((*Regle)->TryGetNumberField(TEXT("BANDE_MAX_M"), V)) { BandeMaxM = (float)V; }
+				if ((*Regle)->TryGetNumberField(TEXT("COLLIER_M"), V)) { CollierM = (float)V; }
+			}
+			Md5Fichier = Calcule;
+			Fichier = Chemin;
+
+			const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+			if (Root->TryGetArrayField(TEXT("bandes"), Arr))
+			{
+				Bandes.Reserve(Arr->Num());
+				for (const TSharedPtr<FJsonValue>& V : *Arr)
+				{
+					const TSharedPtr<FJsonObject>& O = V->AsObject();
+					if (!O.IsValid()) { continue; }
+					FBande B;
+					FString Prop;
+					O->TryGetStringField(TEXT("proprietaire"), Prop);
+					B.Proprio = ProprioDe(Prop);
+					O->TryGetNumberField(TEXT("aire_m2"), B.AireM2);
+					const TArray<TSharedPtr<FJsonValue>>* Cel = nullptr;
+					if (O->TryGetArrayField(TEXT("cellule"), Cel) && Cel->Num() >= 2)
+					{
+						B.Cellule = FIntPoint((int32)(*Cel)[0]->AsNumber(), (int32)(*Cel)[1]->AsNumber());
+					}
+					const TArray<TSharedPtr<FJsonValue>>* Anneaux = nullptr;
+					if (O->TryGetArrayField(TEXT("anneaux"), Anneaux) && Anneaux->Num() > 0)
+					{
+						const TSharedPtr<FJsonObject>& A0 = (*Anneaux)[0]->AsObject();
+						const TArray<TSharedPtr<FJsonValue>>* Ext = nullptr;
+						if (A0.IsValid() && A0->TryGetArrayField(TEXT("ext"), Ext))
+						{
+							LirePoly(*Ext, B.Ext);
+						}
+					}
+					const TArray<TSharedPtr<FJsonValue>>* Lignes = nullptr;
+					if (O->TryGetArrayField(TEXT("ligne_porteuse"), Lignes))
+					{
+						for (const TSharedPtr<FJsonValue>& LV : *Lignes)
+						{
+							const TArray<TSharedPtr<FJsonValue>>* L = nullptr;
+							if (!LV->TryGetArray(L)) { continue; }
+							TArray<FVector2D> Pts;
+							LirePoly(*L, Pts);
+							if (Pts.Num() >= 2) { B.Lignes.Add(MoveTemp(Pts)); }
+						}
+					}
+					Bandes.Add(MoveTemp(B));
+				}
+			}
+			if (Root->TryGetArrayField(TEXT("frontieres"), Arr))
+			{
+				Frontieres.Reserve(Arr->Num());
+				for (const TSharedPtr<FJsonValue>& V : *Arr)
+				{
+					const TSharedPtr<FJsonObject>& O = V->AsObject();
+					if (!O.IsValid()) { continue; }
+					FFrontiere F;
+					O->TryGetBoolField(TEXT("couture_engagee"), F.bEngagee);
+					O->TryGetNumberField(TEXT("longueur_m"), F.LongueurM);
+					const TArray<TSharedPtr<FJsonValue>>* Cel = nullptr;
+					if (O->TryGetArrayField(TEXT("cellule"), Cel) && Cel->Num() >= 2)
+					{
+						F.Cellule = FIntPoint((int32)(*Cel)[0]->AsNumber(), (int32)(*Cel)[1]->AsNumber());
+					}
+					const TArray<TSharedPtr<FJsonValue>>* P = nullptr;
+					if (O->TryGetArrayField(TEXT("polyligne"), P))
+					{
+						LirePoly(*P, F.Poly);
+					}
+					if (F.Poly.Num() >= 2) { Frontieres.Add(MoveTemp(F)); }
+				}
+			}
+			bActive = (Bandes.Num() > 0 || Frontieres.Num() > 0);
+			return bActive;
+		}
+	};
+
+	FCityPartition& PartitionSingleton()
+	{
+		static FCityPartition Partition;
+		return Partition;
+	}
+
 	// Contexte de drapage resolu en debut d'import : sampler charge une fois +
 	// altitude de rebase (Capitole -> z=0). Sampler nul = profil plat (mobile),
 	// GroundZ rend alors exactement 0 (golden path bit-a-bit).
@@ -869,6 +1163,26 @@ namespace
 						*QDir, Quay.GridN, Quay.MursExclus.Num(),
 						Quay.VoleesConstructeur.Num());
 				}
+			}
+		}
+		// ⭐ PARTITION : LA CARTE DE PROPRIETE DU SOL. Rechargee a CHAQUE import,
+		// comme le plafond et le quai (la carte peut avoir ete recuite entre deux
+		// passes). Les DEUX passes qui touchent au sol la voient donc, et elles
+		// lisent LE MEME fichier — une seule verite.
+		FCityPartition& Part = PartitionSingleton();
+		Part.Reset();
+		if (Profile.bPartition)
+		{
+			const FString PDir = Profile.PartitionPath.IsEmpty()
+				? FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/Partition"))
+				: Profile.PartitionPath;
+			if (Part.Charger(PDir))
+			{
+				UE_LOG(LogCityImport, Display,
+					TEXT("PARTITION : carte '%s' CHARGEE ('%s') — md5 %s, empreinte geometries %s, "
+						 "%d bandes, %d frontieres, cellule %.0f m."),
+					*Part.Version, *Part.Fichier, *Part.Md5Fichier, *Part.Md5Geometries,
+					Part.Bandes.Num(), Part.Frontieres.Num(), Part.CelluleM);
 			}
 		}
 		return true;
@@ -4840,7 +5154,18 @@ namespace
 		bool bBakedShade = true, const FResolvedSurface* Surf = nullptr,
 		const FResolvedSurface* SurfPlain = nullptr, const TArray<uint8>* NearJunction = nullptr,
 		const FResolvedSurface* SurfCurb = nullptr, const FResolvedSurface* SurfSlab = nullptr,
-		const FJunctionMap* Junctions = nullptr, int32* OutCurbQuads = nullptr)
+		const FJunctionMap* Junctions = nullptr, int32* OutCurbQuads = nullptr,
+		// PARTITION : le SOCLE du ruban. 55 cm = la valeur historique de la voirie
+		// (elle survolait une dalle plate) ; tout appel qui ne le precise pas garde
+		// donc exactement le meme Z, bit pour bit. Les rubans de BANDE, eux, se
+		// posent sur une dalle DRAPEE : il n'y a plus rien a survoler.
+		float ZBaseCm = 55.f,
+		// PARTITION : ECHELLE DE DEMI-LARGEUR PAR SOMMET, entre 0 et 1. Un
+		// decalage constant applique a des normales de SOMMET se CROISE des que la
+		// ligne tourne serre — le quad s'inverse et on obtient un noeud papillon
+		// (c'est le meme defaut que les 73 murs sur 239 du lot BERGES, corrige la
+		// par le meme rabotage). Nul = comportement historique, bit pour bit.
+		const TArray<float>* HalfScale = nullptr)
 	{
 		const int32 N = PtsCm.Num();
 		if (N < 2)
@@ -4854,8 +5179,8 @@ namespace
 		// de la meme classe, dix fois plus petit que le pas entre classes : l'ordre
 		// entre classes ne s'inverse jamais.
 		const float ZRoad = Surf
-			? 55.f + Surf->Class->ZClassCm + (RoadIndex % 4) * 0.4f
-			: 55.f + (RoadIndex % 7) * 4.f;
+			? ZBaseCm + Surf->Class->ZClassCm + (RoadIndex % 4) * 0.4f
+			: ZBaseCm + (RoadIndex % 7) * 4.f;
 		const bool bWalkway = Type == TEXT("footway") || Type == TEXT("path") || Type == TEXT("cycleway");
 		const bool bMarking = !bWalkway && WidthCm >= 550.f;
 		const bool bSolid = Type == TEXT("primary") || Type == TEXT("secondary");
@@ -4894,7 +5219,10 @@ namespace
 			// v5 : en rue complete, le quad de CLASSE ne couvre plus que la chaussee —
 			// les rives partent dans le groupe de la dalle et la bordure les separe.
 			const float QuadHalf = bStreet ? RoadHalf : Half;
-			const FVector2D NA = Nrm[i] * QuadHalf, NB = Nrm[i + 1] * QuadHalf;
+			// Rabotage anti-retournement, sommet par sommet (cf. HalfScale).
+			const float SA = HalfScale && HalfScale->IsValidIndex(i) ? (*HalfScale)[i] : 1.f;
+			const float SB = HalfScale && HalfScale->IsValidIndex(i + 1) ? (*HalfScale)[i + 1] : 1.f;
+			const FVector2D NA = Nrm[i] * (QuadHalf * SA), NB = Nrm[i + 1] * (QuadHalf * SB);
 			const float SegLen = (B - A).Size();
 			const float ZA = ZRoad + (TerrainZ ? (*TerrainZ)[i] : 0.f);
 			const float ZB = ZRoad + (TerrainZ ? (*TerrainZ)[i + 1] : 0.f);
@@ -6158,6 +6486,380 @@ namespace
 		}
 		return bIn;
 	}
+
+	// =========================================================================
+	// ⭐ PARTITION DU SOL — ① LE CONTRAT DE Z, ③ LE RUBAN DE BANDE,
+	//                       ④ LA LOI D'INTERFACE.
+	//
+	// « La carte dit QUI possede ; le contrat de Z dit A QUELLE COTE ; la
+	// couture dit COMMENT deux proprietaires se rencontrent. »
+	// =========================================================================
+
+	/**
+	 * ① LE CONTRAT DE Z. Le profil d'une ligne : ses points re-echantillonnes a
+	 * pas fixe et, sous chacun, le Z de la surface RENDUE lu par `At()` — LE
+	 * lecteur canonique du projet (celui des escaliers, des gradins, des murs et
+	 * de la vegetation). Lire ne change rien : le contrat est ADDITIF par
+	 * construction, et c'est ce qui rend l'acceptation ① vraie a priori.
+	 */
+	struct FProfilZ
+	{
+		TArray<FVector2D> Pts;   // cm monde
+		TArray<float> Z;         // cm monde, surface RENDUE
+	};
+
+	void EchantillonnerProfil(const TArray<FVector2D>& Ligne, float PasCm,
+		const FRenderedGroundZ& RGZ, FProfilZ& Out)
+	{
+		Out.Pts = (PasCm > 0.f) ? ResamplePolyline(Ligne, PasCm) : Ligne;
+		Out.Z.SetNumUninitialized(Out.Pts.Num());
+		for (int32 i = 0; i < Out.Pts.Num(); ++i)
+		{
+			Out.Z[i] = RGZ.At(Out.Pts[i].X, Out.Pts[i].Y);
+		}
+	}
+
+	/** Normales par sommet d'une polyligne — meme calcul que BuildRoad. */
+	void NormalesSommet(const TArray<FVector2D>& Pts, TArray<FVector2D>& Out)
+	{
+		const int32 N = Pts.Num();
+		Out.SetNum(N);
+		for (int32 i = 0; i < N; ++i)
+		{
+			FVector2D D(0, 0);
+			if (i > 0) { D += (Pts[i] - Pts[i - 1]).GetSafeNormal(); }
+			if (i < N - 1) { D += (Pts[i + 1] - Pts[i]).GetSafeNormal(); }
+			D = D.GetSafeNormal();
+			Out[i] = FVector2D(-D.Y, D.X);
+		}
+	}
+
+	float LongueurCm(const TArray<FVector2D>& Pts)
+	{
+		float L = 0.f;
+		for (int32 i = 0; i + 1 < Pts.Num(); ++i)
+		{
+			L += (float)(Pts[i + 1] - Pts[i]).Size();
+		}
+		return L;
+	}
+
+	/**
+	 * ③ LA CLASSE DU PROPRIETAIRE — et rien qu'elle. AUCUNE classe ni matiere
+	 * nouvelle n'est creee par ce chantier : une bande annexee prend le
+	 * revetement de celui qui l'a annexee, tel qu'il existe deja.
+	 *   voirie / batiment -> la DALLE. C'est la doctrine v5 mot pour mot : « le
+	 *     trottoir n'est PAS un revetement de plus, c'est le sol de la ville ».
+	 *     Une bande le long d'une rue ou au pied d'un immeuble EST cette rive.
+	 *   ouvrage -> la PIERRE DE QUAI (GSurfCurb), deja le materiau des faces et
+	 *     des couronnements de l'ouvrage de berge.
+	 *   zone -> l'HERBE COUPEE, la seule herbe de tous les espaces verts depuis
+	 *     l'assainissement v5.
+	 */
+	const FSurfaceClass* ClasseDeProprio(FCityPartition::EProprio P)
+	{
+		switch (P)
+		{
+		case FCityPartition::EProprio::Ouvrage:  return &GSurfCurb;
+		case FCityPartition::EProprio::Voirie:   return &GSurfSlab;
+		case FCityPartition::EProprio::Batiment: return &GSurfSlab;
+		case FCityPartition::EProprio::Zone:     return &GSurfGrassCut;
+		default:                                 return nullptr;
+		}
+	}
+
+	/**
+	 * ③ LA GEOMETRIE DU RUBAN DE BANDE.
+	 *
+	 * La bande est un polygone mince (≤ 3 m par la regle de la carte) accroche a
+	 * son proprietaire par sa LIGNE PORTEUSE. Le ruban se pose SUR cette ligne
+	 * et se pousse vers l'INTERIEUR de la bande :
+	 *   * largeur = aire / longueur de ligne — la largeur MOYENNE mesuree, un
+	 *     nombre, pas une interpolation ; le collier l'elargit un peu pour que
+	 *     le ruban couvre la bande ENTIERE (13.2 : le recouvrement est benin,
+	 *     le vide est fatal) ;
+	 *   * le COTE se decide par POINT-DANS-POLYGONE (loi 13.3), jamais par le
+	 *     signe d'une normale : on sonde les deux cotes et on garde celui qui
+	 *     tombe dans l'anneau de la bande, a la majorite des sommets ;
+	 *   * le Z vient du profil lu SUR LA LIGNE PORTEUSE, c'est-a-dire AU
+	 *     CONTACT DU PROPRIETAIRE : c'est en cela que la bande cesse d'etre
+	 *     drapee comme de l'organique. Il est CONSTANT en travers de la bande
+	 *     (une constante n'est pas une nappe, 13.1) et suit la surface le long.
+	 *
+	 * Rend false quand il n'y a rien a poser (ligne trop courte, aire nulle).
+	 */
+	// Raisons d'ecart d'un ruban de bande. Nommees : « compte, jamais tu en silence ».
+	enum class ERubanRaison : uint8 { Pose, TropFine, NonRuban };
+
+	/**
+	 * ⛔ LE RABOTAGE ANTI-RETOURNEMENT — mecanisme du projet, repris tel quel du
+	 * constructeur de murs (`Deretourne`, lot BERGES) et non reinvente.
+	 *
+	 * Un decalage CONSTANT applique a des normales de SOMMET se croise des que la
+	 * ligne tourne plus serre que le decalage : le quad s'inverse et l'on obtient
+	 * un NOEUD PAPILLON — le coin sombre plie en deux vu sur la capture. On rabote
+	 * le decalage aux SEULS sommets fautifs (moitie a chaque passe) jusqu'a ce que
+	 * la ligne decalee AVANCE partout, des DEUX cotes. La convergence est acquise :
+	 * a decalage nul, la ligne decalee EST l'axe, qui avance toujours.
+	 *
+	 * Rend le nombre de sommets rabotes.
+	 */
+	int32 EchelleAntiRetournement(const TArray<FVector2D>& Pts, const TArray<FVector2D>& Nrm,
+		float OffCm, TArray<float>& Echelle)
+	{
+		const int32 N = Pts.Num();
+		Echelle.Init(1.f, N);
+		if (OffCm <= 0.f || N < 2)
+		{
+			return 0;
+		}
+		for (int32 Iter = 0; Iter < 12; ++Iter)
+		{
+			bool bPropre = true;
+			for (int32 i = 0; i + 1 < N; ++i)
+			{
+				FVector2D A = Pts[i + 1] - Pts[i];
+				if (A.IsNearlyZero())
+				{
+					continue;
+				}
+				A.Normalize();
+				bool bFaute = false;
+				for (double Signe : { 1.0, -1.0 })
+				{
+					const FVector2D O0 = Pts[i] + Nrm[i] * (Signe * (double)(OffCm * Echelle[i]));
+					const FVector2D O1 = Pts[i + 1]
+						+ Nrm[i + 1] * (Signe * (double)(OffCm * Echelle[i + 1]));
+					if (FVector2D::DotProduct(O1 - O0, A) < 0.0)
+					{
+						bFaute = true;
+					}
+				}
+				if (!bFaute)
+				{
+					continue;
+				}
+				bPropre = false;
+				Echelle[i] *= 0.5f;
+				Echelle[i + 1] *= 0.5f;
+			}
+			if (bPropre)
+			{
+				break;
+			}
+		}
+		int32 Rabotes = 0;
+		for (int32 i = 0; i < N; ++i)
+		{
+			if (Echelle[i] < 1.f) { ++Rabotes; }
+		}
+		return Rabotes;
+	}
+
+	bool RubanDeBande(const FCityPartition::FBande& B, const TArray<FVector2D>& Ligne,
+		float PasCm, float CollierCm, float LargeurMaxCm, float SondeProprioCm,
+		const FRenderedGroundZ& RGZ,
+		TArray<FVector2D>& OutAxe, TArray<float>& OutZ, float& OutLargeurCm,
+		TArray<FVector2D>& OutBordLibre, ERubanRaison& OutRaison,
+		TArray<float>& OutEchelle, int32& OutRabotes)
+	{
+		OutRaison = ERubanRaison::TropFine;
+		FProfilZ Profil;
+		EchantillonnerProfil(Ligne, PasCm, RGZ, Profil);
+		const int32 N = Profil.Pts.Num();
+		if (N < 2 || B.Ext.Num() < 3 || B.AireM2 <= 0.0)
+		{
+			return false;
+		}
+		const float LigneCm = LongueurCm(Profil.Pts);
+		if (LigneCm < 1.f)
+		{
+			return false;
+		}
+		// Aire en cm2 (m2 x 10 000) rapportee a la longueur de la ligne.
+		const float LargeurCm = (float)(B.AireM2 * 10000.0) / LigneCm;
+		if (LargeurCm < 1.f)
+		{
+			return false;
+		}
+		// ⛔ LE MODELE RUBAN NE DECRIT PAS TOUTE BANDE. La carte publie sa propre
+		// borne (`BANDE_MAX_M`) : une bande est au plus large de cela. Quand la
+		// largeur DEDUITE la depasse, ce n'est pas la bande qui est large — c'est
+		// que la ligne porteuse ne longe pas la bande : elle l'EFFLEURE (mesure sur
+		// le district : jusqu'a 598 m2 pour 4 cm de contact, soit un ruban de
+		// 14 km de large). Poser serait poser FAUX ; on ecarte et on COMPTE.
+		if (LargeurMaxCm > 0.f && LargeurCm > LargeurMaxCm)
+		{
+			OutRaison = ERubanRaison::NonRuban;
+			return false;
+		}
+		TArray<FVector2D> Nrm;
+		NormalesSommet(Profil.Pts, Nrm);
+		// LE COTE, par point-dans-polygone. La sonde vaut la moitie de la largeur
+		// (bornee) : assez loin pour sortir du bruit du contour, assez pres pour
+		// rester dans une bande mince.
+		const double Sonde = (double)FMath::Clamp(LargeurCm * 0.5f, 3.f, 150.f);
+		int32 Plus = 0, Moins = 0;
+		for (int32 i = 0; i < N; ++i)
+		{
+			if (PointInRing(B.Ext, Profil.Pts[i] + Nrm[i] * Sonde)) { ++Plus; }
+			if (PointInRing(B.Ext, Profil.Pts[i] - Nrm[i] * Sonde)) { ++Moins; }
+		}
+		if (Plus == 0 && Moins == 0)
+		{
+			return false;   // la ligne ne borde pas cette bande : on n'invente rien
+		}
+		const double Signe = (Plus >= Moins) ? 1.0 : -1.0;
+		OutRaison = ERubanRaison::Pose;
+		OutLargeurCm = LargeurCm + 2.f * CollierCm;
+		// Le point le plus EXTERIEUR du ruban est a (largeur + collier) de la ligne
+		// porteuse : c'est ce decalage-la qu'on rabote, et l'echelle obtenue sert
+		// AUSSI a BuildRoad pour sa propre demi-largeur — sans quoi le noeud
+		// papillon reapparaitrait a l'interieur du constructeur.
+		TArray<float> EchLigne;
+		OutRabotes = EchelleAntiRetournement(Profil.Pts, Nrm, LargeurCm + CollierCm, EchLigne);
+		OutAxe.SetNumUninitialized(N);
+		OutBordLibre.SetNumUninitialized(N);
+		OutZ.SetNumUninitialized(N);
+		for (int32 i = 0; i < N; ++i)
+		{
+			const double Ech = (double)EchLigne[i];
+			// ⭐ LE Z DU PROPRIETAIRE SE LIT CHEZ LE PROPRIETAIRE, PAS SUR LA
+			// FRONTIERE. Sur la ligne meme, `At()` est AMBIGU par definition : elle
+			// longe une discontinuite, et deux echantillons voisins tombent de part
+			// et d'autre (mesure sur les bandes d'ouvrage : 3,7 m d'ecart d'un
+			// echantillon au suivant — un ruban en dents de scie). On sonde donc
+			// LEGEREMENT A L'INTERIEUR du proprietaire, ou la surface est definie.
+			// Ce n'est PAS un lissage (13.1 : aucune nappe) : c'est un echantillon
+			// deplace, chaque valeur reste une cote MESUREE de la surface rendue.
+			const FVector2D Chez = Profil.Pts[i] - Nrm[i] * (Signe * (double)SondeProprioCm);
+			const float ZP = RGZ.At(Chez.X, Chez.Y);
+			OutZ[i] = (ZP > TNumericLimits<float>::Lowest()) ? ZP : Profil.Z[i];
+			// L'axe du ruban : au milieu de la bande. Son BORD LIBRE (celui qui
+			// donne sur l'organique) est a l'autre bout — c'est lui que la loi
+			// d'interface viendra coudre.
+			OutAxe[i] = Profil.Pts[i] + Nrm[i] * (Signe * (double)LargeurCm * 0.5 * Ech);
+			OutBordLibre[i] = Profil.Pts[i] + Nrm[i] * (Signe * (double)OutLargeurCm * Ech);
+		}
+		// ⚠️ ET C'EST ICI QUE SE JOUE LE NOEUD PAPILLON, pas plus haut : le
+		// constructeur de ruban recalcule SES PROPRES normales sur l'AXE qu'on lui
+		// donne, et decale de +-demi-largeur DEPUIS CET AXE. Un rabotage calcule
+		// sur la ligne porteuse ne garde donc pas ce que BuildRoad fabrique
+		// vraiment (erreur payee : le pli etait toujours la apres le premier
+		// correctif). L'echelle rendue est celle de l'AXE, avec SES normales et
+		// SON decalage — exactement la geometrie que le constructeur va poser.
+		TArray<FVector2D> NrmAxe;
+		NormalesSommet(OutAxe, NrmAxe);
+		OutRabotes += EchelleAntiRetournement(OutAxe, NrmAxe, OutLargeurCm * 0.5f, OutEchelle);
+		return true;
+	}
+
+	/**
+	 * ④ LA LOI D'INTERFACE — LA COUTURE.
+	 *
+	 * Une face VERTICALE cousue SOMMET POUR SOMMET entre deux cotes d'une
+	 * frontiere : le haut suit la surface du proprietaire, le bas suit la
+	 * surface voisine. Il n'y a aucun test de normale directionnelle (13.3) :
+	 * l'ORIENTATION est celle que donnent les deux surfaces elles-memes — la
+	 * face regarde toujours vers le BAS-COTE, celui d'ou on la voit.
+	 *
+	 * Rend le nombre de quads poses et cumule la longueur cousue (en cm).
+	 */
+	int32 CoudreFace(FCityMeshBuilder& QM, const TArray<FVector2D>& BordIn,
+		const TArray<float>& ZHautIn, const TArray<float>& ZBasIn, float SeuilCm,
+		const FResolvedSurface* Pierre, const FVector3f& Teinte, float& OutLongueurCm,
+		// Le PLAFOND : au-dela, ce n'est plus une couture mais un ouvrage deja
+		// bati — on ne coud pas, et on COMPTE. 0 = pas de plafond.
+		float HauteurMaxCm, int32& OutTropHaut, float& OutMarcheMaxCm,
+		// La direction, en plan, du COTE BAS — celui d'ou la face se voit. Elle est
+		// MESUREE (comparaison des deux surfaces voisines), jamais devinee. Nulle =
+		// on ne verifie pas. Le sens d'enroulement est corrige NUMERIQUEMENT ici :
+		// aucun raisonnement de signe ne survit a un contour qui tourne (13.3).
+		const FVector2D& DirBas = FVector2D::ZeroVector)
+	{
+		if (BordIn.Num() < 2)
+		{
+			return 0;
+		}
+		TArray<FVector2D> Bord = BordIn;
+		TArray<float> ZHaut = ZHautIn;
+		TArray<float> ZBas = ZBasIn;
+		if (!DirBas.IsNearlyZero() && Bord.Num() >= 2 && ZHaut.Num() == Bord.Num())
+		{
+			// Normale du quad telle que l'enroulement la produira, sur le segment
+			// median. Si elle tourne le dos au bas-cote, on retourne le contour.
+			const int32 M = Bord.Num() / 2;
+			const int32 A = FMath::Clamp(M - 1, 0, Bord.Num() - 2);
+			const FVector2D T = Bord[A + 1] - Bord[A];
+			const FVector2D NorPlan(T.Y, -T.X);
+			if (FVector2D::DotProduct(NorPlan, DirBas) < 0.0)
+			{
+				Algo::Reverse(Bord);
+				Algo::Reverse(ZHaut);
+				Algo::Reverse(ZBas);
+			}
+		}
+		const int32 N = Bord.Num();
+		if (N < 2 || ZHaut.Num() != N || ZBas.Num() != N)
+		{
+			return 0;
+		}
+		const FPolygonGroupID Groupe = Pierre
+			? QM.GetOrCreateGroup(Pierre->SlotName(), Pierre->Material) : QM.WallGroup;
+		int32 Quads = 0;
+		float Arc = 0.f;
+		for (int32 i = 0; i + 1 < N; ++i)
+		{
+			const float SegCm = (float)(Bord[i + 1] - Bord[i]).Size();
+			const float HA = ZHaut[i] - ZBas[i];
+			const float HB = ZHaut[i + 1] - ZBas[i + 1];
+			OutMarcheMaxCm = FMath::Max(OutMarcheMaxCm, FMath::Max(HA, HB));
+			// Les deux surfaces se touchent deja (ou le haut est ENTERRE sous le
+			// bas : l'objet est noye, ce qui est benin) — rien a coudre.
+			if (HA <= SeuilCm && HB <= SeuilCm)
+			{
+				Arc += SegCm;
+				continue;
+			}
+			// ⛔ AU-DELA D'UN NIVEAU, CE N'EST PLUS UNE COUTURE. C'est un mur de
+			// quai, un flanc de pont, un mur de soutenement : un OUVRAGE, qui a
+			// deja sa face. Coudre ici doublerait un mur existant.
+			if (HauteurMaxCm > 0.f && (HA > HauteurMaxCm || HB > HauteurMaxCm))
+			{
+				++OutTropHaut;
+				Arc += SegCm;
+				continue;
+			}
+			const float BasA = ZBas[i], BasB = ZBas[i + 1];
+			const float HautA = FMath::Max(ZHaut[i], BasA), HautB = FMath::Max(ZHaut[i + 1], BasB);
+			const FVector3f P[4] = {
+				FVector3f((float)Bord[i].X, (float)Bord[i].Y, BasA),
+				FVector3f((float)Bord[i + 1].X, (float)Bord[i + 1].Y, BasB),
+				FVector3f((float)Bord[i + 1].X, (float)Bord[i + 1].Y, HautB),
+				FVector3f((float)Bord[i].X, (float)Bord[i].Y, HautA) };
+			// La normale sort de l'ENROULEMENT des sommets, comme partout dans le
+			// projet : elle est une propriete geometrique du quad, pas un choix.
+			FVector3f Nor = FVector3f::CrossProduct(P[1] - P[0], P[3] - P[0]);
+			if (Nor.SizeSquared() < 1e-6f)
+			{
+				Arc += SegCm;
+				continue;
+			}
+			Nor.Normalize();
+			// UV0 en METRES, comme tous les revetements : U = abscisse curviligne,
+			// V = hauteur. La pierre de quai se lit donc a sa vraie echelle.
+			const FVector2f UV[4] = {
+				FVector2f(Arc * 0.01f, 0.f),
+				FVector2f((Arc + SegCm) * 0.01f, 0.f),
+				FVector2f((Arc + SegCm) * 0.01f, (HautB - BasB) * 0.01f),
+				FVector2f(Arc * 0.01f, (HautA - BasA) * 0.01f) };
+			QM.AddPoly(Groupe, P, 4, Nor, UV, Teinte);
+			++Quads;
+			OutLongueurCm += SegCm;
+			Arc += SegCm;
+		}
+		return Quads;
+	}
 }
 
 FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFilePath,
@@ -6614,6 +7316,146 @@ FCitySurfacesSummary UCityImportTools::ImportCitySurfaces(const FString& JsonFil
 				TEXT("LOT EAU : %d cellules IGNOREES — side-car cuit pour des cellules de %.0f m, import a %.0f m."),
 				EauTailleKo, EauTailleCuiteM, CellSizeM);
 		}
+	}
+
+	// -----------------------------------------------------------------------------
+	// ⭐ PARTITION ① — LE CONTRAT DE Z, PUBLIE.
+	//
+	// « La carte dit QUI possede ; ce side-car dit A QUELLE COTE. »
+	// La passe de surfaces echantillonne la surface RENDUE (`FRenderedGroundZ::At`,
+	// le lecteur canonique) le long des LIGNES PORTEUSES des bandes et des
+	// FRONTIERES de la carte, et publie le resultat, versionne et empreinte.
+	//
+	// C'est une LECTURE : aucune geometrie n'est creee, deplacee ni supprimee ici.
+	// L'acceptation ① (« rien ne bouge la ou rien ne devait bouger ») est donc
+	// vraie PAR CONSTRUCTION pour cette etape — ce qui n'empeche pas de la
+	// verifier par diff, et c'est fait.
+	// -----------------------------------------------------------------------------
+	if (Gen.bPublierProfilZ && PartitionSingleton().bActive)
+	{
+		const double T0 = FPlatformTime::Seconds();
+		const FCityPartition& Part = PartitionSingleton();
+		FRenderedGroundZ RGZ;
+		RGZ.Init(Drape, Gen.GroundGridN, Cell);
+		const float PasCm = FMath::Max(Gen.PartitionStepM, 0.05f) * 100.f;
+
+		// Payload construit a la main : ConvertTo-Json/serializer explosent sur ce
+		// volume, et le format doit rester diffable ligne a ligne.
+		FString Corps;
+		Corps.Reserve(1 << 20);
+		const double SondeCm = (double)FMath::Max(Gen.CoutureSondeCm, 1.f);
+		auto EcrireProfil = [&Corps, PasCm, SondeCm, &RGZ, &Summary](const TCHAR* Genre,
+			int32 Index, const TCHAR* Etiquette, const TArray<FVector2D>& Ligne)
+		{
+			FProfilZ P;
+			EchantillonnerProfil(Ligne, PasCm, RGZ, P);
+			if (P.Pts.Num() < 2)
+			{
+				return;
+			}
+			// ⭐ LE CONTRAT PORTE LES TROIS COTES, et c'est ce qui en fait un
+			// CONTRAT plutot qu'une mesure : `z` sur la ligne (ambigue par nature,
+			// on la publie telle quelle), `za` et `zb` DE PART ET D'AUTRE, la ou
+			// chaque surface est definie. La MARCHE — donc la couture — se derive
+			// du fichier seul, sans rejouer le moteur.
+			TArray<FVector2D> Nrm;
+			NormalesSommet(P.Pts, Nrm);
+			auto Ecrire = [&Corps](const TCHAR* Cle, const TArray<float>& Z)
+			{
+				Corps += FString::Printf(TEXT(",\"%s\":["), Cle);
+				for (int32 i = 0; i < Z.Num(); ++i)
+				{
+					// Millimetres entiers : le contrat est une COTE, pas un flottant
+					// a 7 chiffres dont les derniers seraient du bruit de mesure.
+					const int64 Mm = (Z[i] > TNumericLimits<float>::Lowest())
+						? (int64)FMath::RoundToDouble((double)Z[i] * 10.0) : (int64)0;
+					Corps += (i ? TEXT(",") : TEXT(""));
+					Corps += FString::Printf(TEXT("%lld"), Mm);
+				}
+				Corps += TEXT("]");
+			};
+			TArray<float> ZA, ZB;
+			ZA.SetNumUninitialized(P.Pts.Num());
+			ZB.SetNumUninitialized(P.Pts.Num());
+			for (int32 i = 0; i < P.Pts.Num(); ++i)
+			{
+				const FVector2D Pa = P.Pts[i] + Nrm[i] * SondeCm;
+				const FVector2D Pb = P.Pts[i] - Nrm[i] * SondeCm;
+				ZA[i] = RGZ.At(Pa.X, Pa.Y);
+				ZB[i] = RGZ.At(Pb.X, Pb.Y);
+			}
+			Corps += FString::Printf(TEXT("{\"g\":\"%s\",\"i\":%d,\"p\":\"%s\",\"n\":%d"),
+				Genre, Index, Etiquette, P.Pts.Num());
+			Ecrire(TEXT("z"), P.Z);
+			Ecrire(TEXT("za"), ZA);
+			Ecrire(TEXT("zb"), ZB);
+			Corps += TEXT("}\n");
+			Summary.ProfilPoints += P.Z.Num();
+		};
+		for (int32 bi = 0; bi < Part.Bandes.Num(); ++bi)
+		{
+			const FCityPartition::FBande& B = Part.Bandes[bi];
+			if (!CelluleVisee(FVector2D(B.Cellule.X * (double)Cell + 1.0,
+					B.Cellule.Y * (double)Cell + 1.0)))
+			{
+				continue;
+			}
+			for (const TArray<FVector2D>& L : B.Lignes)
+			{
+				EcrireProfil(TEXT("b"), bi, FCityPartition::NomDe(B.Proprio), L);
+			}
+			++Summary.ProfilBandes;
+		}
+		for (int32 fi = 0; fi < Part.Frontieres.Num(); ++fi)
+		{
+			const FCityPartition::FFrontiere& F = Part.Frontieres[fi];
+			if (!CelluleVisee(FVector2D(F.Cellule.X * (double)Cell + 1.0,
+					F.Cellule.Y * (double)Cell + 1.0)))
+			{
+				continue;
+			}
+			EcrireProfil(TEXT("f"), fi, F.bEngagee ? TEXT("engagee") : TEXT("libre"), F.Poly);
+			++Summary.ProfilFrontieres;
+		}
+		// L'EMPREINTE du contrat : md5 du corps seul (l'en-tete porte des chronos
+		// et le filtre de district — il n'a rien a faire dans une empreinte).
+		FTCHARToUTF8 Utf8(*Corps);
+		FMD5 Md5;
+		Md5.Update((const uint8*)Utf8.Get(), Utf8.Length());
+		uint8 Digest[16];
+		Md5.Final(Digest);
+		FString Empreinte;
+		for (int32 i = 0; i < 16; ++i)
+		{
+			Empreinte += FString::Printf(TEXT("%02x"), Digest[i]);
+		}
+		FString Sortie = FString::Printf(
+			TEXT("{\"version\":\"profil_z/v1\",\"produit_par\":\"ImportCitySurfaces\",")
+			TEXT("\"carte_version\":\"%s\",\"carte_md5\":\"%s\",\"carte_geometries_md5\":\"%s\",")
+			TEXT("\"pas_m\":%.3f,\"cellule_m\":%.1f,\"unite_z\":\"mm\",\"repere_z\":\"monde Unreal (Capitole = 0)\",")
+			TEXT("\"sonde_cm\":%.1f,\"cotes\":\"z = sur la ligne (ambigue), za/zb = de part et d'autre a sonde_cm\",")
+			TEXT("\"lecteur\":\"FRenderedGroundZ::At\",\"district\":\"%s\",")
+			TEXT("\"bandes\":%d,\"frontieres\":%d,\"points\":%d,\"empreinte\":\"%s\"}\n"),
+			*Part.Version, *Part.Md5Fichier, *Part.Md5Geometries,
+			Gen.PartitionStepM, CellSizeM, Gen.CoutureSondeCm, *Gen.CellFilter,
+			Summary.ProfilBandes, Summary.ProfilFrontieres, Summary.ProfilPoints, *Empreinte);
+		Sortie += Corps;
+		const FString PDir = Gen.PartitionPath.IsEmpty()
+			? FPaths::Combine(FPaths::ProjectDir(), TEXT("SourceData/Partition"))
+			: Gen.PartitionPath;
+		const FString Chemin = FPaths::Combine(PDir,
+			Gen.CellFilter.IsEmpty() ? TEXT("profil_z_v1.json")
+									 : TEXT("profil_z_v1_district.json"));
+		// ForceUTF8WithoutBOM : SaveStringToFile bascule en UTF-16 des qu'un
+		// caractere sort de l'ASCII (piege paye au lot A-ter).
+		const bool bEcrit = FFileHelper::SaveStringToFile(Sortie, *Chemin,
+			FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+		UE_LOG(LogCityImport, Display,
+			TEXT("PARTITION ① CONTRAT DE Z %s : '%s' — %d bandes, %d frontieres, %d points, "
+				 "pas %.2f m, empreinte %s (%.1f s). Lecture seule : AUCUNE geometrie touchee."),
+			bEcrit ? TEXT("PUBLIE") : TEXT("NON ECRIT"), *Chemin,
+			Summary.ProfilBandes, Summary.ProfilFrontieres, Summary.ProfilPoints,
+			Gen.PartitionStepM, *Empreinte, FPlatformTime::Seconds() - T0);
 	}
 
 	// --- Assets + acteurs par cellule ---
@@ -12059,6 +12901,281 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		TEXT("SOL DE BERGE : %d quads de dalle sont rendus par la TRIANGULATION CONTRAINTE (%d triangles poses dans le meme maillage de dalle). "
 			 "Ce ne sont pas des quads masques : la triangulation couvre le quad ENTIER, coins compris, et ses coins SONT les noeuds de la grille."),
 		OuvrageQuadsCedes, OuvrageSousQuads);
+
+	// -----------------------------------------------------------------------------
+	// ⭐ PARTITION ③ LES BANDES EN RUBANS  +  ④ LA LOI D'INTERFACE AU SOL DE VILLE.
+	//
+	// Les 69 241 m2 de bandes annexees cessent d'etre du sol « reste » drape comme
+	// de l'organique : chacune est POSEE, en ruban, sur sa LIGNE PORTEUSE, au Z lu
+	// AU CONTACT de son proprietaire, avec la classe de revetement de ce
+	// proprietaire — une classe qui existe deja (aucune matiere nouvelle).
+	//
+	// La composition est ADDITIVE (13.2) : la dalle reste COMPLETE dessous. On ne
+	// cede aucun quad, on ne decoupe rien — c'est precisement ce qui a echoue dix
+	// fois. Le ruban se pose, et son BORD LIBRE recoit sa couture : une face
+	// verticale cousue sommet pour sommet jusqu'a la surface voisine, orientee par
+	// les deux surfaces elles-memes.
+	//
+	// Les rubans vivent dans les cellules de RUBANS (SM_Ground_*, sans collision) :
+	// une bande n'a rien a faire dans la dalle porteuse, exactement comme une
+	// bordure ou un tiret.
+	// -----------------------------------------------------------------------------
+	if (PartitionSingleton().bActive)
+	{
+		const double TPart = FPlatformTime::Seconds();
+		const FCityPartition& Part = PartitionSingleton();
+		FRenderedGroundZ PartRGZ;
+		PartRGZ.Init(Drape, Gen.GroundGridN, Cell);
+		const float PasCm = FMath::Max(Gen.PartitionStepM, 0.05f) * 100.f;
+		const float CollierCm = FMath::Max(Gen.PartitionCollarM, 0.f) * 100.f;
+		const FResolvedSurface* Pierre = Surfaces.Resolve(&GSurfCurb);
+		const FVector3f TeinteMinerale(0.85f, 0.85f, 0.80f);
+		float CoutureCm = 0.f;
+		float MarcheMaxCm = 0.f;
+		int32 ParProprio[5] = { 0, 0, 0, 0, 0 };
+		double AireM2 = 0.0, AireNonRuban = 0.0;
+		// La borne de largeur vient de la CARTE, pas du moteur. Carte muette =
+		// aucune borne (on ne devine pas une regle qui n'a pas ete publiee).
+		const float LargeurMaxCm = (Part.BandeMaxM > 0.f) ? Part.BandeMaxM * 100.f : 0.f;
+
+		for (const FCityPartition::FBande& B : Part.Bandes)
+		{
+			if (!CelluleVisee(B.Cellule))
+			{
+				continue;
+			}
+			const FSurfaceClass* Classe = ClasseDeProprio(B.Proprio);
+			if (!Classe || B.Lignes.Num() == 0)
+			{
+				++Summary.PartitionBandesSkipped;
+				continue;
+			}
+			const FResolvedSurface* Surf = Surfaces.Resolve(Classe);
+			bool bPosee = false;
+			bool bNonRuban = false;
+			for (const TArray<FVector2D>& Ligne : B.Lignes)
+			{
+				TArray<FVector2D> Axe, BordLibre;
+				TArray<float> ZLigne;
+				float LargeurCm = 0.f;
+				ERubanRaison Raison = ERubanRaison::TropFine;
+				TArray<float> Echelle;
+				int32 Rabotes = 0;
+				if (!RubanDeBande(B, Ligne, PasCm, CollierCm, LargeurMaxCm,
+						Gen.CoutureSondeCm, PartRGZ,
+						Axe, ZLigne, LargeurCm, BordLibre, Raison, Echelle, Rabotes))
+				{
+					bNonRuban = bNonRuban || (Raison == ERubanRaison::NonRuban);
+					continue;
+				}
+				// Le socle : `PartitionLiftCm` au lieu des 55 cm historiques (la
+				// dalle est DRAPEE, il n'y a plus rien a survoler), et l'index 0 —
+				// deux bandes ne se recouvrent jamais (c'est une PARTITION), le
+				// micro-jitter anti-coplanarite n'a personne a departager.
+				const float ZRuban = Gen.PartitionLiftCm + (Surf ? Surf->Class->ZClassCm : 0.f);
+				Summary.PartitionFlipsFixed += Rabotes;
+
+				// ⛔ LOI DES NAPPES (13.1) APPLIQUEE AU RUBAN : on COUPE sur les
+				// MARCHES du proprietaire au lieu de tendre un quad entre deux
+				// niveaux. Un quad tendu sur 3 m de denivele est une surface
+				// reglee — a l'image, une voile oblique plantee dans le sol.
+				// Chaque troncon est alors PLAT ou en pente douce, et la couture
+				// ferme le pas verticalement.
+				TArray<int32> Coupures;
+				Coupures.Add(0);
+				if (Gen.PartitionMarcheCm > 0.f)
+				{
+					for (int32 i = 0; i + 1 < ZLigne.Num(); ++i)
+					{
+						if (FMath::Abs(ZLigne[i + 1] - ZLigne[i]) > Gen.PartitionMarcheCm)
+						{
+							Coupures.Add(i + 1);
+							++Summary.PartitionRubansCoupes;
+						}
+					}
+				}
+				Coupures.Add(ZLigne.Num());
+				for (int32 c = 0; c + 1 < Coupures.Num(); ++c)
+				{
+					const int32 D = Coupures[c], F2 = Coupures[c + 1];
+					if (F2 - D < 2)
+					{
+						continue;   // un troncon d'un seul sommet n'est pas un ruban
+					}
+					TArray<FVector2D> AxeT, BordT;
+					TArray<float> ZT, EchT;
+					for (int32 i = D; i < F2; ++i)
+					{
+						AxeT.Add(Axe[i]);
+						BordT.Add(BordLibre[i]);
+						ZT.Add(ZLigne[i]);
+						EchT.Add(Echelle.IsValidIndex(i) ? Echelle[i] : 1.f);
+					}
+					BuildRoad(GetInKey(GroundCells, CleSol(AxeT[0], B.Cellule),
+							bLinearColors, bWorldUVs),
+						// ⚠️ LE TYPE N'EST PAS DECORATIF. `BuildRoad` ajoute 1,70 m de
+						// RIVE de chaque cote a tout ce qui n'est pas une voie
+						// pietonne (`WalkW`) : une bande de 0,50 m se retrouvait
+						// alors posee sur 3,90 m — d'ou des nappes qui debordaient
+						// sur la pelouse et, la ligne porteuse tournant serre, des
+						// quads RETOURNES (mesure : normale geometrique nz = -1,00
+						// sur la plupart des grands triangles neufs, donc dos
+						// tourne, donc invisibles : le « coin sombre »).
+						// `path` est le type EXISTANT qui dit « pas de rive » —
+						// c'est exactement ce qu'est une bande.
+						AxeT, LargeurCm, TEXT("path"), /*RoadIndex=*/0, &ZT,
+						bBakedShade, Surf, nullptr, nullptr, nullptr, nullptr, nullptr,
+						nullptr, Gen.PartitionLiftCm, &EchT);
+					bPosee = true;
+					++Summary.PartitionTroncons;
+
+					// ④ LA COUTURE DU BORD LIBRE. Haut = la surface du ruban ; bas
+					// = la surface voisine, MESUREE sous le bord. La face regarde
+					// vers l'exterieur de la bande, direction donnee par la
+					// geometrie — jamais par un test de normale (13.3).
+					if (Gen.bPartitionCoutures)
+					{
+						TArray<float> ZHaut, ZBas;
+						ZHaut.SetNumUninitialized(BordT.Num());
+						ZBas.SetNumUninitialized(BordT.Num());
+						for (int32 i = 0; i < BordT.Num(); ++i)
+						{
+							ZHaut[i] = ZT[i] + ZRuban;
+							ZBas[i] = PartRGZ.At(BordT[i].X, BordT[i].Y);
+						}
+						const FVector2D DirBas =
+							(BordT[BordT.Num() / 2] - AxeT[AxeT.Num() / 2]).GetSafeNormal();
+						Summary.CoutureQuads += CoudreFace(
+							GetInKey(GroundCells, CleSol(BordT[0], B.Cellule),
+								bLinearColors, bWorldUVs),
+							BordT, ZHaut, ZBas, Gen.CoutureSeuilCm, Pierre,
+							TeinteMinerale, CoutureCm, Gen.CoutureHauteurMaxCm,
+							Summary.CoutureTropHaute, MarcheMaxCm, DirBas);
+					}
+				}
+			}
+			if (bPosee)
+			{
+				++Summary.PartitionBandes;
+				AireM2 += B.AireM2;
+				ParProprio[(int32)B.Proprio] += 1;
+			}
+			else
+			{
+				++Summary.PartitionBandesSkipped;
+				if (bNonRuban)
+				{
+					++Summary.PartitionBandesNonRuban;
+					AireNonRuban += B.AireM2;
+				}
+				else
+				{
+					++Summary.PartitionBandesTropFines;
+				}
+			}
+		}
+		Summary.PartitionBandesM2 = FMath::RoundToInt(AireM2);
+		Summary.PartitionBandesNonRubanM2 = FMath::RoundToInt(AireNonRuban);
+
+		// ④ LES FRONTIERES DE LA CARTE. Chaque run zone|organique est SONDE de part
+		// et d'autre sur la surface rendue : la ou les deux surfaces presentent une
+		// MARCHE, elle est cousue ; la ou elles se touchent deja, il n'y a rien a
+		// coudre et c'est un RESULTAT, pas un echec — il se compte a part.
+		if (Gen.bPartitionCoutures)
+		{
+			const double SondeCm = (double)FMath::Max(Gen.CoutureSondeCm, 1.f);
+			for (const FCityPartition::FFrontiere& F : Part.Frontieres)
+			{
+				if (!CelluleVisee(F.Cellule) || F.Poly.Num() < 2)
+				{
+					continue;
+				}
+				++Summary.CoutureRuns;
+				FProfilZ P;
+				EchantillonnerProfil(F.Poly, PasCm, PartRGZ, P);
+				if (P.Pts.Num() < 2)
+				{
+					continue;
+				}
+				TArray<FVector2D> Nrm;
+				NormalesSommet(P.Pts, Nrm);
+				TArray<float> ZA, ZB;
+				ZA.SetNumUninitialized(P.Pts.Num());
+				ZB.SetNumUninitialized(P.Pts.Num());
+				double Somme = 0.0;
+				for (int32 i = 0; i < P.Pts.Num(); ++i)
+				{
+					const FVector2D Pa = P.Pts[i] + Nrm[i] * SondeCm;
+					const FVector2D Pb = P.Pts[i] - Nrm[i] * SondeCm;
+					ZA[i] = PartRGZ.At(Pa.X, Pa.Y);
+					ZB[i] = PartRGZ.At(Pb.X, Pb.Y);
+					Somme += (double)(ZA[i] - ZB[i]);
+				}
+				// Le HAUT est le cote qui domine EN MOYENNE sur tout le run : une
+				// couture ne change pas de sens au milieu d'elle-meme.
+				const bool bAEnHaut = (Somme >= 0.0);
+				TArray<float> ZHaut = bAEnHaut ? ZA : ZB;
+				TArray<float> ZBas = bAEnHaut ? ZB : ZA;
+				float Marche = 0.f;
+				for (int32 i = 0; i < ZHaut.Num(); ++i)
+				{
+					Marche = FMath::Max(Marche, ZHaut[i] - ZBas[i]);
+				}
+				if (Marche <= Gen.CoutureSeuilCm)
+				{
+					++Summary.CoutureSansMarche;
+					continue;
+				}
+				const FVector2D DirBas = (bAEnHaut ? -1.0 : 1.0)
+					* Nrm[Nrm.Num() / 2].GetSafeNormal();
+				Summary.CoutureQuads += CoudreFace(
+					GetInKey(GroundCells, CleSol(P.Pts[0], F.Cellule),
+						bLinearColors, bWorldUVs),
+					P.Pts, ZHaut, ZBas, Gen.CoutureSeuilCm, Pierre,
+					TeinteMinerale, CoutureCm, Gen.CoutureHauteurMaxCm,
+					Summary.CoutureTropHaute, MarcheMaxCm, DirBas);
+			}
+		}
+		Summary.CoutureDm = FMath::RoundToInt(CoutureCm * 0.1f);
+		Summary.CoutureMarcheMaxCm = FMath::RoundToInt(MarcheMaxCm);
+		UE_LOG(LogCityImport, Display,
+			TEXT("PARTITION ③ BANDES : %d posees en ruban (%d m2) — ouvrage %d, voirie %d, "
+				 "batiment %d, zone %d ; %d ECARTEES = %d SUB-CENTIMETRIQUES (pas de donnee, "
+				 "pas d'objet) + %d NON-RUBAN (%d m2 : plaques compactes qui effleurent leur "
+				 "proprietaire, largeur deduite > BANDE_MAX_M = %.1f m publie par la carte — "
+				 "DETTE NOMMEE pour le chemin POLYGONE). Composition ADDITIVE : la dalle reste "
+				 "complete dessous, aucun quad cede."),
+			Summary.PartitionBandes, Summary.PartitionBandesM2,
+			ParProprio[(int32)FCityPartition::EProprio::Ouvrage],
+			ParProprio[(int32)FCityPartition::EProprio::Voirie],
+			ParProprio[(int32)FCityPartition::EProprio::Batiment],
+			ParProprio[(int32)FCityPartition::EProprio::Zone],
+			Summary.PartitionBandesSkipped, Summary.PartitionBandesTropFines,
+			Summary.PartitionBandesNonRuban, Summary.PartitionBandesNonRubanM2,
+			Part.BandeMaxM);
+		UE_LOG(LogCityImport, Display,
+			TEXT("PARTITION ③ ANTI-RETOURNEMENT : %d sommets rabotes (meme mecanisme que "
+				 "RetainingWallFlipsFixed) — sans lui, le ruban se plie en NOEUD PAPILLON "
+				 "des que la ligne porteuse tourne plus serre que sa largeur."),
+			Summary.PartitionFlipsFixed);
+		UE_LOG(LogCityImport, Display,
+			TEXT("PARTITION ③ LOI DES NAPPES : %d coupures sur MARCHE (> %.0f cm par "
+				 "echantillon de %.2f m) — %d troncons poses. Aucun quad n'est tendu entre "
+				 "deux niveaux : la ou le proprietaire change de niveau, le ruban est COUPE "
+				 "et la couture ferme le pas."),
+			Summary.PartitionRubansCoupes, Gen.PartitionMarcheCm, Gen.PartitionStepM,
+			Summary.PartitionTroncons);
+		UE_LOG(LogCityImport, Display,
+			TEXT("PARTITION ④ LOI D'INTERFACE : %d quads de couture, %.1f m cousus ; "
+				 "%d frontieres examinees dont %d SANS MARCHE mesurable (les deux surfaces "
+				 "se touchent deja sous %.0f cm) ; %d segments NON cousus car au-dela d'UN "
+				 "NIVEAU (%.0f cm) — ce sont des OUVRAGES deja batis, pas des coutures ; "
+				 "marche la plus haute rencontree %.2f m — %.1f s."),
+			Summary.CoutureQuads, CoutureCm * 0.01f, Summary.CoutureRuns,
+			Summary.CoutureSansMarche, Gen.CoutureSeuilCm,
+			Summary.CoutureTropHaute, Gen.CoutureHauteurMaxCm, MarcheMaxCm * 0.01f,
+			FPlatformTime::Seconds() - TPart);
+	}
 
 	// --- Rubans routiers : SANS collision (films visuels 55-80 cm au-dessus de la
 	// dalle porteuse, dont la boite monte a 60 cm) et cullables a ~2 km cote runtime.

@@ -602,6 +602,111 @@ struct FCityGenProfile
 	 */
 	UPROPERTY() float CellFilterSizeM = 0.f;
 
+	// -------------------------------------------------------------------------
+	// CHANTIER PARTITION DU SOL (E2-a) — LA CARTE DIT QUI POSSEDE CHAQUE m2.
+	//
+	// Le sol n'avait pas de carte de propriete : il etait « le reste » (tout ce
+	// que personne ne reclame retombe dans le drapage du MNT). La carte
+	// `SourceData/Partition/carte_v2.json` (schema `carte/v2.1`) publie les
+	// BANDES annexees par un proprietaire (voirie, batiment, ouvrage, zone) avec
+	// leur LIGNE PORTEUSE — la ligne de contact avec ce proprietaire — et les
+	// FRONTIERES zone|organique en runs.
+	//
+	// Le moteur ne fait que POSER (doctrine Playbook S11.3 ter) : la carte est
+	// cuite, le C++ lit, verifie son empreinte, et pose des RUBANS avec le
+	// constructeur existant. AUCUNE classe ni matiere nouvelle.
+	//
+	// La composition est ADDITIVE (loi 13.2) : la dalle reste COMPLETE dessous,
+	// le ruban se pose dessus. Le recouvrement est benin, le vide est fatal.
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Lit la carte de partition et pose les rubans de bande. Side-car absent =
+	 * AUCUN effet, sans erreur : le generateur se comporte exactement comme
+	 * avant, bit pour bit (meme convention que le constructeur de quai).
+	 * false = rollback total sans rebuild.
+	 */
+	UPROPERTY() bool bPartition = true;
+
+	/** Dossier de la carte. Vide = <ProjectDir>/SourceData/Partition. */
+	UPROPERTY() FString PartitionPath;
+
+	/**
+	 * Le COLLIER du ruban de bande, en metres : ce dont on elargit la bande au
+	 * dela de sa largeur mesuree, pour que le ruban la couvre ENTIEREMENT malgre
+	 * la discretisation de la ligne porteuse. Le recouvrement est benin (13.2).
+	 */
+	UPROPERTY() float PartitionCollarM = 0.15f;
+
+	/** Pas d'echantillonnage, en metres, des profils de Z publies et des rubans. */
+	UPROPERTY() float PartitionStepM = 1.0f;
+
+	/**
+	 * Le SOCLE du ruban de bande, en cm au-dessus de la surface rendue. Les
+	 * rubans de voirie historiques partent de 55 cm (ils survolaient une dalle
+	 * plate) ; dans la ville PEINTE la dalle est drapee et il n'y a plus rien a
+	 * survoler : 2 cm suffisent a eviter le z-fight, l'empilement par classe
+	 * (`ZClassCm`) restant inchange au-dessus.
+	 */
+	UPROPERTY() float PartitionLiftCm = 2.f;
+
+	/**
+	 * ⛔ LA MARCHE QUI COUPE LE RUBAN, en cm par echantillon (pas
+	 * `PartitionStepM`). Un quad tendu entre deux sommets dont le Z differe de
+	 * plusieurs metres est une SURFACE REGLEE — la « nappe » que la loi 13.1
+	 * interdit ; a l'image c'est une voile triangulaire plantee en travers du sol.
+	 * Or ce n'est pas une pente : c'est que le proprietaire change de NIVEAU
+	 * (haut de mur / esplanade, marche d'escalier). On COUPE donc le ruban, et la
+	 * couture ferme verticalement — « des constantes par zone, jamais une
+	 * interpolation en Z ».
+	 * Valeur choisie SUR LA MESURE du district : a 1 m de pas, 99 % des ecarts
+	 * consecutifs valent moins de 11,9 cm (du terrain) ; au-dela de 30 cm il n'y
+	 * a plus que 0,47 % des cas, et ce sont les vraies marches. 0 = ne coupe pas.
+	 */
+	UPROPERTY() float PartitionMarcheCm = 30.f;
+
+	/**
+	 * LA LOI D'INTERFACE : toute frontiere de la carte recoit sa couture — une
+	 * face verticale cousue sommet pour sommet entre les deux surfaces voisines,
+	 * des que leur MARCHE mesuree depasse ce seuil (en cm). Sous le seuil il n'y
+	 * a rien a coudre : les deux surfaces se touchent deja.
+	 */
+	UPROPERTY() bool bPartitionCoutures = true;
+
+	/** Seuil de MARCHE, en cm, au-dela duquel une frontiere est cousue. */
+	UPROPERTY() float CoutureSeuilCm = 3.f;
+
+	/**
+	 * ⛔ LE PLAFOND DE LA COUTURE, en cm — et c'est une regle de DOCTRINE, pas un
+	 * reglage esthetique. Une couture ferme ce que la partition OUVRE : le pas
+	 * entre deux surfaces de SOL qui devaient se rejoindre. Au-dela d'UN NIVEAU,
+	 * la discontinuite n'est plus une couture, c'est un OUVRAGE — mur de quai,
+	 * flanc de pont, mur de soutenement — et ces objets-la ont DEJA leurs faces,
+	 * baties par leurs propres constructeurs. Y coudre reviendrait a doubler un
+	 * mur existant d'un seul rideau de plus, dans une autre matiere.
+	 * Mesure qui a impose la regle (district) : la marche vaut 2,1 cm a la
+	 * mediane, mais 173 lignes depassent 50 cm et 65 depassent 4 m, jusqu'a
+	 * 11,03 m — la hauteur du mur de quai.
+	 * Valeur = `QuayPlatformHeightM` x 100 : la hauteur d'un niveau, deja une
+	 * constante du projet. 0 = aucun plafond (l'ancien comportement).
+	 */
+	UPROPERTY() float CoutureHauteurMaxCm = 120.f;
+
+	/**
+	 * Demi-ecart, en cm, auquel on sonde le Z de part et d'autre d'une frontiere
+	 * pour MESURER sa marche. C'est la « surface voisine » de la loi
+	 * d'orientation (13.3) : aucun test de normale directionnelle.
+	 */
+	UPROPERTY() float CoutureSondeCm = 40.f;
+
+	/**
+	 * LE CONTRAT DE Z : la passe de surfaces PUBLIE le profil de Z de chaque
+	 * ligne porteuse et de chaque frontiere, echantillonne sur la surface RENDUE
+	 * (`FRenderedGroundZ::At`). Fichier `profil_z_v1.json` a cote de la carte.
+	 * Purement additif : publier ne change aucune geometrie.
+	 */
+	UPROPERTY() bool bPublierProfilZ = true;
+
 	/** Prereglage desktop complet : 64x64 drape, collision 16x16, pas routes 15 m. */
 	static FCityGenProfile Desktop();
 
@@ -785,6 +890,90 @@ struct FCityStreamedSummary
 
 	/** PROFIL : noeuds de dalle FORCES par le profil de berge (plateforme + esplanade). */
 	UPROPERTY() int32 QuayProfileNodes = 0;
+
+	// --- CHANTIER PARTITION DU SOL (E2-a) -----------------------------------
+	/** PARTITION : bandes de la carte posees en RUBAN (constructeur existant). */
+	UPROPERTY() int32 PartitionBandes = 0;
+
+	/**
+	 * PARTITION : AIRE des bandes posees, en m2 (entier). C'est LE discriminant
+	 * de la passe : un compte de bandes est aveugle a une bande qui aurait perdu
+	 * sa surface (doctrine Playbook S6 : on valide par les GEOMETRIES).
+	 */
+	UPROPERTY() int32 PartitionBandesM2 = 0;
+
+	/** PARTITION : bandes ECARTEES, toutes causes. Jamais tu en silence (detail ci-dessous). */
+	UPROPERTY() int32 PartitionBandesSkipped = 0;
+
+	/**
+	 * PARTITION : bandes ecartees parce que SUB-CENTIMETRIQUES (largeur moyenne
+	 * < 1 cm) ou degenerees. « Pas de donnee, pas d'objet » (13.6) : 1 cm est
+	 * deja sous le texel du masque de sol (48,83 cm), rien n'y est representable.
+	 */
+	UPROPERTY() int32 PartitionBandesTropFines = 0;
+
+	/**
+	 * PARTITION — LA DETTE NOMMEE, pour E2-b. Bandes dont la largeur deduite
+	 * (aire / longueur de ligne porteuse) DEPASSE le `BANDE_MAX_M` que la carte
+	 * publie elle-meme : ce ne sont pas des rubans mais des PLAQUES COMPACTES qui
+	 * ne font qu'effleurer leur proprietaire (mesure : jusqu'a 598 m2 pour 4 cm
+	 * de contact). Le constructeur Ribbon ne les decrit pas — les poser quand
+	 * meme mettrait des quads kilometriques en travers de la carte. Elles sont
+	 * ECARTEES et COMPTEES, en attendant le chemin POLYGONE.
+	 */
+	UPROPERTY() int32 PartitionBandesNonRuban = 0;
+
+	/** PARTITION : AIRE de la dette ci-dessus, en m2. La vraie taille du reste a faire. */
+	UPROPERTY() int32 PartitionBandesNonRubanM2 = 0;
+
+	/** PARTITION : frontieres de la carte examinees par la loi d'interface. */
+	UPROPERTY() int32 CoutureRuns = 0;
+
+	/** PARTITION : quads de COUTURE poses (faces verticales cousues sommet pour sommet). */
+	UPROPERTY() int32 CoutureQuads = 0;
+
+	/** PARTITION : LONGUEUR cousue, en decimetres. Le discriminant de la loi d'interface. */
+	UPROPERTY() int32 CoutureDm = 0;
+
+	/**
+	 * PARTITION : frontieres SANS MARCHE mesuree (les deux surfaces se touchent
+	 * deja sous le seuil) — il n'y a rien a coudre, et c'est un resultat, pas un
+	 * echec. Compte a part de CoutureRuns.
+	 */
+	UPROPERTY() int32 CoutureSansMarche = 0;
+
+	/**
+	 * PARTITION — LA SECONDE DETTE NOMMEE. Segments NON cousus parce que leur
+	 * marche depasse `CoutureHauteurMaxCm` : ce sont des OUVRAGES deja batis (mur
+	 * de quai, pont, soutenement), pas des coutures. Compte, jamais tu en silence.
+	 */
+	UPROPERTY() int32 CoutureTropHaute = 0;
+
+	/** PARTITION : la marche la plus haute rencontree, en cm. Le temoin de la queue. */
+	UPROPERTY() int32 CoutureMarcheMaxCm = 0;
+
+	/**
+	 * PARTITION : sommets dont le decalage a ete RABOTE pour ne pas RETOURNER un
+	 * quad (noeud papillon). Meme mecanisme et meme compteur d'esprit que
+	 * `RetainingWallFlipsFixed` du lot BERGES — le defaut est le meme, le remede
+	 * aussi. Un ruban de bande suit une ligne de donnee qui peut tourner tres
+	 * serre : sans rabotage, le ruban se plie en deux et se voit.
+	 */
+	UPROPERTY() int32 PartitionFlipsFixed = 0;
+
+	/**
+	 * PARTITION : COUPURES du ruban sur une MARCHE du proprietaire (cf.
+	 * `PartitionMarcheCm`). Chaque coupure evite une surface reglee — une voile
+	 * oblique — et rend deux troncons a leur niveau. Le discriminant de la loi
+	 * des nappes appliquee aux rubans de bande.
+	 */
+	UPROPERTY() int32 PartitionRubansCoupes = 0;
+
+	/** PARTITION : troncons de ruban effectivement poses (>= 2 sommets apres coupure). */
+	UPROPERTY() int32 PartitionTroncons = 0;
+
+	/** PARTITION : ecart max, en mm, entre le profil de Z PUBLIE et celui relu. Doit valoir 0. */
+	UPROPERTY() int32 ProfilEcartMaxMm = 0;
 };
 
 /** Counts of what GenerateBuildingCollisionCell produced for one cell. */
@@ -860,6 +1049,15 @@ struct FCitySurfacesSummary
 
 	/** LOT EAU : cellules du side-car effectivement lues. */
 	UPROPERTY() int32 WaterCells = 0;
+
+	/** PARTITION : bandes de la carte dont le profil de Z a ete publie. */
+	UPROPERTY() int32 ProfilBandes = 0;
+
+	/** PARTITION : frontieres de la carte dont le profil de Z a ete publie. */
+	UPROPERTY() int32 ProfilFrontieres = 0;
+
+	/** PARTITION : points de profil publies (echantillons de la surface RENDUE). */
+	UPROPERTY() int32 ProfilPoints = 0;
 };
 
 /** Counts of what ImportVegetation placed. */
