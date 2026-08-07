@@ -1,0 +1,128 @@
+# Chantier PARTITION DU SOL — brief de conception (soumis à arbitrage)
+
+> **Statut : CONCEPTION — aucune exécution avant arbitrage utilisateur** (§8).
+> Rédigé le 2026-08-07 après la saga berge (voir `Reprise-Etat-Projet.md` et les
+> commits `6f5c3414..a8671110`). Objectif produit inchangé : *un rendu sans défauts,
+> basé sur les données, qui fonctionne au niveau national — la cohérence globale.*
+
+## 1. Le problème de fond (établi par ~15 nommages mesurés)
+
+Tous les griefs de la berge ont vécu **aux coutures entre deux propriétaires du sol**,
+jamais au cœur d'un objet :
+
+| Grief (nommé au pixel) | Couture entre… |
+|---|---|
+| Vide au pied de l'escalier | objet C++ (escalier sans joues) ↔ sol de la cuisson |
+| Lames pâles (« triangle ») | famille `tris` (dalle) ↔ famille `objets` (gradins, sans slot) |
+| Bande « chantier » | régime zone (plan) ↔ régime dur (voirie/ouvrage) |
+| Cratère / crête serpentante | monde organique (drapage MNT) ↔ monde architectural (plans) |
+| Incident végétation (+75 160) | semis ↔ emprise d'ouvrage (repli silencieux sur le brut) |
+
+Cause unique : **le sol n'a pas de carte de propriété**. Il est « le reste » — tout ce
+que personne ne réclame retombe dans le drapage du MNT, et les ouvrages se posent
+par-dessus sans se déclarer. Les frontières sont émergentes, donc défectueuses.
+Trois rustines locales (palier, 3 formes de finition) ont été essayées et **toutes
+contredites par la mesure** : on réparait au mauvais niveau.
+
+## 2. Le précédent qui prouve le modèle
+
+Les trois mondes cohérents du proto suivent DÉJÀ le modèle visé :
+- **Bâtiments** : emprise de donnée (BD TOPO) = frontière autoritaire, un constructeur,
+  propriétés à la création. Le sol s'arrête à l'emprise (`GroundRibbonsSkipped`).
+- **Végétation** : semis global + loi vectorielle unique (« rien n'est semé sur un
+  ouvrage », l'emprise fait autorité).
+- **Routes** : le graphe est l'autorité (side-car gardien existant), un constructeur.
+
+Le chantier = **étendre au sol le modèle qui marche** : fermer la dernière exception.
+
+## 3. Le principe
+
+> **P1 — Partition** : chaque m² de sol appartient à exactement UNE cellule, qui a un
+> propriétaire et un régime. Couverture 100 %, zéro interstice émergent.
+> **P2 — Frontières de donnée** : toute frontière de cellule est une LIGNE DE DONNÉE
+> (bord de voirie du graphe, emprise de bâtiment, polygone de zone, emprise d'ouvrage
+> déclarée) — jamais une limite émergente de calcul.
+> **P3 — Loi d'interface unique** : toute frontière entre deux cellules reçoit sa
+> couture par UN SEUL mécanisme (la fermeture systémique, étendue à tous les
+> producteurs) ; les matériaux se résolvent à l'interface (slots des deux côtés).
+> **P4 — Contrat des objets posés** : tout objet posé sur le sol déclare son emprise
+> dans la partition et respecte la loi (joues fermées, slots déclarés).
+
+Les lois existantes restent : anti-nappe (le Z ne s'interpole jamais — constantes par
+cellule pour l'architectural, drapage pur pour l'organique), composition additive,
+orientation par surface voisine, réglages canoniques en code + `garde_ancrage()`.
+
+## 4. Les autorités et la préséance (⚠️ arbitrage §8-A)
+
+Ordre de préséance proposé en cas de recouvrement (du plus fort au plus faible) :
+1. **Emprises d'ouvrages posés** (bloc/berge : `bl2_emprise.wkt` existe ; escaliers,
+   ponts/culées C++ : à déclarer — étape É2) ;
+2. **Graphe routier** (voirie, bordures — side-car gardien existant) ;
+3. **Emprises de bâtiments** (BD TOPO) ;
+4. **Polygones de zones** (OCS GE), *clippés/snappés sur 1-3* : un polygone de zone
+   ne franchit jamais une autorité supérieure — l'interstice zone/dur disparaît par
+   construction (c'est LE remède de fond à la « bande ») ;
+5. **Le reste = organique** (drapage MNT d'origine, intouché).
+
+## 5. Les régimes par cellule
+
+- **Architectural** : Z = constante(s) par cellule (plans). Attribution par règles
+  nationales mesurables déjà en place ou à généraliser : voirie (régime routier
+  existant), zones encaissées (règle « plan dominant p50 », 3 critères validés),
+  emprises d'ouvrages (leur constructeur).
+- **Organique** : drapage du MNT d'origine, strictement identique à aujourd'hui.
+- Une cellule non attribuée est organique par défaut (« pas de donnée → pas d'objet »).
+
+## 6. Les étapes livrables (chacune : verrous + commit + zooms)
+
+- **É0 — LA CARTE (mesure seule, rien ne change au rendu)** : construire le side-car
+  de partition (cellules, propriétaires, régimes, frontières) à partir des autorités
+  §4. Verrous : couverture 100 % de la 3×3, 0 interstice > seuil, stats par
+  propriétaire publiées, empreinte de la carte dans `garde_ancrage()`.
+  *Fourchette : 1-2 h agent.*
+- **É1 — LE SOL SE RECONSTRUIT DEPUIS LA CARTE** : les cellules organiques redonnent
+  un drapage attendu bit-identique à l'existant ; les cellules architecturales
+  reprennent les plans déjà validés ; la loi d'interface unique remplace les coutures
+  ad hoc. Verrous : g6 sur les 4 poses de référence (≤ 0/0/24/12739), verrous berge
+  (79,75 m, C2, veg/corps), idempotence, hors zones litigieuses bit-identique.
+  *Fourchette : 2-4 h agent, itérations en district.* **Le gros morceau.**
+- **É2 — LE CONTRAT DES OBJETS (build C++ complet, éditeur fermé/rouvert par agents)** :
+  emprises déclarées dans la partition + joues fermées (« un escalier a des joues »)
+  + slots pour la famille `objets`. Ferme : le VIDE, les LAMES, et toute la classe.
+  Verrou structurel : 0 arête de bord verticale non cousue sur les objets posés
+  (détecteur existant). *Fourchette : ~1 h build compris.*
+- **É3 — LA BASCULE DES GRIEFS** : zooms A/B sur TOUS les points nommés de la saga
+  (bande, cratère, vide, lames, liaison incurvée) aux coordonnées exactes —
+  fermeture par l'utilisateur, grief par grief. *Fourchette : 30-45 min.*
+
+Ordre É0→É1→É2→É3 ; É0 et É1 sont cuisson pures (Live Coding inutile), É2 est le
+seul cycle de build. Chaque étape est commitée avec ses leçons ; retour arrière
+possible étape par étape (`.bak` + git).
+
+## 7. Ce que le chantier NE fait PAS
+
+- Aucun nouveau matériau ni classe de sol ; le lot RENDU (bâtonnet, trait blanc,
+  girons, patchwork, Fresnel) reste séparé et vient APRÈS.
+- Aucune retouche au modèle deux-niveaux validé de la berge (promenade, gradins,
+  volées, limons : INTOUCHÉS).
+- Aucune « correction » des données : les lignes font autorité telles quelles ;
+  on simplifie notre construction, pas la réalité.
+- Pas de World Partition Unreal ni de refonte moteur : c'est un side-car + la cuisson.
+
+## 8. ⚠️ Les arbitrages qui t'appartiennent (avant É0)
+
+- **A. La préséance §4** te convient-elle (ouvrages > routes > bâtiments > zones >
+  organique) ? Des cas particuliers te semblent-ils inversés ?
+- **B. Le seuil d'interstice** toléré dans la carte avant qu'une frontière soit
+  déclarée défectueuse (proposé : 5 cm, le « collé » mesuré sur 72,8 % du tour).
+- **C. Périmètre** : la partition s'applique à toute la 3×3 dès É0 (recommandé — les
+  lois sont globales, les itérations restent en district) ou d'abord au district berge ?
+- **D. Go de principe sur l'ordre É0→É3** et ses fourchettes (une grosse journée de
+  travail agent au total, séquencée, interruptible à chaque étape).
+
+## 9. Références
+
+Saga et nommages : `Reprise-Etat-Projet.md` (v3) + commits `6f5c3414..a8671110`.
+Doctrine : Playbook §13 (lois), §11 (boucle), Brief-Template.md (workflow agents).
+Précédent sol/routes : mémoire `survol-sol-routes-chantier` (différenciation
+vectorielle abandonnée ; le graphe side-car gardien = graine de la carte).
