@@ -31,3 +31,6 @@ SourceData/*.avant_rognage.json
 SourceData/*.avant_cours.json
 SourceData/*.avant_flatcut.json
 SourceData/*.avant_interstices.json
+
+*.bak-*
+*.essai-*-KO
