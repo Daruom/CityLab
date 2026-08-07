@@ -718,6 +718,30 @@ struct FCityGenProfile
 	 */
 	UPROPERTY() bool bPublierProfilZ = true;
 
+	// -------------------------------------------------------------------------
+	// LE PLAN DE VILLE (etage 2) — `Doc/Chantier-Plan-de-Ville.md` S8.
+	//
+	// Le plan est COMPILE hors moteur (`Tools/PlanVille/c0..c8`, Python pur) et
+	// installe dans `SourceData/PlanVille/`. Le C++ n'y DECIDE plus rien : il
+	// lit un contrat, verifie ses empreintes, et REFUSE tout plan incomplet ou
+	// altere — « jamais devine » (S2, garde de l'etage 2).
+	//
+	// Le lecteur-validateur vit dans `PlanVille.h/.cpp` (lot E2-0) : il est
+	// autonome, il ne construit RIEN, et personne ne l'appelle encore.
+	// -------------------------------------------------------------------------
+
+	/**
+	 * L'INTERRUPTEUR DU PLAN. Eteint par defaut, et pour l'instant INERTE :
+	 * AUCUN code ne le consomme (lot E2-0 = lire, valider, refuser — pas batir).
+	 * C'est E2-1 qui s'en servira pour brancher le constructeur sur le plan ;
+	 * jusque-la, `true` comme `false` produisent exactement la meme generation,
+	 * bit pour bit.
+	 *
+	 * Meme convention que `bPartition` : un lot d'etage 2 doit pouvoir etre
+	 * eteint sans rebuild ni revert.
+	 */
+	UPROPERTY() bool bPlan = false;
+
 	/** Prereglage desktop complet : 64x64 drape, collision 16x16, pas routes 15 m. */
 	static FCityGenProfile Desktop();
 

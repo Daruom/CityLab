@@ -222,8 +222,18 @@ au vert (couverture 100,000000 %, interstices 0, recouvrements 0, résolutions 1
   non prouvée : points le long des bandes, là où le monde construit s'écarte du MNT) ;
   787 tronçons > plafond de pente 12 % (signets) ; masques 36/49 cellules (344
   parcelles en règle de repli) ; enquête g6 antérieure.
-- **Prochaine étape : É2-0** — lecteur-validateur C++ (garde d'empreintes, refuse un
-  plan incomplet, recompte = manifeste, API par cellule pour É2-1, `bPlan=false`).
+- **É2-0 FAIT (07/08 21h42)** — lecteur-validateur C++ livré : `PlanVille.h/.cpp` +
+  spec `CityLab.PlanVille` 4/4 PASS (plan complet 6,13 s / 152 empreintes, comptes
+  reconstitués = manifeste, DISTRICT-FIRST prouvé à 3 fichiers/cellule, SABOTAGE et
+  MANQUE refusés explicitement, bac à sable Saved/Tests — SourceData jamais écrit) ;
+  `bPlan=false` inerte (1 seule occurrence du symbole). **1 cellule refusée à la
+  construction : (2,−2)** — porte les 5 `arbitrage_demande` du coteau. Leçons :
+  les interfaces n'ont pas de `cellule_porteuse` (identité = couple (a,b), compte
+  distinct GLOBAL, comptes par cellule = pièces) ; UE 5.8 : clés de `FJsonObject`
+  en `UE::FSharedString`.
+- **Prochaine étape : É2-1** — le SOL d'un district construit depuis le plan
+  (district 100 % résolu d'abord), puis l'A/B 3D du coteau pour l'arbitrage
+  utilisateur (p50 vs éligibilité au relief).
 
 ## 13. Références
 
