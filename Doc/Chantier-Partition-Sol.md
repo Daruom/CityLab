@@ -134,7 +134,33 @@ Formulation d'origine conservée ci-dessous pour mémoire :
 - **D. Go de principe sur l'ordre É0→É3** et ses fourchettes (une grosse journée de
   travail agent au total, séquencée, interruptible à chaque étape).
 
-## 9. Références
+## 9. É0 — VERDICT RENDU (2026-08-07, 61 min, mesure seule)
+
+Carte `part/v1` construite sur 49 cellules (12,25 km²), idempotente, empreintes md5 des
+4 sources. Répartition : organique 48,4 %, bâtiments 26,1 %, voirie 15,0 %, zones 8,7 %,
+ouvrages 1,8 %. Recouvrements résolus par préséance (zone −215 557 m² etc.).
+**3 des 5 points de la saga résolus en donnée** : cratère (zone architecturale, plan
+141,01), liaison incurvée (à 0,02 m du bord déclaré de l'ouvrage), frontières de la berge
+(100 % portées par des lignes de donnée après contrôle d'un artefact de mesure).
+**1 dette attendue** : les 36 escaliers n'ont pas d'emprise surfacique (donnée = axe) → É2.
+**1 NON RÉSOLU = le critère d'arrêt a fonctionné** : ⛔ la prémisse du §4 (« zones clippées
+→ l'interstice disparaît ») est FAUSSE — *le clippage ôte les recouvrements, pas les
+vides*. Zone du cratère : bord clippé encore à p90 0,69 / max 2,95 m du dur (25,5 % du
+tour > 5 cm) ; global : 4 324 bandes fines > 5 cm (69 238 m², 0,565 % du domaine).
+Le remède est un **SNAPPING dans la carte** (avancer le bord de zone jusqu'au dur,
+segment par segment sur des lignes de donnée — l'objet qui a échoué 3 fois en cuisson 3D
+devient faisable en 2D). → Arbitrage §10.
+
+## 10. ⚠️ Arbitrage SNAPPING (ouvert)
+
+Règle proposée : **une bande organique de largeur ≤ 3 m coincée entre deux cellules
+architecturales est annexée par snapping** (au-delà de 3 m : elle reste organique, c'est
+du vrai terrain). Côté d'annexion à trancher (dur vs zone vs plus-long-contact).
+É0-bis = le snapping DANS LA CARTE, mesure seule, acceptations : bandes > 5 cm
+restantes ~0 (parmi les ≤ 3 m), tour de la zone du cratère collé ≥ 99 %, idempotence,
+PNG A/B de la carte. STOP possible au même prix qu'É0.
+
+## 11. Références
 
 Saga et nommages : `Reprise-Etat-Projet.md` (v3) + commits `6f5c3414..a8671110`.
 Doctrine : Playbook §13 (lois), §11 (boucle), Brief-Template.md (workflow agents).
