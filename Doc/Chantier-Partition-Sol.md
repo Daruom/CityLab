@@ -208,7 +208,31 @@ inventer de la frontière.**
 ci-dessus et devra figurer dans son brief. Fin du mandat d'autonomie : **É1 = GO
 utilisateur explicite** (premier changement réel du rendu).
 
-## 13. Références
+## 13. É1 — verdict (2026-08-07, 2 BLOQUE en 39 min, zéro ligne écrite pour rien)
+
+**BLOQUE 1 (périmètre)** : le sol de la 3×3 est bâti en C++ (`ImportCitySurfaces` :
+drapage MNT, rubans de voirie) — la cuisson Python ne cuit que le lot berge. Le
+contournement data-driven (forcer une grille de nœuds Z par side-car) existe et a été
+REFUSÉ : c'est une nappe. **BLOQUE 2 (le plus structurant)** : *le Z du propriétaire
+n'est pas publié* — `routes_3x3.json` est 2D pur (vérifié sur 500 tronçons), le Z
+routier naît au cook. 93,9 % des bandes du district sont donc non-constructibles en
+Python, et draper la bande sur le MNT reproduirait le défaut même qu'on corrige.
+**Décision (coordinateur)** : É1 versée entière dans É2, le **lot-contrat unique**,
+dont la dette compte désormais 4 points — le 4ᵉ débloquant les autres :
+1. `ImportCitySurfaces` lit la carte v2 (autorité de propriété du drapage) ;
+2. les 69 241 m² de bandes en rubans (constructeur Ribbon) ;
+3. la loi d'interface au sol de ville (toutes paires, dont zone/organique ≤ 3 m —
+   l'engagement des 106 855 m²) ;
+4. **LE CONTRAT DE Z : la cuisson publie le Z de chaque propriétaire le long de ses
+   lignes de frontière** (side-car « frontière → profil de Z »). La carte dit QUI ;
+   ce side-car dit À QUELLE COTE ; la couture dit COMMENT.
++ la dette d'É0 : slots de la famille `objets` (lames), joues d'escaliers, emprises
+d'escaliers déclarées (axe → polygone, comme la voirie).
+Découpage proposé : **É2-a = le sol** (points 1-4, un build, verrous sol + zooms bande
+du cratère) puis **É2-b = les objets** (slots/joues/emprises, un build, zooms lames +
+vide). Chacun testable, chacun commité.
+
+## 14. Références
 
 Saga et nommages : `Reprise-Etat-Projet.md` (v3) + commits `6f5c3414..a8671110`.
 Doctrine : Playbook §13 (lois), §11 (boucle), Brief-Template.md (workflow agents).
