@@ -109,7 +109,21 @@ possible étape par étape (`.bak` + git).
   on simplifie notre construction, pas la réalité.
 - Pas de World Partition Unreal ni de refonte moteur : c'est un side-car + la cuisson.
 
-## 8. ⚠️ Les arbitrages qui t'appartiennent (avant É0)
+## 8. ⚠️ Les arbitrages — TRANCHÉS le 2026-08-07
+
+> **A : préséance validée telle quelle** (ouvrages > routes > bâtiments > zones
+> clippées > organique) · **B : seuil 5 cm** · **C : toute la 3×3 dès É0** ·
+> **D : GO É0→É3 enchaînées**, chaque étape commitée et présentée avant la suivante.
+>
+> **Amendement utilisateur (même jour) : « pas d'un méga-plan qui finit par échouer —
+> tester ! »** → chaque étape est un TEST falsifiable avec critère d'arrêt :
+> É0 doit rendre un VERDICT sur les 5 points nommés de la saga (la carte résout-elle,
+> en donnée, la bande / le cratère / le vide / les frontières berge ?) — sinon STOP
+> et on repense, pour le prix d'une mesure. É1 se teste d'abord sur le DISTRICT
+> berge avant toute régé 3×3. Aucune étape ne s'engage sur la foi de la précédente
+> sans ses propres verrous.
+
+Formulation d'origine conservée ci-dessous pour mémoire :
 
 - **A. La préséance §4** te convient-elle (ouvrages > routes > bâtiments > zones >
   organique) ? Des cas particuliers te semblent-ils inversés ?
