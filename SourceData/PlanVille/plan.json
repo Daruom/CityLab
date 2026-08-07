@@ -2,109 +2,199 @@
  "arbitrage": {
   "cas": [
    {
-    "a": "voi/7745#1",
-    "b": "bnd/8730#0",
-    "dz_m": 16.569,
-    "dz_max_m": 16.569,
-    "longueur_m": 2.185,
+    "a": "ouv/28#0",
+    "b": "org/662#0",
+    "dz_m": 14.12,
+    "dz_max_m": 14.12,
+    "longueur_m": 45.957,
     "mat": [
      "mineral",
-     "mineral"
+     "eau"
     ],
-    "motif": "dZ = 16.57 m au-dessus du plafond de mur (12.0 m)",
+    "motif": "dZ = 14.12 m au-dessus du plafond de mur (12.0 m)",
     "type": null,
-    "x": 1156.83,
-    "y": -880.72
+    "x": -731.69,
+    "y": 138.32
    },
    {
-    "a": "voi/8081#0",
-    "b": "bnd/8730#0",
-    "dz_m": 16.569,
-    "dz_max_m": 16.569,
-    "longueur_m": 1.25,
+    "a": "voi/17999#0",
+    "b": "org/662#0",
+    "dz_m": 13.8577,
+    "dz_max_m": 14.0885,
+    "longueur_m": 16.624,
+    "mat": [
+     "eau",
+     "eau"
+    ],
+    "motif": "dZ = 13.86 m au-dessus du plafond de mur (12.0 m)",
+    "type": null,
+    "x": -798.65,
+    "y": 93.57
+   },
+   {
+    "a": "ouv/27#0",
+    "b": "org/662#0",
+    "dz_m": 13.5,
+    "dz_max_m": 13.5,
+    "longueur_m": 18.12,
     "mat": [
      "mineral",
-     "mineral"
+     "eau"
     ],
-    "motif": "dZ = 16.57 m au-dessus du plafond de mur (12.0 m)",
+    "motif": "dZ = 13.50 m au-dessus du plafond de mur (12.0 m)",
     "type": null,
-    "x": 1156.8,
-    "y": -880.76
+    "x": -943.65,
+    "y": 1.42
    },
    {
-    "a": "voi/8082#0",
-    "b": "bnd/8730#0",
-    "dz_m": 15.707,
-    "dz_max_m": 16.3963,
-    "longueur_m": 26.441,
+    "a": "ouv/107#0",
+    "b": "ouv/108#0",
+    "dz_m": 12.96,
+    "dz_max_m": 12.96,
+    "longueur_m": 3.5,
     "mat": [
      "mineral",
-     "mineral"
+     "eau"
     ],
-    "motif": "dZ = 15.71 m au-dessus du plafond de mur (12.0 m)",
+    "motif": "dZ = 12.96 m au-dessus du plafond de mur (12.0 m)",
     "type": null,
-    "x": 1175.7,
-    "y": -899.22
+    "x": -809.4,
+    "y": 361.67
    },
    {
-    "a": "voi/7740#0",
-    "b": "bnd/8730#0",
-    "dz_m": 13.1766,
-    "dz_max_m": 15.7861,
-    "longueur_m": 98.148,
+    "a": "voi/20020#5",
+    "b": "zon/391#2",
+    "dz_m": 12.6579,
+    "dz_max_m": 12.9697,
+    "longueur_m": 5.996,
     "mat": [
      "mineral",
-     "mineral"
+     "vegetal"
     ],
-    "motif": "dZ = 13.18 m au-dessus du plafond de mur (12.0 m)",
+    "motif": "dZ = 12.66 m au-dessus du plafond de mur (12.0 m)",
     "type": null,
-    "x": 1158.19,
-    "y": -880.71
+    "x": 1264.16,
+    "y": -919.63
    },
    {
-    "a": "zon/445#1",
-    "b": "bnd/8730#0",
-    "dz_m": 12.106,
-    "dz_max_m": 12.106,
-    "longueur_m": 89.559,
+    "a": "ouv/14#0",
+    "b": "zon/634#0",
+    "dz_m": 12.58,
+    "dz_max_m": 12.58,
+    "longueur_m": 37.755,
     "mat": [
-     "vegetal",
-     "mineral"
+     "mineral",
+     "eau"
     ],
-    "motif": "dZ = 12.11 m au-dessus du plafond de mur (12.0 m)",
+    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
     "type": null,
-    "x": 1223.36,
-    "y": -941.15
+    "x": -1343.55,
+    "y": 232.18
+   },
+   {
+    "a": "ouv/14#0",
+    "b": "ouv/129#0",
+    "dz_m": 12.58,
+    "dz_max_m": 12.58,
+    "longueur_m": 4.968,
+    "mat": [
+     "mineral",
+     "eau"
+    ],
+    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
+    "type": null,
+    "x": -1322.68,
+    "y": 238.32
+   },
+   {
+    "a": "ouv/14#0",
+    "b": "ouv/131#0",
+    "dz_m": 12.58,
+    "dz_max_m": 12.58,
+    "longueur_m": 12.167,
+    "mat": [
+     "mineral",
+     "eau"
+    ],
+    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
+    "type": null,
+    "x": -1312.92,
+    "y": 239.99
+   },
+   {
+    "a": "ouv/14#0",
+    "b": "ouv/134#0",
+    "dz_m": 12.58,
+    "dz_max_m": 12.58,
+    "longueur_m": 20.467,
+    "mat": [
+     "mineral",
+     "eau"
+    ],
+    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
+    "type": null,
+    "x": -1303.19,
+    "y": 241.87
+   },
+   {
+    "a": "ouv/14#0",
+    "b": "org/662#0",
+    "dz_m": 12.58,
+    "dz_max_m": 12.58,
+    "longueur_m": 105.566,
+    "mat": [
+     "mineral",
+     "eau"
+    ],
+    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
+    "type": null,
+    "x": -1254.01,
+    "y": 264.13
+   },
+   {
+    "a": "ouv/30#0",
+    "b": "org/1152#0",
+    "dz_m": 12.21,
+    "dz_max_m": 12.21,
+    "longueur_m": 106.753,
+    "mat": [
+     "mineral",
+     "eau"
+    ],
+    "motif": "dZ = 12.21 m au-dessus du plafond de mur (12.0 m)",
+    "type": null,
+    "x": -540.8,
+    "y": 534.31
    }
   ],
-  "m": 217.6,
-  "n": 5
+  "m": 377.9,
+  "n": 11
  },
  "couches": {
   "interfaces.json": {
-   "md5_logique": "0907919b7bd9aa549b61dc7426352a2e",
-   "md5_octets": "0907919b7bd9aa549b61dc7426352a2e",
-   "octets": 2713
+   "md5_logique": "bbf3185ae6df3848e03196e2923dd502",
+   "md5_octets": "bbf3185ae6df3848e03196e2923dd502",
+   "octets": 4401
   },
   "juges.json": {
-   "md5_logique": "5b4c8bc2e58eff1cb17a0832b4114fb1",
-   "md5_octets": "5b4c8bc2e58eff1cb17a0832b4114fb1",
-   "octets": 18313
+   "md5_logique": "122c18bfad8f9cdcd3f83adaa065aeef",
+   "md5_octets": "122c18bfad8f9cdcd3f83adaa065aeef",
+   "octets": 24748
   },
   "matiere.json": {
-   "md5_logique": "442eb3c1e7d89e0adcef6dcbee0259f6",
-   "md5_octets": "442eb3c1e7d89e0adcef6dcbee0259f6",
-   "octets": 4150
+   "md5_logique": "220faf6a7b2a919f1597d82b30f19db6",
+   "md5_octets": "220faf6a7b2a919f1597d82b30f19db6",
+   "octets": 4174
   },
   "niveaux.json": {
-   "md5_logique": "04b0de70dd8ba426059dd16fc1da6753",
-   "md5_octets": "04b0de70dd8ba426059dd16fc1da6753",
-   "octets": 2613
+   "md5_logique": "ff43e11b3f655511e2a0cc5c401fa3bf",
+   "md5_octets": "ff43e11b3f655511e2a0cc5c401fa3bf",
+   "octets": 8486
   },
   "qui.json": {
-   "md5_logique": "926cfd3826c5cf129197d66e0e4ec262",
-   "md5_octets": "926cfd3826c5cf129197d66e0e4ec262",
-   "octets": 2817
+   "md5_logique": "b4ee2ef106abd692b73cf5e4d9c79e90",
+   "md5_octets": "b4ee2ef106abd692b73cf5e4d9c79e90",
+   "octets": 3204
   }
  },
  "domaine": {
@@ -165,28 +255,22 @@
  "ecarts_chiffres": {
   "conflits_donnee_visible": {
    "dur_peint_vegetal": {
-    "m2": 114330.4,
-    "parcelles": 1366
+    "m2": 113108.1,
+    "parcelles": 2653
    },
    "zone_verte_minerale": {
-    "m2": 936.1,
-    "parcelles": 133
+    "m2": 936.0,
+    "parcelles": 132
    }
   },
   "contre_preuve_z": {
-   "desaccord_5cm_repartition_pc": {
-    "batiment": 0.09,
-    "organique": 43.68,
-    "ouvrage": 4.2,
-    "voirie": 2.05,
-    "zone": 41.3
-   },
    "ecart_max_m": 9.563375,
    "ecart_median_m": 0.000279,
    "ecart_moyen_m": 0.203144,
    "ecart_p95_m": 2.047195,
    "ecart_p99_m": 3.524232,
    "hors_bornes_n": 0,
+   "note": "la lecture Python est celle du MNT nu ; le drapage de l'organique n'est pas touche par NIVEAUX v2, cet ecart doit donc etre IDENTIQUE a celui de v1",
    "points": 93887,
    "runs": 5028,
    "sous_1cm_pc": 89.954,
@@ -218,15 +302,15 @@
  "index_donnees": {
   "convention_decoupe": "parcelle et frontiere DECOUPEES PAR CELLULE",
   "fichier": "data/plan_index.json",
-  "md5_logique": "679a274b851ce4474871d0a43e392d9a",
-  "md5_octets": "679a274b851ce4474871d0a43e392d9a",
-  "octets": 29739,
+  "md5_logique": "67f83843d0186d77d7dca000abd2f829",
+  "md5_octets": "67f83843d0186d77d7dca000abd2f829",
+  "octets": 29856,
   "totaux": {
-   "instances": 990061,
-   "interfaces_distinctes": 96986,
-   "interfaces_pieces": 99909,
-   "parcelles_distinctes": 46424,
-   "parcelles_pieces": 49934
+   "instances": 989965,
+   "interfaces_distinctes": 127011,
+   "interfaces_pieces": 130065,
+   "parcelles_distinctes": 60835,
+   "parcelles_pieces": 64496
   }
  },
  "invariants": {

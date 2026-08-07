@@ -2,7 +2,7 @@
  "biefs": {
   "amplitude_max_m": 7.5,
   "amplitude_mediane_m": 0.565,
-  "parcelles_eau_n": 548,
+  "parcelles_eau_n": 704,
   "pires": [
    {
     "amplitude_m": 7.5,
@@ -45,63 +45,63 @@
     "nature": "Canal"
    }
   ],
-  "z_max_m": 149.454,
+  "z_max_m": 149.62,
   "z_min_m": 126.27
  },
  "compteurs_par_regle": {
   "HORS CATALOGUE": {
-   "appliquee_n": 5,
+   "appliquee_n": 11,
    "couverture_revue_pc": 100.0,
-   "revue_n": 5
+   "revue_n": 11
   },
   "annexion E0-bis": {
-   "appliquee_n": 6573,
+   "appliquee_n": 6572,
    "couverture_revue_pc": 0.1826,
    "revue_n": 12
   },
   "catalogue: None": {
-   "appliquee_n": 5,
-   "couverture_revue_pc": 100.0,
+   "appliquee_n": 11,
+   "couverture_revue_pc": 45.4545,
    "revue_n": 5
   },
   "catalogue: affleurement": {
-   "appliquee_n": 21483,
-   "couverture_revue_pc": 0.0233,
+   "appliquee_n": 39162,
+   "couverture_revue_pc": 0.0128,
    "revue_n": 5
   },
   "catalogue: bordure": {
-   "appliquee_n": 52427,
-   "couverture_revue_pc": 0.0095,
+   "appliquee_n": 62435,
+   "couverture_revue_pc": 0.008,
    "revue_n": 5
   },
   "catalogue: emmarchement": {
-   "appliquee_n": 192,
-   "couverture_revue_pc": 2.6042,
+   "appliquee_n": 204,
+   "couverture_revue_pc": 2.451,
    "revue_n": 5
   },
   "catalogue: mur": {
-   "appliquee_n": 22408,
-   "couverture_revue_pc": 0.0223,
+   "appliquee_n": 24730,
+   "couverture_revue_pc": 0.0202,
    "revue_n": 5
   },
   "catalogue: rien": {
-   "appliquee_n": 289,
-   "couverture_revue_pc": 1.7301,
+   "appliquee_n": 465,
+   "couverture_revue_pc": 1.0753,
    "revue_n": 5
   },
   "catalogue: talus": {
-   "appliquee_n": 182,
-   "couverture_revue_pc": 2.7473,
+   "appliquee_n": 4,
+   "couverture_revue_pc": 125.0,
    "revue_n": 5
   },
   "conflit donnee/visible": {
-   "appliquee_n": 1499,
-   "couverture_revue_pc": 0.8005,
+   "appliquee_n": 2785,
+   "couverture_revue_pc": 0.4309,
    "revue_n": 12
   },
   "constante p50": {
-   "appliquee_n": 27218,
-   "couverture_revue_pc": 0.0441,
+   "appliquee_n": 38892,
+   "couverture_revue_pc": 0.0309,
    "revue_n": 12
   },
   "drapage": {
@@ -110,8 +110,8 @@
    "revue_n": 0
   },
   "profil par troncon": {
-   "appliquee_n": 14298,
-   "couverture_revue_pc": 0.0839,
+   "appliquee_n": 17169,
+   "couverture_revue_pc": 0.0699,
    "revue_n": 12
   }
  },
@@ -123,7 +123,8 @@
   "drapage",
   "catalogue: mur",
   "catalogue: bordure",
-  "catalogue: affleurement"
+  "catalogue: affleurement",
+  "conflit donnee/visible"
  ],
  "semis": {
   "brut_n": 1222412,
@@ -131,9 +132,9 @@
   "invariant_retenues_sur_dur_n": 0,
   "regle": "une instance vit si son PIXEL de masque est herbe (R >= 128) ET si elle n'est pas sur une parcelle minerale du plan",
   "rejet_pixel_non_herbe_n": 99727,
-  "rejet_sur_dur_du_plan_n": 132624,
-  "retenues_n": 990061,
-  "retenues_pc": 80.992,
+  "rejet_sur_dur_du_plan_n": 132720,
+  "retenues_n": 989965,
+  "retenues_pc": 80.985,
   "verification": "sur les PIXELS des masques, pas sur une vectorisation"
  },
  "tournee": [
@@ -141,8 +142,8 @@
    "detail": "598.3 m2, largeur 4A/P 2.916 m",
    "regle": "annexion E0-bis",
    "titre": "plus grande bande annexee (voirie)",
-   "x": -519.04,
-   "y": 52.75
+   "x": -519.62,
+   "y": 52.95
   },
   {
    "detail": "537.0 m2, largeur 4A/P 2.499 m",
@@ -222,214 +223,214 @@
    "y": -2.0
   },
   {
-   "detail": "zone, 4193 m2, relief du MNT sous la parcelle 16.42 m, cote retenue 180.53 m",
+   "detail": "zone, 4193 m2, relief du MNT sous la parcelle 21.96 m, cote retenue 179.03 m",
    "regle": "constante p50",
    "titre": "zone aplanie au plus fort relief",
    "x": 1353.85,
    "y": -750.75
   },
   {
-   "detail": "zone, 3070 m2, relief du MNT sous la parcelle 14.66 m, cote retenue 183.88 m",
+   "detail": "zone, 1298 m2, relief du MNT sous la parcelle 21.96 m, cote retenue 179.03 m",
+   "regle": "constante p50",
+   "titre": "zone aplanie au plus fort relief",
+   "x": 1322.83,
+   "y": -634.16
+  },
+  {
+   "detail": "zone, 1348 m2, relief du MNT sous la parcelle 21.96 m, cote retenue 179.03 m",
+   "regle": "constante p50",
+   "titre": "zone aplanie au plus fort relief",
+   "x": 1327.1,
+   "y": -710.79
+  },
+  {
+   "detail": "zone, 3070 m2, relief du MNT sous la parcelle 21.96 m, cote retenue 179.03 m",
    "regle": "constante p50",
    "titre": "zone aplanie au plus fort relief",
    "x": 1402.03,
    "y": -703.08
   },
   {
-   "detail": "zone, 3788 m2, relief du MNT sous la parcelle 14.02 m, cote retenue 169.39 m",
+   "detail": "zone, 593 m2, relief du MNT sous la parcelle 21.96 m, cote retenue 179.03 m",
    "regle": "constante p50",
    "titre": "zone aplanie au plus fort relief",
-   "x": 1236.18,
-   "y": -1125.32
+   "x": 1351.04,
+   "y": -637.54
   },
   {
-   "detail": "zone, 8040 m2, relief du MNT sous la parcelle 13.96 m, cote retenue 181.84 m",
+   "detail": "zone, 231 m2, relief du MNT sous la parcelle 18.30 m, cote retenue 180.94 m",
    "regle": "constante p50",
    "titre": "zone aplanie au plus fort relief",
-   "x": 1736.98,
-   "y": -912.39
+   "x": 1271.83,
+   "y": -907.3
   },
   {
-   "detail": "batiment, 1779 m2, relief du MNT sous la parcelle 13.81 m, cote retenue 169.48 m",
+   "detail": "zone, 2466 m2, relief du MNT sous la parcelle 18.30 m, cote retenue 180.94 m",
    "regle": "constante p50",
    "titre": "zone aplanie au plus fort relief",
-   "x": 1276.5,
-   "y": -1025.47
+   "x": 1331.26,
+   "y": -903.5
   },
   {
-   "detail": "zone, 3459 m2, relief du MNT sous la parcelle 13.39 m, cote retenue 173.65 m",
+   "detail": "zone, 3008 m2, relief du MNT sous la parcelle 18.30 m, cote retenue 180.94 m",
    "regle": "constante p50",
    "titre": "zone aplanie au plus fort relief",
-   "x": 1275.6,
-   "y": -944.29
+   "x": 1355.37,
+   "y": -858.3
   },
   {
-   "detail": "ouvrage, 4563 m2, relief du MNT sous la parcelle 12.35 m, cote retenue 133.81 m",
+   "detail": "zone, 0 m2, relief du MNT sous la parcelle 18.30 m, cote retenue 180.94 m",
    "regle": "constante p50",
    "titre": "zone aplanie au plus fort relief",
-   "x": -1296.91,
-   "y": 263.52
+   "x": 1348.27,
+   "y": -879.46
   },
   {
-   "detail": "ouvrage, 0 m2, relief du MNT sous la parcelle 12.35 m, cote retenue 133.81 m",
+   "detail": "zone, 1004 m2, relief du MNT sous la parcelle 18.30 m, cote retenue 180.94 m",
    "regle": "constante p50",
    "titre": "zone aplanie au plus fort relief",
-   "x": -1367.13,
-   "y": 232.64
+   "x": 1308.15,
+   "y": -891.3
   },
   {
-   "detail": "ouvrage, 2 m2, relief du MNT sous la parcelle 12.35 m, cote retenue 133.81 m",
+   "detail": "zone, 1249 m2, relief du MNT sous la parcelle 15.68 m, cote retenue 167.64 m",
    "regle": "constante p50",
    "titre": "zone aplanie au plus fort relief",
-   "x": -1332.7,
-   "y": 269.75
+   "x": 1360.16,
+   "y": 808.2
   },
   {
-   "detail": "ouvrage, 11 m2, relief du MNT sous la parcelle 12.35 m, cote retenue 133.81 m",
+   "detail": "zone, 2286 m2, relief du MNT sous la parcelle 15.68 m, cote retenue 167.64 m",
    "regle": "constante p50",
    "titre": "zone aplanie au plus fort relief",
-   "x": -1337.83,
-   "y": 266.41
+   "x": 1317.9,
+   "y": 764.33
   },
   {
-   "detail": "ouvrage, 15 m2, relief du MNT sous la parcelle 12.35 m, cote retenue 133.81 m",
-   "regle": "constante p50",
-   "titre": "zone aplanie au plus fort relief",
-   "x": -1253.69,
-   "y": 302.17
-  },
-  {
-   "detail": "ouvrage, 0 m2, relief du MNT sous la parcelle 12.35 m, cote retenue 133.81 m",
-   "regle": "constante p50",
-   "titre": "zone aplanie au plus fort relief",
-   "x": -1367.22,
-   "y": 236.88
-  },
-  {
-   "detail": "pente max 75.94 % sur 5.8 m (plafond voirie 12 %)",
+   "detail": "pente max 356.75 % sur 12.3 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 1095.52,
-   "y": -90.3
+   "x": -677.7,
+   "y": 1314.79
   },
   {
-   "detail": "pente max 75.50 % sur 18.0 m (plafond voirie 12 %)",
+   "detail": "pente max 334.84 % sur 316.6 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": -820.91,
-   "y": 77.24
+   "x": -676.41,
+   "y": 169.25
   },
   {
-   "detail": "pente max 75.50 % sur 18.0 m (plafond voirie 12 %)",
+   "detail": "pente max 250.70 % sur 27.1 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": -819.87,
-   "y": 77.61
+   "x": 974.55,
+   "y": 399.88
   },
   {
-   "detail": "pente max 74.53 % sur 2.1 m (plafond voirie 12 %)",
+   "detail": "pente max 250.70 % sur 27.1 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 1102.69,
-   "y": -82.62
+   "x": 970.79,
+   "y": 403.47
   },
   {
-   "detail": "pente max 70.11 % sur 21.8 m (plafond voirie 12 %)",
+   "detail": "pente max 206.71 % sur 234.8 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 1568.81,
-   "y": -1214.93
+   "x": -807.39,
+   "y": 357.94
   },
   {
-   "detail": "pente max 70.11 % sur 21.8 m (plafond voirie 12 %)",
+   "detail": "pente max 206.71 % sur 234.8 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 1563.2,
-   "y": -1210.35
+   "x": -777.62,
+   "y": 301.32
   },
   {
-   "detail": "pente max 69.78 % sur 11.2 m (plafond voirie 12 %)",
+   "detail": "pente max 183.75 % sur 844.9 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": -380.7,
-   "y": 368.69
+   "x": 1007.4,
+   "y": 93.3
   },
   {
-   "detail": "pente max 69.67 % sur 28.3 m (plafond voirie 12 %)",
+   "detail": "pente max 183.75 % sur 844.9 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 1036.42,
-   "y": -221.51
+   "x": 961.47,
+   "y": 584.29
   },
   {
-   "detail": "pente max 69.67 % sur 28.3 m (plafond voirie 12 %)",
+   "detail": "pente max 151.51 % sur 81.3 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 1040.51,
-   "y": -227.4
+   "x": -321.76,
+   "y": 1301.45
   },
   {
-   "detail": "pente max 66.37 % sur 106.5 m (plafond voirie 12 %)",
+   "detail": "pente max 151.51 % sur 81.3 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 1546.09,
-   "y": -1190.65
+   "x": -319.32,
+   "y": 1318.62
   },
   {
-   "detail": "pente max 63.83 % sur 29.6 m (plafond voirie 12 %)",
+   "detail": "pente max 135.13 % sur 5.8 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 1098.09,
-   "y": -82.92
+   "x": -235.39,
+   "y": 749.85
   },
   {
-   "detail": "pente max 63.83 % sur 29.6 m (plafond voirie 12 %)",
+   "detail": "pente max 131.53 % sur 5.8 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 1098.5,
+   "x": 1095.68,
    "y": -90.55
   },
   {
-   "detail": "98.1 m, dZ 13.177 m, mineral|mineral",
+   "detail": "106.8 m, dZ 12.210 m, mineral|eau",
    "regle": "catalogue: None",
    "titre": "plus longue interface `None`",
-   "x": 1158.19,
-   "y": -880.71
+   "x": -540.8,
+   "y": 534.31
   },
   {
-   "detail": "89.6 m, dZ 12.106 m, vegetal|mineral",
+   "detail": "105.6 m, dZ 12.580 m, mineral|eau",
    "regle": "catalogue: None",
    "titre": "plus longue interface `None`",
-   "x": 1223.36,
-   "y": -941.15
+   "x": -1254.01,
+   "y": 264.13
   },
   {
-   "detail": "26.4 m, dZ 15.707 m, mineral|mineral",
+   "detail": "46.0 m, dZ 14.120 m, mineral|eau",
    "regle": "catalogue: None",
    "titre": "plus longue interface `None`",
-   "x": 1175.7,
-   "y": -899.22
+   "x": -731.69,
+   "y": 138.32
   },
   {
-   "detail": "dZ 16.569 m sur 2.2 m",
+   "detail": "dZ 14.120 m sur 46.0 m",
    "regle": "catalogue: None",
    "titre": "plus fort dZ pour `None`",
-   "x": 1156.83,
-   "y": -880.72
+   "x": -731.69,
+   "y": 138.32
   },
   {
-   "detail": "dZ 16.569 m sur 1.2 m",
+   "detail": "dZ 13.858 m sur 16.6 m",
    "regle": "catalogue: None",
    "titre": "plus fort dZ pour `None`",
-   "x": 1156.8,
-   "y": -880.76
+   "x": -798.65,
+   "y": 93.57
   },
   {
-   "detail": "421.3 m, dZ 0.017 m, mineral|mineral",
+   "detail": "387.1 m, dZ 0.000 m, mineral|mineral",
    "regle": "catalogue: affleurement",
    "titre": "plus longue interface `affleurement`",
-   "x": -1413.36,
-   "y": -609.1
+   "x": 255.86,
+   "y": 1175.05
   },
   {
    "detail": "344.5 m, dZ 0.000 m, eau|eau",
@@ -439,53 +440,46 @@
    "y": -76.3
   },
   {
-   "detail": "315.3 m, dZ 0.000 m, mineral|mineral",
+   "detail": "306.3 m, dZ 0.000 m, mineral|mineral",
    "regle": "catalogue: affleurement",
    "titre": "plus longue interface `affleurement`",
-   "x": -1765.37,
-   "y": -756.62
+   "x": -1173.31,
+   "y": 1633.5
   },
   {
-   "detail": "dZ 0.020 m sur 44.7 m",
+   "detail": "dZ 0.020 m sur 113.7 m",
    "regle": "catalogue: affleurement",
    "titre": "plus fort dZ pour `affleurement`",
-   "x": -1462.69,
-   "y": -564.76
+   "x": 429.04,
+   "y": -1067.84
   },
   {
-   "detail": "dZ 0.020 m sur 32.2 m",
+   "detail": "dZ 0.020 m sur 80.4 m",
    "regle": "catalogue: affleurement",
    "titre": "plus fort dZ pour `affleurement`",
-   "x": 144.79,
-   "y": -969.54
+   "x": 805.6,
+   "y": 971.19
   },
   {
-   "detail": "739.4 m, dZ 0.029 m, mineral|vegetal",
+   "detail": "642.6 m, dZ 0.029 m, mineral|vegetal",
    "regle": "catalogue: bordure",
    "titre": "plus longue interface `bordure`",
    "x": 438.44,
    "y": 1239.97
   },
   {
-   "detail": "616.5 m, dZ 0.020 m, mineral|mineral",
+   "detail": "616.7 m, dZ 0.087 m, mineral|mineral",
    "regle": "catalogue: bordure",
    "titre": "plus longue interface `bordure`",
    "x": 184.54,
    "y": 1812.33
   },
   {
-   "detail": "586.8 m, dZ 0.064 m, mineral|mineral",
+   "detail": "536.1 m, dZ 0.128 m, mineral|mineral",
    "regle": "catalogue: bordure",
    "titre": "plus longue interface `bordure`",
-   "x": -1025.46,
-   "y": 1737.67
-  },
-  {
-   "detail": "dZ 0.200 m sur 88.5 m",
-   "regle": "catalogue: bordure",
-   "titre": "plus fort dZ pour `bordure`",
-   "x": 1489.93,
-   "y": -261.56
+   "x": -1210.59,
+   "y": -1264.04
   },
   {
    "detail": "dZ 0.200 m sur 26.2 m",
@@ -495,11 +489,11 @@
    "y": 1465.45
   },
   {
-   "detail": "49.0 m, dZ 0.923 m, mineral|mineral",
-   "regle": "catalogue: emmarchement",
-   "titre": "plus longue interface `emmarchement`",
-   "x": 1371.12,
-   "y": -930.77
+   "detail": "dZ 0.200 m sur 24.5 m",
+   "regle": "catalogue: bordure",
+   "titre": "plus fort dZ pour `bordure`",
+   "x": 321.67,
+   "y": 1446.85
   },
   {
    "detail": "33.3 m, dZ 0.206 m, mineral|mineral",
@@ -516,18 +510,25 @@
    "y": -9.53
   },
   {
-   "detail": "dZ 4.963 m sur 5.2 m",
+   "detail": "24.5 m, dZ 0.811 m, eau|eau",
+   "regle": "catalogue: emmarchement",
+   "titre": "plus longue interface `emmarchement`",
+   "x": -321.94,
+   "y": 1403.59
+  },
+  {
+   "detail": "dZ 5.237 m sur 1.5 m",
+   "regle": "catalogue: emmarchement",
+   "titre": "plus fort dZ pour `emmarchement`",
+   "x": -840.37,
+   "y": 420.98
+  },
+  {
+   "detail": "dZ 4.876 m sur 4.5 m",
    "regle": "catalogue: emmarchement",
    "titre": "plus fort dZ pour `emmarchement`",
    "x": 1422.65,
    "y": -966.37
-  },
-  {
-   "detail": "dZ 4.448 m sur 7.6 m",
-   "regle": "catalogue: emmarchement",
-   "titre": "plus fort dZ pour `emmarchement`",
-   "x": 1424.81,
-   "y": -959.45
   },
   {
    "detail": "685.8 m, dZ 0.774 m, vegetal|mineral",
@@ -537,13 +538,6 @@
    "y": -976.25
   },
   {
-   "detail": "683.4 m, dZ 0.217 m, mineral|mineral",
-   "regle": "catalogue: mur",
-   "titre": "plus longue interface `mur`",
-   "x": 1751.13,
-   "y": 23.53
-  },
-  {
    "detail": "674.8 m, dZ 0.243 m, mineral|mineral",
    "regle": "catalogue: mur",
    "titre": "plus longue interface `mur`",
@@ -551,130 +545,319 @@
    "y": -776.72
   },
   {
-   "detail": "dZ 11.622 m sur 18.1 m",
+   "detail": "652.5 m, dZ 2.606 m, vegetal|eau",
    "regle": "catalogue: mur",
-   "titre": "plus fort dZ pour `mur`",
-   "x": -943.65,
-   "y": 1.42
+   "titre": "plus longue interface `mur`",
+   "x": -784.56,
+   "y": 1714.71
   },
   {
-   "detail": "dZ 11.571 m sur 0.9 m",
+   "detail": "dZ 11.910 m sur 79.8 m",
    "regle": "catalogue: mur",
    "titre": "plus fort dZ pour `mur`",
-   "x": -1212.69,
-   "y": 287.89
+   "x": -1167.92,
+   "y": 293.94
   },
   {
-   "detail": "147.9 m, dZ 0.010 m, vegetal|vegetal",
+   "detail": "dZ 11.910 m sur 46.8 m",
+   "regle": "catalogue: mur",
+   "titre": "plus fort dZ pour `mur`",
+   "x": -1144.65,
+   "y": 299.8
+  },
+  {
+   "detail": "154.9 m, dZ 0.000 m, vegetal|vegetal",
+   "regle": "catalogue: rien",
+   "titre": "plus longue interface `rien`",
+   "x": 512.3,
+   "y": 959.6
+  },
+  {
+   "detail": "147.9 m, dZ 0.000 m, vegetal|vegetal",
    "regle": "catalogue: rien",
    "titre": "plus longue interface `rien`",
    "x": 472.46,
    "y": 645.1
   },
   {
-   "detail": "130.5 m, dZ 0.184 m, vegetal|vegetal",
+   "detail": "138.8 m, dZ 0.000 m, vegetal|vegetal",
    "regle": "catalogue: rien",
    "titre": "plus longue interface `rien`",
-   "x": -555.83,
-   "y": 883.87
-  },
-  {
-   "detail": "127.3 m, dZ 0.108 m, vegetal|vegetal",
-   "regle": "catalogue: rien",
-   "titre": "plus longue interface `rien`",
-   "x": 650.62,
-   "y": 641.67
-  },
-  {
-   "detail": "dZ 0.299 m sur 19.7 m",
-   "regle": "catalogue: rien",
-   "titre": "plus fort dZ pour `rien`",
-   "x": -1410.64,
-   "y": -126.44
-  },
-  {
-   "detail": "dZ 0.298 m sur 28.5 m",
-   "regle": "catalogue: rien",
-   "titre": "plus fort dZ pour `rien`",
-   "x": 1432.11,
-   "y": -778.48
-  },
-  {
-   "detail": "154.9 m, dZ 0.643 m, vegetal|vegetal",
-   "regle": "catalogue: talus",
-   "titre": "plus longue interface `talus`",
-   "x": 512.3,
-   "y": 959.6
-  },
-  {
-   "detail": "138.8 m, dZ 1.300 m, vegetal|vegetal",
-   "regle": "catalogue: talus",
-   "titre": "plus longue interface `talus`",
    "x": 1360.88,
    "y": 775.97
   },
   {
-   "detail": "118.9 m, dZ 1.361 m, vegetal|vegetal",
+   "detail": "dZ 0.270 m sur 45.0 m",
+   "regle": "catalogue: rien",
+   "titre": "plus fort dZ pour `rien`",
+   "x": -1190.42,
+   "y": 457.45
+  },
+  {
+   "detail": "dZ 0.247 m sur 15.1 m",
+   "regle": "catalogue: rien",
+   "titre": "plus fort dZ pour `rien`",
+   "x": -1053.98,
+   "y": -13.61
+  },
+  {
+   "detail": "57.4 m, dZ 0.931 m, vegetal|vegetal",
    "regle": "catalogue: talus",
    "titre": "plus longue interface `talus`",
-   "x": 1255.87,
-   "y": 500.46
+   "x": 1322.67,
+   "y": -751.49
   },
   {
-   "detail": "dZ 11.502 m sur 4.8 m",
+   "detail": "23.7 m, dZ 0.355 m, vegetal|vegetal",
+   "regle": "catalogue: talus",
+   "titre": "plus longue interface `talus`",
+   "x": -1463.9,
+   "y": -108.17
+  },
+  {
+   "detail": "12.5 m, dZ 0.407 m, vegetal|vegetal",
+   "regle": "catalogue: talus",
+   "titre": "plus longue interface `talus`",
+   "x": -1438.2,
+   "y": -101.47
+  },
+  {
+   "detail": "dZ 0.931 m sur 57.4 m",
    "regle": "catalogue: talus",
    "titre": "plus fort dZ pour `talus`",
-   "x": 1354.01,
-   "y": -663.61
+   "x": 1322.67,
+   "y": -751.49
   },
   {
-   "detail": "dZ 6.832 m sur 25.0 m",
+   "detail": "dZ 0.407 m sur 12.5 m",
    "regle": "catalogue: talus",
    "titre": "plus fort dZ pour `talus`",
-   "x": 1373.58,
-   "y": -700.91
+   "x": -1438.2,
+   "y": -101.47
   },
   {
-   "detail": "voi/819#3 : 2768 m2, 77.8 % de pixels herbe",
-   "regle": "conflit donnee/visible",
-   "titre": "du dur peint en herbe",
-   "x": 224.79,
-   "y": 1207.38
+   "detail": "5 membres, 10502 m2, relief du MNT 21.96 m, cote retenue 179.03 m",
+   "regle": "communaute de nivellement",
+   "titre": "communaute au plus fort relief (vegetal)",
+   "x": 1353.9,
+   "y": -750.8
   },
   {
-   "detail": "voi/1751#0 : 2512 m2, 71.4 % de pixels herbe",
-   "regle": "conflit donnee/visible",
-   "titre": "du dur peint en herbe",
-   "x": -967.59,
-   "y": -1073.77
+   "detail": "5 membres, 6708 m2, relief du MNT 18.30 m, cote retenue 180.94 m",
+   "regle": "communaute de nivellement",
+   "titre": "communaute au plus fort relief (vegetal)",
+   "x": 1271.8,
+   "y": -907.3
   },
   {
-   "detail": "voi/625#0 : 1537 m2, 91.3 % de pixels herbe",
-   "regle": "conflit donnee/visible",
-   "titre": "du dur peint en herbe",
-   "x": 345.06,
-   "y": 1133.28
+   "detail": "7 membres, 15429 m2, relief du MNT 15.68 m, cote retenue 167.64 m",
+   "regle": "communaute de nivellement",
+   "titre": "communaute au plus fort relief (vegetal)",
+   "x": 1360.2,
+   "y": 808.2
   },
   {
-   "detail": "voi/66#0 : 1478 m2, 100.0 % de pixels herbe",
+   "detail": "2 membres, 3625 m2, relief du MNT 14.15 m, cote retenue 171.96 m",
+   "regle": "communaute de nivellement",
+   "titre": "communaute au plus fort relief (vegetal)",
+   "x": 1278.6,
+   "y": -812.4
+  },
+  {
+   "detail": "2 membres, 4546 m2, relief du MNT 14.02 m, cote retenue 170.05 m",
+   "regle": "communaute de nivellement",
+   "titre": "communaute au plus fort relief (vegetal)",
+   "x": 1236.2,
+   "y": -1125.3
+  },
+  {
+   "detail": "2 membres, 3519 m2, relief du MNT 13.39 m, cote retenue 173.69 m",
+   "regle": "communaute de nivellement",
+   "titre": "communaute au plus fort relief (vegetal)",
+   "x": 1275.7,
+   "y": -944.4
+  },
+  {
+   "detail": "2 membres, 1358 m2, relief du MNT 11.76 m, cote retenue 161.57 m",
+   "regle": "communaute de nivellement",
+   "titre": "communaute au plus fort relief (vegetal)",
+   "x": 1249.2,
+   "y": -976.6
+  },
+  {
+   "detail": "4 membres, 7382 m2, relief du MNT 11.50 m, cote retenue 172.71 m",
+   "regle": "communaute de nivellement",
+   "titre": "communaute au plus fort relief (vegetal)",
+   "x": 1371.1,
+   "y": -94.8
+  },
+  {
+   "detail": "4 membres, 11009 m2, relief du MNT 9.60 m, cote retenue 158.32 m",
+   "regle": "communaute de nivellement",
+   "titre": "communaute au plus fort relief (vegetal)",
+   "x": 1484.5,
+   "y": 1539.4
+  },
+  {
+   "detail": "2 membres, 190 m2, relief du MNT 9.53 m, cote retenue 164.56 m",
+   "regle": "communaute de nivellement",
+   "titre": "communaute au plus fort relief (vegetal)",
+   "x": 1254.1,
+   "y": -970.6
+  },
+  {
+   "detail": "2 membres, 1205 m2, relief du MNT 8.73 m, cote retenue 164.37 m",
+   "regle": "communaute de nivellement",
+   "titre": "communaute au plus fort relief (vegetal)",
+   "x": 1304.5,
+   "y": 634.5
+  },
+  {
+   "detail": "2 membres, 2851 m2, relief du MNT 8.64 m, cote retenue 170.25 m",
+   "regle": "communaute de nivellement",
+   "titre": "communaute au plus fort relief (vegetal)",
+   "x": 1291.5,
+   "y": -553.8
+  },
+  {
+   "detail": "ouv/186#0, 88.8 m2, 4 interfaces ; plus forte marche 1.55 m (emmarchement)",
+   "regle": "Saint-Pierre (grief utilisateur)",
+   "titre": "escalier de la place Saint-Pierre",
+   "x": -734.77,
+   "y": -11.66
+  },
+  {
+   "detail": "ouv/187#0, 1.9 m2, 3 interfaces ; plus forte marche 1.12 m (emmarchement)",
+   "regle": "Saint-Pierre (grief utilisateur)",
+   "titre": "escalier de la place Saint-Pierre",
+   "x": -677.4,
+   "y": 131.83
+  },
+  {
+   "detail": "dZ 11.002 m sur 8.1 m, resolution DECLAREE `mur`",
+   "regle": "marche entre chaussees",
+   "titre": "plus forte marche chaussee|chaussee restante",
+   "x": 1178.65,
+   "y": -107.26
+  },
+  {
+   "detail": "dZ 10.995 m sur 6.8 m, resolution DECLAREE `mur`",
+   "regle": "marche entre chaussees",
+   "titre": "plus forte marche chaussee|chaussee restante",
+   "x": -677.7,
+   "y": 1312.56
+  },
+  {
+   "detail": "dZ 10.991 m sur 2.5 m, resolution DECLAREE `mur`",
+   "regle": "marche entre chaussees",
+   "titre": "plus forte marche chaussee|chaussee restante",
+   "x": -677.58,
+   "y": 1312.98
+  },
+  {
+   "detail": "dZ 10.891 m sur 0.4 m, resolution DECLAREE `mur`",
+   "regle": "marche entre chaussees",
+   "titre": "plus forte marche chaussee|chaussee restante",
+   "x": 1176.79,
+   "y": -105.01
+  },
+  {
+   "detail": "dZ 10.791 m sur 6.5 m, resolution DECLAREE `mur`",
+   "regle": "marche entre chaussees",
+   "titre": "plus forte marche chaussee|chaussee restante",
+   "x": 1178.46,
+   "y": -106.34
+  },
+  {
+   "detail": "dZ 10.791 m sur 1.0 m, resolution DECLAREE `mur`",
+   "regle": "marche entre chaussees",
+   "titre": "plus forte marche chaussee|chaussee restante",
+   "x": 1178.38,
+   "y": -103.65
+  },
+  {
+   "detail": "dZ 10.743 m sur 9.4 m, resolution DECLAREE `mur`",
+   "regle": "marche entre chaussees",
+   "titre": "plus forte marche chaussee|chaussee restante",
+   "x": 1182.77,
+   "y": -108.37
+  },
+  {
+   "detail": "dZ 10.622 m sur 9.0 m, resolution DECLAREE `mur`",
+   "regle": "marche entre chaussees",
+   "titre": "plus forte marche chaussee|chaussee restante",
+   "x": 1179.88,
+   "y": -105.89
+  },
+  {
+   "detail": "dZ 10.434 m sur 6.5 m, resolution DECLAREE `mur`",
+   "regle": "marche entre chaussees",
+   "titre": "plus forte marche chaussee|chaussee restante",
+   "x": 1186.18,
+   "y": -106.63
+  },
+  {
+   "detail": "dZ 10.424 m sur 2.1 m, resolution DECLAREE `mur`",
+   "regle": "marche entre chaussees",
+   "titre": "plus forte marche chaussee|chaussee restante",
+   "x": 1529.66,
+   "y": -202.99
+  },
+  {
+   "detail": "dZ 10.423 m sur 7.8 m, resolution DECLAREE `mur`",
+   "regle": "marche entre chaussees",
+   "titre": "plus forte marche chaussee|chaussee restante",
+   "x": 1528.74,
+   "y": -198.16
+  },
+  {
+   "detail": "dZ 10.382 m sur 1.1 m, resolution DECLAREE `mur`",
+   "regle": "marche entre chaussees",
+   "titre": "plus forte marche chaussee|chaussee restante",
+   "x": 1533.95,
+   "y": -195.14
+  },
+  {
+   "detail": "voi/12316#0 : 1478 m2, 100.0 % de pixels herbe",
    "regle": "conflit donnee/visible",
    "titre": "du dur peint en herbe",
    "x": -973.75,
    "y": 1723.35
   },
   {
-   "detail": "voi/8461#0 : 1435 m2, 98.2 % de pixels herbe",
+   "detail": "voi/12875#0 : 1474 m2, 93.2 % de pixels herbe",
    "regle": "conflit donnee/visible",
    "titre": "du dur peint en herbe",
-   "x": -261.86,
-   "y": -1214.96
+   "x": 338.51,
+   "y": 1136.49
   },
   {
-   "detail": "voi/446#0 : 1235 m2, 77.6 % de pixels herbe",
+   "detail": "voi/13069#9 : 1389 m2, 66.8 % de pixels herbe",
    "regle": "conflit donnee/visible",
    "titre": "du dur peint en herbe",
-   "x": 757.6,
-   "y": 964.72
+   "x": 224.79,
+   "y": 1207.38
+  },
+  {
+   "detail": "voi/13069#8 : 1254 m2, 92.3 % de pixels herbe",
+   "regle": "conflit donnee/visible",
+   "titre": "du dur peint en herbe",
+   "x": 150.9,
+   "y": 1225.41
+  },
+  {
+   "detail": "voi/19055#0 : 883 m2, 59.3 % de pixels herbe",
+   "regle": "conflit donnee/visible",
+   "titre": "du dur peint en herbe",
+   "x": -783.35,
+   "y": -107.82
+  },
+  {
+   "detail": "voi/20741#0 : 830 m2, 99.4 % de pixels herbe",
+   "regle": "conflit donnee/visible",
+   "titre": "du dur peint en herbe",
+   "x": 358.19,
+   "y": -1134.76
   },
   {
    "detail": "zon/598#1 : 148 m2, 0.0 % de pixels herbe",
@@ -701,8 +884,8 @@
    "detail": "zon/39#5 : 49 m2, 27.4 % de pixels herbe",
    "regle": "conflit donnee/visible",
    "titre": "une zone OCS GE sans herbe visible",
-   "x": -1157.92,
-   "y": -267.54
+   "x": -1158.1,
+   "y": -267.63
   },
   {
    "detail": "zon/39#4 : 40 m2, 0.0 % de pixels herbe",
@@ -719,39 +902,81 @@
    "y": 231.29
   },
   {
-   "detail": "dZ 16.57 m sur 2.2 m, mineral|mineral",
+   "detail": "dZ 14.12 m sur 46.0 m, mineral|eau",
    "regle": "HORS CATALOGUE",
    "titre": "arbitrage demande",
-   "x": 1156.83,
-   "y": -880.72
+   "x": -731.69,
+   "y": 138.32
   },
   {
-   "detail": "dZ 16.57 m sur 1.2 m, mineral|mineral",
+   "detail": "dZ 13.86 m sur 16.6 m, eau|eau",
    "regle": "HORS CATALOGUE",
    "titre": "arbitrage demande",
-   "x": 1156.8,
-   "y": -880.76
+   "x": -798.65,
+   "y": 93.57
   },
   {
-   "detail": "dZ 15.71 m sur 26.4 m, mineral|mineral",
+   "detail": "dZ 13.50 m sur 18.1 m, mineral|eau",
    "regle": "HORS CATALOGUE",
    "titre": "arbitrage demande",
-   "x": 1175.7,
-   "y": -899.22
+   "x": -943.65,
+   "y": 1.42
   },
   {
-   "detail": "dZ 13.18 m sur 98.1 m, mineral|mineral",
+   "detail": "dZ 12.96 m sur 3.5 m, mineral|eau",
    "regle": "HORS CATALOGUE",
    "titre": "arbitrage demande",
-   "x": 1158.19,
-   "y": -880.71
+   "x": -809.4,
+   "y": 361.67
   },
   {
-   "detail": "dZ 12.11 m sur 89.6 m, vegetal|mineral",
+   "detail": "dZ 12.66 m sur 6.0 m, mineral|vegetal",
    "regle": "HORS CATALOGUE",
    "titre": "arbitrage demande",
-   "x": 1223.36,
-   "y": -941.15
+   "x": 1264.16,
+   "y": -919.63
+  },
+  {
+   "detail": "dZ 12.58 m sur 37.8 m, mineral|eau",
+   "regle": "HORS CATALOGUE",
+   "titre": "arbitrage demande",
+   "x": -1343.55,
+   "y": 232.18
+  },
+  {
+   "detail": "dZ 12.58 m sur 5.0 m, mineral|eau",
+   "regle": "HORS CATALOGUE",
+   "titre": "arbitrage demande",
+   "x": -1322.68,
+   "y": 238.32
+  },
+  {
+   "detail": "dZ 12.58 m sur 12.2 m, mineral|eau",
+   "regle": "HORS CATALOGUE",
+   "titre": "arbitrage demande",
+   "x": -1312.92,
+   "y": 239.99
+  },
+  {
+   "detail": "dZ 12.58 m sur 20.5 m, mineral|eau",
+   "regle": "HORS CATALOGUE",
+   "titre": "arbitrage demande",
+   "x": -1303.19,
+   "y": 241.87
+  },
+  {
+   "detail": "dZ 12.58 m sur 105.6 m, mineral|eau",
+   "regle": "HORS CATALOGUE",
+   "titre": "arbitrage demande",
+   "x": -1254.01,
+   "y": 264.13
+  },
+  {
+   "detail": "dZ 12.21 m sur 106.8 m, mineral|eau",
+   "regle": "HORS CATALOGUE",
+   "titre": "arbitrage demande",
+   "x": -540.8,
+   "y": 534.31
   }
  ]
 }

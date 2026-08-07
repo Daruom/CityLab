@@ -10,6 +10,7 @@
   ],
   "regle": "E0-bis (work/PART/p5_snap.py)"
  },
+ "carrefours_n": 12250,
  "couche": "QUI",
  "domaine_cellules": [
   "-4_-2",
@@ -93,14 +94,14 @@
   "interstices_m2": 0.0,
   "interstices_n": 0,
   "interstices_seuil_m": 0.05,
-  "parcelles_n": 46424,
+  "parcelles_n": 60969,
   "recouvrements_m2": 0.0,
   "recouvrements_n": 0,
-  "reparations_2e_passe_n": 0,
-  "reparations_m2": 78.520347,
-  "reparations_n": 1,
-  "trous_m2": 78.520347,
-  "trous_n": 1
+  "reparations_m2": 95.185219,
+  "reparations_n": 3,
+  "tours_de_garde": 2,
+  "trous_m2": 95.18522,
+  "trous_n": 4
  },
  "par_proprietaire": {
   "batiment": {
@@ -126,8 +127,8 @@
    "aire_m2": 1898286.6,
    "bandes_annexees_m2": 57527.3,
    "bandes_annexees_n": 3900,
-   "objets": 9373,
-   "parcelles": 14611
+   "objets": 21623,
+   "parcelles": 29154
   },
   "zone": {
    "aire_m2": 1069651.8,
@@ -144,5 +145,20 @@
   "zone",
   "organique"
  ],
- "regle_emprise_ouvrage": "axe du side-car tamponne de largeur_m/2, bouts francs (largeur_m = donnee BD TOPO)"
+ "regle_emprise_ouvrage": "axe du side-car tamponne de largeur_m/2, bouts francs (largeur_m = donnee BD TOPO)",
+ "reseau_noue": {
+  "MARGE_CARREFOUR_M": 0.5,
+  "SEUIL_DENIVELE_M": 2.5,
+  "SNAP_NOEUD_M": 0.1,
+  "axes": 9373,
+  "axes_portes_par_un_ouvrage": 491,
+  "carrefours": 12257,
+  "croisements": 17668,
+  "croisements_deniveles": 1120,
+  "deniveles_par_ecart_z": 0,
+  "deniveles_par_ouvrage": 1120,
+  "extremites": 18746,
+  "noeuds": 14730,
+  "rayon_disque_median_m": 1.647
+ }
 }

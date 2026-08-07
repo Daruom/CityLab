@@ -1,26 +1,301 @@
 {
- "bandes_heritees": 6574,
+ "ancrage_ouvrages": {
+  "ouvrages_cotes": 79,
+  "parcelles_ancrees": 32
+ },
+ "bandes": {
+  "en_offset_bordure": 3500,
+  "n": 6575
+ },
+ "carrefours": {
+  "parcelles": 11585
+ },
+ "communautes": {
+  "communautes_n": 224,
+  "membres_candidats": 2015,
+  "parcelles_couvertes": 649,
+  "pires_reliefs": [
+   {
+    "aire_m2": 10502.1,
+    "id": "comm/1395",
+    "matiere": "vegetal",
+    "membres": 5,
+    "relief_m": 21.958,
+    "x": 1353.9,
+    "y": -750.8,
+    "z_m": 179.028
+   },
+   {
+    "aire_m2": 6708.4,
+    "id": "comm/1390",
+    "matiere": "vegetal",
+    "membres": 5,
+    "relief_m": 18.298,
+    "x": 1271.8,
+    "y": -907.3,
+    "z_m": 180.94
+   },
+   {
+    "aire_m2": 15428.6,
+    "id": "comm/1055",
+    "matiere": "vegetal",
+    "membres": 7,
+    "relief_m": 15.682,
+    "x": 1360.2,
+    "y": 808.2,
+    "z_m": 167.636
+   },
+   {
+    "aire_m2": 3625.1,
+    "id": "comm/1355",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 14.154,
+    "x": 1278.6,
+    "y": -812.4,
+    "z_m": 171.963
+   },
+   {
+    "aire_m2": 4546.1,
+    "id": "comm/1459",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 14.017,
+    "x": 1236.2,
+    "y": -1125.3,
+    "z_m": 170.052
+   },
+   {
+    "aire_m2": 3519.2,
+    "id": "comm/1387",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 13.395,
+    "x": 1275.7,
+    "y": -944.4,
+    "z_m": 173.686
+   },
+   {
+    "aire_m2": 1357.7,
+    "id": "comm/1370",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 11.758,
+    "x": 1249.2,
+    "y": -976.6,
+    "z_m": 161.567
+   },
+   {
+    "aire_m2": 7382.5,
+    "id": "comm/1346",
+    "matiere": "vegetal",
+    "membres": 4,
+    "relief_m": 11.499,
+    "x": 1371.1,
+    "y": -94.8,
+    "z_m": 172.713
+   },
+   {
+    "aire_m2": 11009.2,
+    "id": "comm/1603",
+    "matiere": "vegetal",
+    "membres": 4,
+    "relief_m": 9.603,
+    "x": 1484.5,
+    "y": 1539.4,
+    "z_m": 158.322
+   },
+   {
+    "aire_m2": 189.6,
+    "id": "comm/1371",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 9.53,
+    "x": 1254.1,
+    "y": -970.6,
+    "z_m": 164.563
+   },
+   {
+    "aire_m2": 1204.8,
+    "id": "comm/1012",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 8.73,
+    "x": 1304.5,
+    "y": 634.5,
+    "z_m": 164.365
+   },
+   {
+    "aire_m2": 2851.1,
+    "id": "comm/1350",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 8.637,
+    "x": 1291.5,
+    "y": -553.8,
+    "z_m": 170.25
+   },
+   {
+    "aire_m2": 9994.2,
+    "id": "comm/1058",
+    "matiere": "vegetal",
+    "membres": 3,
+    "relief_m": 8.501,
+    "x": 1256.1,
+    "y": 452.8,
+    "z_m": 161.365
+   },
+   {
+    "aire_m2": 1438.5,
+    "id": "comm/1429",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 7.837,
+    "x": 1258.1,
+    "y": -446.1,
+    "z_m": 169.605
+   },
+   {
+    "aire_m2": 9232.9,
+    "id": "comm/1063",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 7.819,
+    "x": 1515.3,
+    "y": 1414.5,
+    "z_m": 162.967
+   },
+   {
+    "aire_m2": 1717.8,
+    "id": "comm/1558",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 7.801,
+    "x": 1326.9,
+    "y": -1425.9,
+    "z_m": 168.64
+   },
+   {
+    "aire_m2": 4215.2,
+    "id": "comm/765",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 7.646,
+    "x": -207.3,
+    "y": 821.6,
+    "z_m": 138.065
+   },
+   {
+    "aire_m2": 814.6,
+    "id": "comm/1344",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 7.627,
+    "x": 1296.8,
+    "y": -690.6,
+    "z_m": 171.487
+   },
+   {
+    "aire_m2": 4396.0,
+    "id": "comm/1053",
+    "matiere": "vegetal",
+    "membres": 3,
+    "relief_m": 7.448,
+    "x": 1313.5,
+    "y": 1205.2,
+    "z_m": 162.973
+   },
+   {
+    "aire_m2": 7317.4,
+    "id": "comm/1460",
+    "matiere": "vegetal",
+    "membres": 4,
+    "relief_m": 7.304,
+    "x": 1369.6,
+    "y": -1153.0,
+    "z_m": 178.233
+   },
+   {
+    "aire_m2": 8046.2,
+    "id": "comm/1059",
+    "matiere": "vegetal",
+    "membres": 3,
+    "relief_m": 7.16,
+    "x": 1260.6,
+    "y": 546.0,
+    "z_m": 161.859
+   },
+   {
+    "aire_m2": 6298.3,
+    "id": "comm/1045",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 6.869,
+    "x": 1439.4,
+    "y": 581.1,
+    "z_m": 176.741
+   },
+   {
+    "aire_m2": 2815.7,
+    "id": "comm/1019",
+    "matiere": "vegetal",
+    "membres": 3,
+    "relief_m": 6.819,
+    "x": 1387.5,
+    "y": 1293.0,
+    "z_m": 162.066
+   },
+   {
+    "aire_m2": 7153.9,
+    "id": "comm/1444",
+    "matiere": "vegetal",
+    "membres": 4,
+    "relief_m": 6.646,
+    "x": 1460.2,
+    "y": -893.9,
+    "z_m": 190.881
+   },
+   {
+    "aire_m2": 4107.4,
+    "id": "comm/1056",
+    "matiere": "vegetal",
+    "membres": 2,
+    "relief_m": 6.389,
+    "x": 1431.7,
+    "y": 459.5,
+    "z_m": 171.034
+   }
+  ],
+  "relief": {
+   "max_m": 21.958,
+   "median_m": 1.222,
+   "p95_m": 8.617
+  }
+ },
  "constantes_de_norme": {
+  "BORDURE_NOMINALE_M": 0.14,
+  "D_ANCRE_NOEUD_M": 3.0,
+  "K_SOLIDAIRE": 3.0,
+  "L_ANCRE_M": 1.0,
+  "L_SOLIDAIRE_M": 2.0,
+  "MARGE_CARREFOUR_M": 0.5,
+  "PART_PLATEAU_MAX": 0.25,
   "PAS_PROFIL_M": 5.0,
   "PENTE_MAX_CHEMINEMENT_PC": 5.0,
   "PENTE_MAX_VOIRIE_PC": 12.0,
+  "PLAIN_PIED_MAX_M": 0.2,
   "RESSAUT_MAX_M": 0.02,
+  "SNAP_NOEUD_M": 0.1,
   "TOL_PROFIL_M": 0.15
  },
  "contre_preuve_z": {
-  "desaccord_5cm_repartition_pc": {
-   "batiment": 0.09,
-   "organique": 43.68,
-   "ouvrage": 4.2,
-   "voirie": 2.05,
-   "zone": 41.3
-  },
   "ecart_max_m": 9.563375,
   "ecart_median_m": 0.000279,
   "ecart_moyen_m": 0.203144,
   "ecart_p95_m": 2.047195,
   "ecart_p99_m": 3.524232,
   "hors_bornes_n": 0,
+  "note": "la lecture Python est celle du MNT nu ; le drapage de l'organique n'est pas touche par NIVEAUX v2, cet ecart doit donc etre IDENTIQUE a celui de v1",
   "points": 93887,
   "runs": 5028,
   "sous_1cm_pc": 89.954,
@@ -33,118 +308,154 @@
   "drapage"
  ],
  "lecteur": "work/BERGES/b_lib.py::SolRendu (bilineaire FTerrainSampler + enveloppe des deux triangulations)",
+ "noeuds": {
+  "ancres_sur_ouvrage": 256,
+  "n": 14730,
+  "rayon_plateau_max_m": 5.5,
+  "rayon_plateau_median_m": 1.75
+ },
+ "ordre_national": [
+  "ouvrages (ancres declarees)",
+  "noeuds",
+  "troncons ancres",
+  "solidarite voirie",
+  "bandes en offset",
+  "communautes",
+  "ancrage aux ouvrages",
+  "organique drape"
+ ],
  "parcelles_par_loi": {
-  "constante": 27218,
+  "constante": 38892,
   "drapage": 4908,
-  "profil_troncon": 14298
+  "profil_troncon": 17169
  },
  "pente_voirie": {
-  "hors_plafond_cheminement_n": 1927,
-  "hors_plafond_voirie_n": 787,
-  "max_pc": 75.942,
-  "mediane_pc": 1.269,
-  "p95_pc": 16.884,
+  "hors_plafond_cheminement_n": 3714,
+  "hors_plafond_voirie_n": 1580,
+  "max_pc": 356.749,
+  "mediane_pc": 2.353,
+  "p95_pc": 22.134,
   "pires": [
    {
+    "L_m": 12.327,
+    "id": "voi/13360#0",
+    "pente_pc": 356.749
+   },
+   {
+    "L_m": 316.602,
+    "id": "voi/16849#0",
+    "pente_pc": 334.84
+   },
+   {
+    "L_m": 27.123,
+    "id": "voi/15647#0",
+    "pente_pc": 250.696
+   },
+   {
+    "L_m": 27.123,
+    "id": "voi/15647#1",
+    "pente_pc": 250.696
+   },
+   {
+    "L_m": 234.796,
+    "id": "voi/14906#0",
+    "pente_pc": 206.709
+   },
+   {
+    "L_m": 234.796,
+    "id": "voi/14906#1",
+    "pente_pc": 206.709
+   },
+   {
+    "L_m": 844.859,
+    "id": "voi/15912#1",
+    "pente_pc": 183.75
+   },
+   {
+    "L_m": 844.859,
+    "id": "voi/15912#3",
+    "pente_pc": 183.75
+   },
+   {
+    "L_m": 81.271,
+    "id": "voi/13179#0",
+    "pente_pc": 151.508
+   },
+   {
+    "L_m": 81.271,
+    "id": "voi/13179#1",
+    "pente_pc": 151.508
+   },
+   {
+    "L_m": 5.811,
+    "id": "voi/16607#0",
+    "pente_pc": 135.134
+   },
+   {
     "L_m": 5.837,
-    "id": "voi/8172#0",
-    "pente_pc": 75.942
+    "id": "voi/20422#1",
+    "pente_pc": 131.528
    },
    {
-    "L_m": 18.014,
-    "id": "voi/4334#0",
-    "pente_pc": 75.505
+    "L_m": 222.107,
+    "id": "voi/18173#0",
+    "pente_pc": 131.328
    },
    {
-    "L_m": 18.014,
-    "id": "voi/4334#1",
-    "pente_pc": 75.505
+    "L_m": 93.637,
+    "id": "voi/15914#0",
+    "pente_pc": 125.384
    },
    {
-    "L_m": 2.081,
-    "id": "voi/8179#0",
-    "pente_pc": 74.531
+    "L_m": 93.637,
+    "id": "voi/15914#1",
+    "pente_pc": 125.384
    },
    {
-    "L_m": 21.835,
-    "id": "voi/9319#0",
-    "pente_pc": 70.105
+    "L_m": 40.023,
+    "id": "voi/14360#0",
+    "pente_pc": 124.464
    },
    {
-    "L_m": 21.835,
-    "id": "voi/9319#1",
-    "pente_pc": 70.105
+    "L_m": 40.023,
+    "id": "voi/14360#1",
+    "pente_pc": 124.464
    },
    {
-    "L_m": 11.187,
-    "id": "voi/5339#0",
-    "pente_pc": 69.777
+    "L_m": 40.023,
+    "id": "voi/14360#2",
+    "pente_pc": 124.464
    },
    {
-    "L_m": 28.328,
-    "id": "voi/7749#0",
-    "pente_pc": 69.667
+    "L_m": 40.023,
+    "id": "voi/14360#3",
+    "pente_pc": 124.464
    },
    {
-    "L_m": 28.328,
-    "id": "voi/7749#1",
-    "pente_pc": 69.667
-   },
-   {
-    "L_m": 106.506,
-    "id": "voi/9315#0",
-    "pente_pc": 66.371
-   },
-   {
-    "L_m": 29.607,
-    "id": "voi/7922#0",
-    "pente_pc": 63.83
-   },
-   {
-    "L_m": 225.139,
-    "id": "voi/2167#0",
-    "pente_pc": 62.962
-   },
-   {
-    "L_m": 225.139,
-    "id": "voi/2167#1",
-    "pente_pc": 62.962
-   },
-   {
-    "L_m": 225.139,
-    "id": "voi/2167#2",
-    "pente_pc": 62.962
-   },
-   {
-    "L_m": 225.139,
-    "id": "voi/2167#3",
-    "pente_pc": 62.962
-   },
-   {
-    "L_m": 225.139,
-    "id": "voi/2167#5",
-    "pente_pc": 62.962
-   },
-   {
-    "L_m": 28.721,
-    "id": "voi/8168#0",
-    "pente_pc": 62.712
-   },
-   {
-    "L_m": 133.861,
-    "id": "voi/3117#0",
-    "pente_pc": 62.384
-   },
-   {
-    "L_m": 133.861,
-    "id": "voi/3117#1",
-    "pente_pc": 62.384
-   },
-   {
-    "L_m": 5.805,
-    "id": "voi/474#0",
-    "pente_pc": 61.723
+    "L_m": 40.023,
+    "id": "voi/14360#4",
+    "pente_pc": 124.464
    }
   ]
- }
+ },
+ "reseau_noue": {
+  "MARGE_CARREFOUR_M": 0.5,
+  "SEUIL_DENIVELE_M": 2.5,
+  "SNAP_NOEUD_M": 0.1,
+  "axes": 9373,
+  "axes_portes_par_un_ouvrage": 491,
+  "carrefours": 12257,
+  "croisements": 17668,
+  "croisements_deniveles": 1120,
+  "deniveles_par_ecart_z": 0,
+  "deniveles_par_ouvrage": 1120,
+  "extremites": 18746,
+  "noeuds": 14730,
+  "rayon_disque_median_m": 1.647
+ },
+ "solidarite_voirie": {
+  "fusions": 859,
+  "parcelles_adoptantes": 859
+ },
+ "version": "v2 — solidarite"
 }

@@ -70,6 +70,7 @@ def main():
           "bordure": (33, 150, 243), "mur": (244, 67, 54),
           None: (255, 0, 255)}
     byid = {p["id"]: p["geom"] for p in P}
+    import shapely as _sh
     ordre = ["affleurement", "bordure", "mur", "talus", "rien", "emmarchement",
              None]
     par = {}
@@ -101,6 +102,74 @@ def main():
                         im2[j, i] = CT[t]
     ecrire_png(os.path.join(PLAN, "_PLAN_D.png"), im2[::-1])
     chrono("C7/rendu D", time.time() - t2, "_PLAN_D.png")
+
+    # ---- _PLAN_SAINT_PIERRE.png : le grief nominatif de l'utilisateur ------
+    t3 = time.time()
+    CX, CY, DEMI = -700.0, 120.0, 90.0
+    W2 = 1100
+    H2 = W2
+    gx = CX - DEMI + (np.arange(W2) + 0.5) * (2 * DEMI) / W2
+    gy = CY - DEMI + (np.arange(H2) + 0.5) * (2 * DEMI) / H2
+    GX2, GY2 = np.meshgrid(gx, gy)
+    GX2, GY2 = GX2.ravel(), GY2.ravel()
+    im3 = np.full((H2 * W2, 3), 16, dtype=np.uint8)
+    COUL2 = {"constante": (224, 183, 74), "profil_troncon": (224, 112, 58),
+             "drapage": (74, 144, 192)}
+    zone = shapely.box(CX - DEMI, CY - DEMI, CX + DEMI, CY + DEMI)
+    loc = [p for p in P if p["geom"].intersects(zone)]
+    for k, c in COUL2.items():
+        gs = [p["geom"] for p in loc
+              if (lois.get(p["id"]) or {}).get("loi") == k]
+        if not gs:
+            continue
+        U = valide(unary_union(gs))
+        shapely.prepare(U)
+        im3[shapely.contains_xy(U, GX2, GY2)] = c
+    # les ouvrages (dont les escaliers) en surbrillance
+    gs = [p["geom"] for p in loc if p["proprietaire"] == "ouvrage"]
+    if gs:
+        U = valide(unary_union(gs))
+        shapely.prepare(U)
+        im3[shapely.contains_xy(U, GX2, GY2)] = (232, 96, 84)
+    im3 = im3.reshape(H2, W2, 3)
+    sx2 = W2 / (2 * DEMI)
+    sy2 = H2 / (2 * DEMI)
+    for f in fronts:
+        if not (CX - DEMI <= f["x"] <= CX + DEMI
+                and CY - DEMI <= f["y"] <= CY + DEMI):
+            continue
+        a, b = byid.get(f["a"]), byid.get(f["b"])
+        if a is None or b is None:
+            continue
+        try:
+            ba, bb = a.boundary, b.boundary
+            it = None if (ba is None or bb is None) else ba.intersection(bb)
+        except Exception:
+            continue
+        if it is None or it.is_empty:
+            continue
+        dz = f["dz_m"]
+        cm = ((58, 209, 122) if dz <= 0.02 else (240, 196, 25) if dz <= 0.20
+              else (240, 123, 25) if dz <= 1.0 else (224, 32, 32))
+        for L2 in (it.geoms if hasattr(it, "geoms") else [it]):
+            if L2.geom_type != "LineString" or L2.length <= 0:
+                continue
+            n = max(2, int(L2.length / 0.15))
+            for q in range(n + 1):
+                pp = L2.interpolate(q / float(n), normalized=True)
+                i2 = int((pp.x - (CX - DEMI)) * sx2)
+                j2 = int((pp.y - (CY - DEMI)) * sy2)
+                if 0 <= i2 < W2 and 0 <= j2 < H2:
+                    im3[j2, i2] = cm
+    ecrire_png(os.path.join(PLAN, "_PLAN_SAINT_PIERRE.png"), im3[::-1])
+    chrono("C7/zoom Saint-Pierre", time.time() - t3,
+           "%.0f m de cote, %d parcelles" % (2 * DEMI, len(loc)))
+    jalon("C7/ZOOM SAINT-PIERRE : _PLAN_SAINT_PIERRE.png (%d x %d px, %.0f m "
+          "de cote autour de (%.0f ; %.0f), 1 px = %.3f m) — lois de Z en fond "
+          "(constante jaune / profil orange / drapage bleu), ouvrages en rouge "
+          "clair, frontieres colorees par CLASSE DE MARCHE (vert <= 2 cm, "
+          "jaune <= 20 cm, orange <= 1 m, rouge > 1 m)"
+          % (W2, H2, 2 * DEMI, CX, CY, 2 * DEMI / W2))
 
     # ---- l'index de contrat ------------------------------------------------
     couches = {}

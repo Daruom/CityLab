@@ -41,6 +41,8 @@ from c2_matiere import MASQUE_PX, PX_M, SEUIL_R, charge_masques
 
 DATA = os.path.join(OUT, "data")
 MM = 3                      # les geometries sont ecrites au MILLIMETRE
+AIRE_NULLE_M2 = 1e-6        # DETTE c8 SOLDEE : une parcelle d'aire nulle
+#                             n'entre pas dans le contrat (elle est comptee)
 ENTETE = {"cellSizeM": CELL_M,
           "crs": "equirectangulaire locale (SourceData/toulouse10_mnt.json)",
           "axes": "x = est (m), y = SUD (m), z = altitude NGF (m)",
@@ -57,8 +59,26 @@ def ecrire(path, obj):
             "md5_logique": md5_logique(s)}
 
 
+def _dedup(pts, ferme):
+    """DETTE c8 SOLDEE : deux sommets a moins d'un MILLIMETRE l'un de l'autre
+    sont un seul sommet. Le contrat sort propre ; la fusion cote lecteur C++
+    reste comme garde, elle n'a plus rien a rattraper."""
+    out = []
+    for q in pts:
+        if out and abs(q[0] - out[-1][0]) < 1e-3 and abs(q[1] - out[-1][1]) < 1e-3:
+            continue
+        out.append(q)
+    if ferme:
+        while len(out) > 1 and abs(out[0][0] - out[-1][0]) < 1e-3 \
+                and abs(out[0][1] - out[-1][1]) < 1e-3:
+            out.pop()
+        if len(out) >= 3:
+            out.append([out[0][0], out[0][1]])
+    return out
+
+
 def coords(g):
-    """Anneaux d'un polygone (ext puis trous), au mm."""
+    """Anneaux d'un polygone (ext puis trous), au mm, sommets dedupliques."""
     out = []
     for h in (g.geoms if hasattr(g, "geoms") else [g]):
         if h.geom_type != "Polygon":
@@ -67,8 +87,10 @@ def coords(g):
             c = np.asarray(ring.coords)
             if len(c) < 4:
                 continue
-            out.append([[round(float(x), MM), round(float(y), MM)]
-                        for x, y in c])
+            r = _dedup([[round(float(x), MM), round(float(y), MM)]
+                        for x, y in c], True)
+            if len(r) >= 4:
+                out.append(r)
     return out
 
 
@@ -169,6 +191,7 @@ def main():
     scy = np.floor(YS / CELL_M).astype(np.int64)
 
     fichiers = {}
+    nulles = set()
     par_cell = {}
     n_parc_pieces = n_int_pieces = n_sem = 0
     ids_parc, ids_int = set(), set()
@@ -186,6 +209,9 @@ def main():
         for j in sorted(int(k) for k in T.query(bx)):
             p = P[j]
             g = p["geom"]
+            if g.area <= AIRE_NULLE_M2:
+                nulles.add(p["id"])
+                continue
             try:
                 q = valide(g.intersection(bx))
             except Exception:
@@ -326,6 +352,9 @@ def main():
                        "longueur_totale_m": "longueur de la frontiere ENTIERE"},
             "non_geometrique": "loi de Z, axe de troncon et matiere sont "
                                "RECOPIES entiers dans chaque cellule concernee"},
+        "parcelles_aire_nulle_exclues": {"n": len(nulles),
+                                         "ids": sorted(nulles)[:50]},
+        "deduplication_sommets_mm": 1.0,
         "totaux": {"parcelles_distinctes": len(ids_parc),
                    "parcelles_pieces": n_parc_pieces,
                    "interfaces_distinctes": len(ids_int),

@@ -63,6 +63,7 @@ def main():
         lois = pickle.load(f)["lois"]
     with open(os.path.join(CACHE, "interfaces.pkl"), "rb") as f:
         fronts = pickle.load(f)["fronts"]
+    byid = {p["id"]: p for p in P}
 
     # ================================================= ① LE SEMIS, SUR PIXELS =
     X, Y, K = lit_semis()
@@ -184,10 +185,49 @@ def main():
         for f in L2[:2]:
             sig("catalogue: %s" % t, "plus fort dZ pour `%s`" % t, f["x"],
                 f["y"], "dZ %.3f m sur %.1f m" % (f["dz_m"], f["longueur_m"]))
+    # -- les communautes au plus fort RELIEF (l'A/B 3D de l'utilisateur :
+    #    aplanir ou draper une grande communaute pentue ? seuil NON tranche)
+    nrep = json.load(io.open(os.path.join(OUT, "niveaux.json"),
+                             encoding="utf-8"))
+    for c in (nrep.get("communautes", {}).get("pires_reliefs") or [])[:N_TOURNEE]:
+        sig("communaute de nivellement",
+            "communaute au plus fort relief (%s)" % c["matiere"], c["x"],
+            c["y"], "%d membres, %.0f m2, relief du MNT %.2f m, cote retenue "
+                    "%.2f m" % (c["membres"], c["aire_m2"], c["relief_m"],
+                                c["z_m"]))
+    # -- LE GRIEF NOMINATIF : la place Saint-Pierre et ses escaliers
+    for p2 in P:
+        if (p2.get("meta") or {}).get("nature") != "escalier":
+            continue
+        r = p2["geom"].representative_point()
+        if (r.x + 700.0) ** 2 + (r.y - 120.0) ** 2 > 200.0 ** 2:
+            continue
+        vs = [f for f in fronts if f["a"] == p2["id"] or f["b"] == p2["id"]]
+        pire = max(vs, key=lambda f: f["dz_m"]) if vs else None
+        sig("Saint-Pierre (grief utilisateur)", "escalier de la place "
+            "Saint-Pierre", r.x, r.y,
+            "%s, %.1f m2, %d interfaces ; plus forte marche %.2f m (%s)"
+            % (p2["id"], p2["geom"].area, len(vs),
+               pire["dz_m"] if pire else 0.0,
+               pire["type"] if pire else "-"))
+    # -- les plus fortes marches RESTANTES entre chaussees (invariant ①)
+    def _bande(i):
+        return i.startswith("bnd/") or i.startswith("tro/")
+    ch = [f for f in fronts
+          if byid.get(f["a"]) and byid.get(f["b"])
+          and byid[f["a"]]["proprietaire"] == "voirie"
+          and byid[f["b"]]["proprietaire"] == "voirie"
+          and not (_bande(f["a"]) or _bande(f["b"]))]
+    ch.sort(key=lambda f: -f["dz_m"])
+    for f in ch[:N_TOURNEE]:
+        sig("marche entre chaussees", "plus forte marche chaussee|chaussee "
+            "restante", f["x"], f["y"],
+            "dZ %.3f m sur %.1f m, resolution DECLAREE `%s`"
+            % (f["dz_m"], f["longueur_m"], f["type"]))
+
     # -- les pires conflits donnee/visible
     mrep = json.load(io.open(os.path.join(OUT, "matiere.json"),
                              encoding="utf-8"))
-    byid = {p["id"]: p for p in P}
     for k, lib in (("dur_peint_vegetal", "du dur peint en herbe"),
                    ("zone_verte_minerale", "une zone OCS GE sans herbe "
                                            "visible")):

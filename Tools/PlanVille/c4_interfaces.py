@@ -53,6 +53,7 @@ class Cote(object):
         self.sol = sol
         self.loi = lois
         self.axe = {}
+        self._cache = {}
         for p in parcelles:
             a = (p.get("meta") or {}).get("axe")
             if a:
@@ -60,25 +61,39 @@ class Cote(object):
                                                 for q in a])
 
     def z(self, pid, xs, ys):
+        """NIVEAUX v2 : la loi porte elle-meme son AXE et son OFFSET. Deux
+        parcelles SOLIDAIRES referencent le MEME axe et le MEME profil : elles
+        rendent la MEME valeur au meme point — dZ nul par construction."""
         L = self.loi.get(pid)
         if L is None:
             return None
+        off = float(L.get("offset_m") or 0.0)
         if L["loi"] == "constante":
-            return np.full(len(xs), float(L["z_m"]))
+            return np.full(len(xs), float(L["z_m"]) + off)
         if L["loi"] == "drapage":
             return np.asarray(self.sol.z(np.asarray(xs), np.asarray(ys)),
                               dtype=float)
         if L["loi"] == "profil_troncon":
-            ax = self.axe.get(L.get("loi_heritee_de") or pid) or self.axe.get(pid)
+            ax = None
+            if L.get("axe"):
+                cle = id(L["axe"])
+                ax = self._cache.get(cle)
+                if ax is None:
+                    ax = LineString([(float(q[0]), float(q[1]))
+                                     for q in L["axe"]])
+                    self._cache[cle] = ax
+            if ax is None:
+                ax = self.axe.get(L.get("loi_heritee_de") or pid) \
+                    or self.axe.get(pid)
             pr = L.get("profil")
-            if ax is None or not pr or not pr["pts"]:
-                return np.full(len(xs), float(pr["pts"][0][1]) if pr
-                               and pr["pts"] else 0.0)
+            if ax is None or not pr or not pr.get("pts"):
+                return np.full(len(xs), (float(pr["pts"][0][1]) if pr
+                                         and pr.get("pts") else 0.0) + off)
             S = np.array([q[0] for q in pr["pts"]], dtype=float)
             Z = np.array([q[1] for q in pr["pts"]], dtype=float)
             ss = np.array([ax.project(Point(float(x), float(y)))
                            for x, y in zip(xs, ys)], dtype=float)
-            return np.interp(ss, S, Z)
+            return np.interp(ss, S, Z) + off
         return None
 
 
@@ -169,10 +184,11 @@ def main():
         # polyligne n'en sort pour le contrat machine. L'intersection des bords
         # est lineaire par definition.
         try:
-            it = G[i].boundary.intersection(G[j].boundary)
+            ba, bb = G[i].boundary, G[j].boundary
+            it = None if (ba is None or bb is None) else ba.intersection(bb)
         except Exception:
             continue
-        if it.is_empty:
+        if it is None or it.is_empty:
             continue
         Lg = it.length
         if Lg < LONG_MIN_M:

@@ -134,6 +134,8 @@ def sources():
         if not g.is_empty:
             voi.append((g, {"src": "routes_3x3.json", "i": i, "w_m": w,
                             "t": r.get("t"), "surface": r.get("surface"),
+                            "bridge": bool(r.get("bridge")),
+                            "layer": int(r.get("layer") or 0),
                             "axe": [[round(float(q[0]), 3),
                                      round(float(q[1]), 3)] for q in pts]}))
     src["voirie"] = voi
@@ -413,6 +415,21 @@ def combler(parcelles, cells):
                     break
             if cible is None and "zone" in vois:
                 cible = "zone"
+        # ⚠️ Le comblement est AUTORITAIRE : la piece comblee est retranchee
+        # de toute parcelle que GEOS declarerait la recouvrir. Sans cela les
+        # deux gardes OSCILLENT sur la meme surface (mesure : 3,262215 m2
+        # passaient de « trou » a « recouvrement » a chaque tour, sans jamais
+        # converger) — c'est la meme incoherence GEOS entre `intersection` et
+        # `difference` deja payee sur voi/2906 et voi/4504.
+        for j in T.query(q):
+            j = int(j)
+            try:
+                if geoms[j].intersects(q):
+                    g2 = valide(geoms[j].difference(q))
+                    geoms[j] = g2
+                    parcelles[j]["geom"] = g2
+            except Exception:
+                pass
         parcelles.append({"id": "tro/%d#0" % i,
                           "proprietaire": cible or "organique", "geom": q,
                           "meta": {"src": "comblement d'un trou de calcul",
@@ -506,14 +523,55 @@ def main():
                         len(hors), ["%d_%d" % c for c in hors], len(manq),
                         ["%d_%d" % c for c in manq]))
     src, emp = sources()
+
+    # ---- LES PARCELLES DE CARREFOUR (arbitrage coordinateur, option b) -----
+    # Un carrefour EST un plateau : il devient une PARCELLE a part entiere, a
+    # loi CONSTANTE (la cote de son noeud, posee par C3). Consequence voulue :
+    # deux chaussees ne se touchent plus jamais directement — le carrefour les
+    # separe — donc la marche chaussee|chaussee de carrefour DISPARAIT au lieu
+    # d'etre rabotee. Les carrefours passent EN TETE de la classe voirie : le
+    # depart d'ex-aequo intra-classe par index leur donne le sol.
+    import cn_reseau as RES
+    from c0_socle import sol_rendu
+    axes = RES.axes_du_graphe()
+    NX, NY, RN, INC, stres, cles, LS, REFF, RDISQ, SUR = \
+        RES.reseau(axes, sol_rendu())
+    carre = RES.emprises_carrefour(NX, NY, RDISQ, INC, axes, cles, LS,
+                                   BOUT)
+    src["voirie"] = carre + src["voirie"]
+    jalon("C1/CARREFOURS : %d parcelles de carrefour construites (disque du "
+          "plateau intersecte l'emprise des voies incidentes), placees en tete "
+          "de la classe voirie" % len(carre))
+
     parcelles, stats = partition(src, DOM)
-    D = disjoindre(parcelles)
-    C = combler(parcelles, cells)
-    D2 = disjoindre(parcelles)
+    # Les deux gardes (disjonction et couverture) s'appellent l'une l'autre :
+    # reparer un recouvrement peut ouvrir un trou, et combler un trou peut
+    # creer un recouvrement. On ITERE jusqu'a point fixe (mesure : 2 tours
+    # suffisent, le 3e ne repare rien).
+    D = {"reparations_n": 0, "reparations_m2": 0.0}
+    C = {"trous_n": 0, "trous_m2": 0.0}
+    tours = 0
+    for tours in range(1, 9):
+        d = disjoindre(parcelles)
+        c = combler(parcelles, cells)
+        D["reparations_n"] += d["reparations_n"]
+        D["reparations_m2"] = round(D["reparations_m2"]
+                                    + d["reparations_m2"], 6)
+        C["trous_n"] += c["trous_n"]
+        C["trous_m2"] = round(C["trous_m2"] + c["trous_m2"], 6)
+        if d["reparations_n"] == 0 and c["trous_n"] == 0:
+            break
+    else:
+        d = disjoindre(parcelles)
+        D["reparations_n"] += d["reparations_n"]
+    jalon("C1/POINT FIXE des gardes atteint en %d tour(s) : %d reparations de "
+          "disjonction (%.6f m2) et %d comblements (%.6f m2) au total"
+          % (tours, D["reparations_n"], D["reparations_m2"], C["trous_n"],
+             C["trous_m2"]))
     J = juges(parcelles, DOM)
     J.update(D)
     J.update(C)
-    J["reparations_2e_passe_n"] = D2["reparations_n"]
+    J["tours_de_garde"] = tours
 
     # empreintes de la carte v2.1 : on VERIFIE qu'on lit les memes octets
     ref = carte.get("empreinte_sources", {})
@@ -545,6 +603,8 @@ def main():
                "hors_carte": ["%d_%d" % c for c in hors],
                "manquantes_sur_disque": ["%d_%d" % c for c in manq]},
            "preseance": PROPS,
+           "reseau_noue": stres,
+           "carrefours_n": len(carre),
            "annexion": {"regle": "E0-bis (work/PART/p5_snap.py)",
                         "BANDE_MAX_M": BANDE_MAX_M, "COLLIER_M": COLLIER_M,
                         "preseance_dur": DUR, "heritee": True},

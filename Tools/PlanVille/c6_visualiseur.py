@@ -160,9 +160,13 @@ def main():
         if not lg:
             continue
         t = f["type"] if f["type"] in TYPES else "HORS CATALOGUE"
+        # classe de MARCHE (carte des marches, anti-recidive) :
+        # 0 <= 2 cm | 1 <= 20 cm | 2 <= 1 m | 3 > 1 m
+        dz = f["dz_m"]
+        cm = 0 if dz <= 0.02 else (1 if dz <= 0.20 else (2 if dz <= 1.0 else 3))
         F.append([TYPES.index(t), f["dz_m"], round(f["longueur_m"], 1),
                   MATS.index(f["mat"][0]), MATS.index(f["mat"][1]),
-                  f["a"], f["b"], lg])
+                  f["a"], f["b"], lg, cm])
         nf += 1
     of = 0
     for i in range(0, len(F), PAQUET):
@@ -208,6 +212,8 @@ def main():
     M = {"lots_parcelles": len(lots),
          "lots_frontieres": (len(F) + PAQUET - 1) // PAQUET,
          "props": PROPS, "mats": MATS, "lois": LOIS, "types": TYPES,
+         "marches": ["<= 2 cm (affleurement)", "<= 20 cm (bordure)",
+                     "<= 1 m", "> 1 m"],
          "parcelles_affichees": n_aff, "parcelles_non_affichees": n_saute,
          "frontieres_affichees": nf,
          "semis_n": ns,

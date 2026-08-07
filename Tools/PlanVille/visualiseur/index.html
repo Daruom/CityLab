@@ -62,6 +62,7 @@
 
   <h2>Superpositions</h2>
   <label><input type="checkbox" id="cif"> ④ INTERFACES (frontieres)</label>
+  <label><input type="checkbox" id="cmar"> ⑤ CARTE DES MARCHES (par dZ)</label>
   <label><input type="checkbox" id="csem"> semis retenu par le plan</label>
   <label><input type="checkbox" id="cfond" checked> fond orthophoto IGN</label>
   <label><input type="checkbox" id="ccont" checked> contours des parcelles</label>
@@ -171,6 +172,7 @@ var C_PROP = ['#ce584c','#5a5a60','#9680b0','#6ca868','#cbb98c'];
 var C_MAT  = ['#96928c','#56984c','#3a6eb2'];
 var C_LOI  = ['#e0b74a','#e0703a','#4a90c0'];
 var C_TYPE = ['#4caf50','#8bc34a','#ff9800','#9e9e9e','#2196f3','#f44336','#ff00ff'];
+var C_MARCHE = ['#3ad17a','#f0c419','#f07b19','#e02020'];
 var LEG = {
   qui:  {t:'proprietaire', n:META.props, c:C_PROP},
   mat:  {t:'matiere',      n:META.mats,  c:C_MAT},
@@ -237,12 +239,13 @@ function dessine(){
     if (contours && (w>6||h>6)) ctx.stroke();
   }
   ctx.globalAlpha = 1;
-  if (document.getElementById('cif').checked){
+  var mar = document.getElementById('cmar').checked;
+  if (document.getElementById('cif').checked || mar){
     ctx.lineWidth = Math.max(1, Math.min(4, (view.z-13)));
     for (var i=0;i<FRONT.length;i++){
       var f = FRONT[i], b = bboxF(f);
       if (b[2]<lo0||b[0]>lo1||b[3]<la0||b[1]>la1) continue;
-      ctx.strokeStyle = C_TYPE[f[0]];
+      ctx.strokeStyle = mar ? C_MARCHE[f[8]||0] : C_TYPE[f[0]];
       ctx.beginPath();
       var g = f[7];
       for (var k=0;k<g.length;k++){
@@ -311,7 +314,8 @@ function clic(e){
   var lo = wx2lon(lon2wx(view.lon,view.z)+(e.clientX-W/2), view.z);
   var la = wy2lat(lat2wy(view.lat,view.z)+(e.clientY-H/2), view.z);
   // frontiere d'abord si la couche est active (elles sont fines)
-  if (document.getElementById('cif').checked){
+  if (document.getElementById('cif').checked
+      || document.getElementById('cmar').checked){
     var best=null, bd=1e18, tol = 6;
     for (var i=0;i<FRONT.length;i++){
       var f=FRONT[i], b=bboxF(f);
@@ -359,6 +363,7 @@ function ficheFront(f){
     + kv('resolution', META.types[f[0]])
     + kv('dZ (m)', f[1]) + kv('longueur (m)', f[2])
     + kv('matieres', META.mats[f[3]]+' | '+META.mats[f[4]])
+    + kv('classe de marche', META.marches ? META.marches[f[8]||0] : '-')
     + kv('parcelle A', f[5]) + kv('parcelle B', f[6]);
   d.style.display='block';
 }
@@ -369,7 +374,12 @@ function legende(){
   for (var i=0;i<L.n.length;i++)
     h += '<div class="leg"><span class="sw" style="background:'+L.c[i]
        + '"></span>'+L.n[i]+'</div>';
-  if (document.getElementById('cif').checked){
+  if (document.getElementById('cmar').checked){
+    h += '<h2>carte des marches</h2>';
+    for (var i=0;i<C_MARCHE.length;i++)
+      h += '<div class="leg"><span class="sw" style="background:'+C_MARCHE[i]
+         + ';height:3px"></span>'+(META.marches?META.marches[i]:i)+'</div>';
+  } else if (document.getElementById('cif').checked){
     h += '<h2>interfaces</h2>';
     for (var i=0;i<META.types.length;i++)
       h += '<div class="leg"><span class="sw" style="background:'+C_TYPE[i]
@@ -435,7 +445,7 @@ document.getElementById('csem').onchange = function(){
   }
   dessine();
 };
-['cif','cfond','ccont'].forEach(function(id){
+['cif','cmar','cfond','ccont'].forEach(function(id){
   document.getElementById(id).onchange = function(){ legende(); dessine(); };
 });
 Array.prototype.forEach.call(document.querySelectorAll('input[name=cou]'),

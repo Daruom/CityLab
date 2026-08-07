@@ -11,6 +11,7 @@
   "justification": "le lecteur C++ est district-first : il doit pouvoir construire une cellule sans ouvrir aucune autre",
   "non_geometrique": "loi de Z, axe de troncon et matiere sont RECOPIES entiers dans chaque cellule concernee"
  },
+ "deduplication_sommets_mm": 1.0,
  "domaine": {
   "cellule_m": 500.0,
   "cellules": [
@@ -68,494 +69,494 @@
  },
  "fichiers": {
   "plan_interfaces_-1_-1.json": {
-   "md5_logique": "640e4338284a90fafaeee41ad5a3cfdb",
-   "md5_octets": "640e4338284a90fafaeee41ad5a3cfdb",
-   "octets": 1847170
+   "md5_logique": "91b54b33352dce98478fdb1e0cad519a",
+   "md5_octets": "91b54b33352dce98478fdb1e0cad519a",
+   "octets": 4062876
   },
   "plan_interfaces_-1_-2.json": {
-   "md5_logique": "9a456baa432cdb6b2a93b07298baaeab",
-   "md5_octets": "9a456baa432cdb6b2a93b07298baaeab",
-   "octets": 2241848
+   "md5_logique": "9b21216b158a345a971d499f7594dda4",
+   "md5_octets": "9b21216b158a345a971d499f7594dda4",
+   "octets": 4666446
   },
   "plan_interfaces_-1_-3.json": {
-   "md5_logique": "334548f97755882dcb769023d8079243",
-   "md5_octets": "334548f97755882dcb769023d8079243",
-   "octets": 1520304
+   "md5_logique": "d1fa2820cda106cf7a5e434f9b77367d",
+   "md5_octets": "d1fa2820cda106cf7a5e434f9b77367d",
+   "octets": 3176773
   },
   "plan_interfaces_-1_0.json": {
-   "md5_logique": "959cc0d9242bfe0306b8ca10a536ce86",
-   "md5_octets": "959cc0d9242bfe0306b8ca10a536ce86",
-   "octets": 1920947
+   "md5_logique": "ebe29773500db61dd38c829ae26a89dd",
+   "md5_octets": "ebe29773500db61dd38c829ae26a89dd",
+   "octets": 4128772
   },
   "plan_interfaces_-1_1.json": {
-   "md5_logique": "c77b5753b46d71e3ed5a9f42e1dea5bd",
-   "md5_octets": "c77b5753b46d71e3ed5a9f42e1dea5bd",
-   "octets": 1239491
+   "md5_logique": "282a8f3d04b86b88dd6b3c3b40abe000",
+   "md5_octets": "282a8f3d04b86b88dd6b3c3b40abe000",
+   "octets": 1940521
   },
   "plan_interfaces_-1_2.json": {
-   "md5_logique": "95384421a290d53d904ca5d5d550e6aa",
-   "md5_octets": "95384421a290d53d904ca5d5d550e6aa",
-   "octets": 1392995
+   "md5_logique": "57db47abc038e227a223b907b0b70bfc",
+   "md5_octets": "57db47abc038e227a223b907b0b70bfc",
+   "octets": 3687871
   },
   "plan_interfaces_-1_3.json": {
-   "md5_logique": "e823182fbc67a87a5ea767724aeca4dd",
-   "md5_octets": "e823182fbc67a87a5ea767724aeca4dd",
-   "octets": 137853
+   "md5_logique": "f0245a3e0167801aa34dbd5e1a7597c3",
+   "md5_octets": "f0245a3e0167801aa34dbd5e1a7597c3",
+   "octets": 376546
   },
   "plan_interfaces_-2_-1.json": {
-   "md5_logique": "badb7de96a3524910bcf9076e9504b3d",
-   "md5_octets": "badb7de96a3524910bcf9076e9504b3d",
-   "octets": 1375907
+   "md5_logique": "6481a05607ba661fe03247e67062be66",
+   "md5_octets": "6481a05607ba661fe03247e67062be66",
+   "octets": 3209931
   },
   "plan_interfaces_-2_-2.json": {
-   "md5_logique": "9a4da8a158a8d2710c9849e994e6b7f3",
-   "md5_octets": "9a4da8a158a8d2710c9849e994e6b7f3",
-   "octets": 1595920
+   "md5_logique": "332c00773c0b9fe20acdd885f93a7668",
+   "md5_octets": "332c00773c0b9fe20acdd885f93a7668",
+   "octets": 3886404
   },
   "plan_interfaces_-2_-3.json": {
-   "md5_logique": "97fbc299d4c2a5e4a7961cda20d5343e",
-   "md5_octets": "97fbc299d4c2a5e4a7961cda20d5343e",
-   "octets": 1611310
+   "md5_logique": "9ebc5f725089ed74fddd84b02b17dd65",
+   "md5_octets": "9ebc5f725089ed74fddd84b02b17dd65",
+   "octets": 3676866
   },
   "plan_interfaces_-2_0.json": {
-   "md5_logique": "a8ac45ac564ffd1dd602daeb3d74500b",
-   "md5_octets": "a8ac45ac564ffd1dd602daeb3d74500b",
-   "octets": 1156497
+   "md5_logique": "ef06c4e42773a7edaf2b70487139afc9",
+   "md5_octets": "ef06c4e42773a7edaf2b70487139afc9",
+   "octets": 2289429
   },
   "plan_interfaces_-2_1.json": {
-   "md5_logique": "53a978b66a3667916f462d05717ebb8c",
-   "md5_octets": "53a978b66a3667916f462d05717ebb8c",
-   "octets": 1992864
+   "md5_logique": "b9dbd6e2ce1da872f4b1e29d6fdb421b",
+   "md5_octets": "b9dbd6e2ce1da872f4b1e29d6fdb421b",
+   "octets": 5024808
   },
   "plan_interfaces_-2_2.json": {
-   "md5_logique": "d381e383edc3157e007e25a8757f20e7",
-   "md5_octets": "d381e383edc3157e007e25a8757f20e7",
-   "octets": 1191120
+   "md5_logique": "5019e82f74211a73a401f759af72d1b7",
+   "md5_octets": "5019e82f74211a73a401f759af72d1b7",
+   "octets": 2851174
   },
   "plan_interfaces_-2_3.json": {
-   "md5_logique": "50f3702e278ff0d32633f616df9250c8",
-   "md5_octets": "50f3702e278ff0d32633f616df9250c8",
-   "octets": 139465
+   "md5_logique": "412e1b7c6a4e04c9a8e064bcfc72d476",
+   "md5_octets": "412e1b7c6a4e04c9a8e064bcfc72d476",
+   "octets": 278349
   },
   "plan_interfaces_-3_-1.json": {
-   "md5_logique": "66ea4cb015b85243377ca631b4c434fe",
-   "md5_octets": "66ea4cb015b85243377ca631b4c434fe",
-   "octets": 1650212
+   "md5_logique": "0315d192c48c361aa1b24477f9edec46",
+   "md5_octets": "0315d192c48c361aa1b24477f9edec46",
+   "octets": 3635114
   },
   "plan_interfaces_-3_-2.json": {
-   "md5_logique": "9e16b494f0c028e32c57eabef8a7eae4",
-   "md5_octets": "9e16b494f0c028e32c57eabef8a7eae4",
-   "octets": 1055453
+   "md5_logique": "724ccef36357abfbc18ab33551d0a193",
+   "md5_octets": "724ccef36357abfbc18ab33551d0a193",
+   "octets": 2668198
   },
   "plan_interfaces_-3_-3.json": {
-   "md5_logique": "61f3c1141918f3704a25c53a95da683c",
-   "md5_octets": "61f3c1141918f3704a25c53a95da683c",
-   "octets": 884150
+   "md5_logique": "6834ae490476989a411eec5cfd8f4598",
+   "md5_octets": "6834ae490476989a411eec5cfd8f4598",
+   "octets": 1839447
   },
   "plan_interfaces_-3_0.json": {
-   "md5_logique": "9c263f0da989ca312ed2c67112b656e5",
-   "md5_octets": "9c263f0da989ca312ed2c67112b656e5",
-   "octets": 950118
+   "md5_logique": "2560dac1387acef91239f434beb87437",
+   "md5_octets": "2560dac1387acef91239f434beb87437",
+   "octets": 1849572
   },
   "plan_interfaces_-3_1.json": {
-   "md5_logique": "6068859f2279ce60d81b147fb76e0e6b",
-   "md5_octets": "6068859f2279ce60d81b147fb76e0e6b",
-   "octets": 1727182
+   "md5_logique": "5216a8f5d093a0dc3bbf54cd6c8481ee",
+   "md5_octets": "5216a8f5d093a0dc3bbf54cd6c8481ee",
+   "octets": 3918927
   },
   "plan_interfaces_-3_2.json": {
-   "md5_logique": "f1c59537f84c2fb9725d05b0f3df09bc",
-   "md5_octets": "f1c59537f84c2fb9725d05b0f3df09bc",
-   "octets": 1492945
+   "md5_logique": "5241c1425f23ec70b7e3abe2b8c19bb6",
+   "md5_octets": "5241c1425f23ec70b7e3abe2b8c19bb6",
+   "octets": 3498338
   },
   "plan_interfaces_-3_3.json": {
-   "md5_logique": "a3129e6689d9ce0d8aabfdaee58acead",
-   "md5_octets": "a3129e6689d9ce0d8aabfdaee58acead",
-   "octets": 114061
+   "md5_logique": "91be3d358098f039c18dc08b6b8255b8",
+   "md5_octets": "91be3d358098f039c18dc08b6b8255b8",
+   "octets": 429586
   },
   "plan_interfaces_-4_-2.json": {
-   "md5_logique": "c86b007c64ed9693e71a72d31314b75f",
-   "md5_octets": "c86b007c64ed9693e71a72d31314b75f",
-   "octets": 206753
+   "md5_logique": "1971ab06c962d2cb387899e891f450e7",
+   "md5_octets": "1971ab06c962d2cb387899e891f450e7",
+   "octets": 699840
   },
   "plan_interfaces_0_-1.json": {
-   "md5_logique": "63f1cbbfaf184e6dfcdbf802428e6a9e",
-   "md5_octets": "63f1cbbfaf184e6dfcdbf802428e6a9e",
-   "octets": 1983007
+   "md5_logique": "25486c8ec8f32a9d42d8425b0f9fccc7",
+   "md5_octets": "25486c8ec8f32a9d42d8425b0f9fccc7",
+   "octets": 6940473
   },
   "plan_interfaces_0_-2.json": {
-   "md5_logique": "c2c43277fa1e6b415e3842a059fe7f3e",
-   "md5_octets": "c2c43277fa1e6b415e3842a059fe7f3e",
-   "octets": 1947480
+   "md5_logique": "13b04a6415f3c43994539f8d5a4f4e84",
+   "md5_octets": "13b04a6415f3c43994539f8d5a4f4e84",
+   "octets": 5156876
   },
   "plan_interfaces_0_-3.json": {
-   "md5_logique": "19dd261574b9179a5bbf49b59643a9e8",
-   "md5_octets": "19dd261574b9179a5bbf49b59643a9e8",
-   "octets": 1298797
+   "md5_logique": "c6cb2bb745cc9a0b7e7cd45e07d5fba0",
+   "md5_octets": "c6cb2bb745cc9a0b7e7cd45e07d5fba0",
+   "octets": 3505825
   },
   "plan_interfaces_0_0.json": {
-   "md5_logique": "f251759bc3ab175f2f0d43206eee13f6",
-   "md5_octets": "f251759bc3ab175f2f0d43206eee13f6",
-   "octets": 1881427
+   "md5_logique": "b86c13417ad295d58fed97478502d497",
+   "md5_octets": "b86c13417ad295d58fed97478502d497",
+   "octets": 4309587
   },
   "plan_interfaces_0_1.json": {
-   "md5_logique": "1cfddb6c7a5f26fb6e359345c480d25a",
-   "md5_octets": "1cfddb6c7a5f26fb6e359345c480d25a",
-   "octets": 2072897
+   "md5_logique": "c564d3d4ae58e31c37f22a388d68b00b",
+   "md5_octets": "c564d3d4ae58e31c37f22a388d68b00b",
+   "octets": 4784940
   },
   "plan_interfaces_0_2.json": {
-   "md5_logique": "55b605c64991040e64d8143ab9ef9f0d",
-   "md5_octets": "55b605c64991040e64d8143ab9ef9f0d",
-   "octets": 1429096
+   "md5_logique": "a3534ef6a55b971bababca95bb8698e6",
+   "md5_octets": "a3534ef6a55b971bababca95bb8698e6",
+   "octets": 3601456
   },
   "plan_interfaces_0_3.json": {
-   "md5_logique": "3b6b811eb201a4ce7e630c9adb7677dd",
-   "md5_octets": "3b6b811eb201a4ce7e630c9adb7677dd",
-   "octets": 92144
+   "md5_logique": "0b34052c640c7e8516ce8b398fb6d791",
+   "md5_octets": "0b34052c640c7e8516ce8b398fb6d791",
+   "octets": 425500
   },
   "plan_interfaces_1_-1.json": {
-   "md5_logique": "81d099d6edef8950d50193d364e5c34b",
-   "md5_octets": "81d099d6edef8950d50193d364e5c34b",
-   "octets": 1764546
+   "md5_logique": "5d92c584dad2e92b940d7cd0e2c6b92a",
+   "md5_octets": "5d92c584dad2e92b940d7cd0e2c6b92a",
+   "octets": 4595921
   },
   "plan_interfaces_1_-2.json": {
-   "md5_logique": "d5111071a3db451bf9da6668739e1764",
-   "md5_octets": "d5111071a3db451bf9da6668739e1764",
-   "octets": 1687188
+   "md5_logique": "680c07e54eb35a5c09614b83ba896208",
+   "md5_octets": "680c07e54eb35a5c09614b83ba896208",
+   "octets": 5376513
   },
   "plan_interfaces_1_-3.json": {
-   "md5_logique": "616857753c5128b3a212bbb442b8143c",
-   "md5_octets": "616857753c5128b3a212bbb442b8143c",
-   "octets": 1027945
+   "md5_logique": "fa7c80f9ccfe2ea2054f39d68db7e826",
+   "md5_octets": "fa7c80f9ccfe2ea2054f39d68db7e826",
+   "octets": 1977271
   },
   "plan_interfaces_1_0.json": {
-   "md5_logique": "428895c6d6df4b3d68ef36362c71e67a",
-   "md5_octets": "428895c6d6df4b3d68ef36362c71e67a",
-   "octets": 1869356
+   "md5_logique": "64147f86c2ecdc947ca8dbc18c742c0b",
+   "md5_octets": "64147f86c2ecdc947ca8dbc18c742c0b",
+   "octets": 5477818
   },
   "plan_interfaces_1_1.json": {
-   "md5_logique": "3dd4868fe4c96979980c550e6fc535a7",
-   "md5_octets": "3dd4868fe4c96979980c550e6fc535a7",
-   "octets": 1402458
+   "md5_logique": "6d8b6a2ff6745b0ec477c8a19ddfea59",
+   "md5_octets": "6d8b6a2ff6745b0ec477c8a19ddfea59",
+   "octets": 3580026
   },
   "plan_interfaces_1_2.json": {
-   "md5_logique": "22eb2fb068cf265cf57b8b4f32a8528f",
-   "md5_octets": "22eb2fb068cf265cf57b8b4f32a8528f",
-   "octets": 1323797
+   "md5_logique": "e2ce14d3256c58ac684244dc2a24caf9",
+   "md5_octets": "e2ce14d3256c58ac684244dc2a24caf9",
+   "octets": 3081935
   },
   "plan_interfaces_1_3.json": {
-   "md5_logique": "d6885c733a2cf95fcb8887a964f9c80d",
-   "md5_octets": "d6885c733a2cf95fcb8887a964f9c80d",
-   "octets": 105914
+   "md5_logique": "305edfde8a596cfbcc500cbd015a6ab9",
+   "md5_octets": "305edfde8a596cfbcc500cbd015a6ab9",
+   "octets": 402359
   },
   "plan_interfaces_2_-1.json": {
-   "md5_logique": "c0ebb932019c1d4cd9961911b6e72159",
-   "md5_octets": "c0ebb932019c1d4cd9961911b6e72159",
-   "octets": 1703684
+   "md5_logique": "8c657bbaef84d27f944ea07c00eed38a",
+   "md5_octets": "8c657bbaef84d27f944ea07c00eed38a",
+   "octets": 3024579
   },
   "plan_interfaces_2_-2.json": {
-   "md5_logique": "4d6d781319033618c8c982ef815b441e",
-   "md5_octets": "4d6d781319033618c8c982ef815b441e",
-   "octets": 1604855
+   "md5_logique": "273f1cfa1cdbdc996fb3e6f1fa005fbc",
+   "md5_octets": "273f1cfa1cdbdc996fb3e6f1fa005fbc",
+   "octets": 2888443
   },
   "plan_interfaces_2_-3.json": {
-   "md5_logique": "231c517b2569aa88a7045243713da378",
-   "md5_octets": "231c517b2569aa88a7045243713da378",
-   "octets": 1431304
+   "md5_logique": "a4bdaf7663e515b636dce1150bde08e8",
+   "md5_octets": "a4bdaf7663e515b636dce1150bde08e8",
+   "octets": 2678297
   },
   "plan_interfaces_2_0.json": {
-   "md5_logique": "21efa736a976bb46486bf83387179184",
-   "md5_octets": "21efa736a976bb46486bf83387179184",
-   "octets": 1447594
+   "md5_logique": "3b509e54844b50cb422bdaaab57fd548",
+   "md5_octets": "3b509e54844b50cb422bdaaab57fd548",
+   "octets": 2117253
   },
   "plan_interfaces_2_1.json": {
-   "md5_logique": "86f3697fcf419cd6301eb21f75265a28",
-   "md5_octets": "86f3697fcf419cd6301eb21f75265a28",
-   "octets": 1132341
+   "md5_logique": "697c64025cd3c13f36e3ceab1399edd5",
+   "md5_octets": "697c64025cd3c13f36e3ceab1399edd5",
+   "octets": 1619305
   },
   "plan_interfaces_2_2.json": {
-   "md5_logique": "1b941a8d1362c9f214a8ef027974532f",
-   "md5_octets": "1b941a8d1362c9f214a8ef027974532f",
-   "octets": 1320531
+   "md5_logique": "11a96824a2d597a153c42b2c53cad4fd",
+   "md5_octets": "11a96824a2d597a153c42b2c53cad4fd",
+   "octets": 2344615
   },
   "plan_interfaces_2_3.json": {
-   "md5_logique": "86832ad7b954cf511770990d6f4aa328",
-   "md5_octets": "86832ad7b954cf511770990d6f4aa328",
-   "octets": 152095
+   "md5_logique": "e67825e114e6468d635515edce9fb6cd",
+   "md5_octets": "e67825e114e6468d635515edce9fb6cd",
+   "octets": 457698
   },
   "plan_interfaces_3_-1.json": {
-   "md5_logique": "cdf1fbdf3d5a7f3b923131a9e1585090",
-   "md5_octets": "cdf1fbdf3d5a7f3b923131a9e1585090",
-   "octets": 184032
+   "md5_logique": "435b512d0110e9cd70ee934203006be7",
+   "md5_octets": "435b512d0110e9cd70ee934203006be7",
+   "octets": 549022
   },
   "plan_interfaces_3_-2.json": {
-   "md5_logique": "9e91cf701a2d21b535ecca96ede09aef",
-   "md5_octets": "9e91cf701a2d21b535ecca96ede09aef",
-   "octets": 198561
+   "md5_logique": "a44b7ec4bc85462a373b36e012be6fbf",
+   "md5_octets": "a44b7ec4bc85462a373b36e012be6fbf",
+   "octets": 422495
   },
   "plan_interfaces_3_-3.json": {
-   "md5_logique": "d562a91ef8847d116851257671e21b7d",
-   "md5_octets": "d562a91ef8847d116851257671e21b7d",
-   "octets": 294631
+   "md5_logique": "5beb4c0c3234d3e91d2731867f3aeb5b",
+   "md5_octets": "5beb4c0c3234d3e91d2731867f3aeb5b",
+   "octets": 907940
   },
   "plan_interfaces_3_0.json": {
-   "md5_logique": "7965a25a29b1f200958746314a8df7b1",
-   "md5_octets": "7965a25a29b1f200958746314a8df7b1",
-   "octets": 135514
+   "md5_logique": "37499020e62c7551a63a35ce0eab52d4",
+   "md5_octets": "37499020e62c7551a63a35ce0eab52d4",
+   "octets": 461162
   },
   "plan_interfaces_3_1.json": {
-   "md5_logique": "de7bc508a6979c4efab46d447cd13602",
-   "md5_octets": "de7bc508a6979c4efab46d447cd13602",
-   "octets": 110608
+   "md5_logique": "9fc1efa3b120a9cd3ab447dfda613e43",
+   "md5_octets": "9fc1efa3b120a9cd3ab447dfda613e43",
+   "octets": 333736
   },
   "plan_interfaces_3_2.json": {
-   "md5_logique": "5a7a01d95af55ad60e6646c9891ee53f",
-   "md5_octets": "5a7a01d95af55ad60e6646c9891ee53f",
-   "octets": 71944
+   "md5_logique": "0e56584c0a5df7974ffb27295e481e68",
+   "md5_octets": "0e56584c0a5df7974ffb27295e481e68",
+   "octets": 161347
   },
   "plan_qui_-1_-1.json": {
-   "md5_logique": "41204c748fc65ab5fc1520e0a9e6f062",
-   "md5_octets": "41204c748fc65ab5fc1520e0a9e6f062",
-   "octets": 1717724
+   "md5_logique": "65ddb2bbad7d6e3624e46924788382da",
+   "md5_octets": "65ddb2bbad7d6e3624e46924788382da",
+   "octets": 3836015
   },
   "plan_qui_-1_-2.json": {
-   "md5_logique": "b4a8f5be7b83b457f9e7e7a4fdcff362",
-   "md5_octets": "b4a8f5be7b83b457f9e7e7a4fdcff362",
-   "octets": 2096237
+   "md5_logique": "24602dc03ecfd21340cb60f199326a85",
+   "md5_octets": "24602dc03ecfd21340cb60f199326a85",
+   "octets": 4426213
   },
   "plan_qui_-1_-3.json": {
-   "md5_logique": "f549db7f4d5a67c08d46a5a7def86ea2",
-   "md5_octets": "f549db7f4d5a67c08d46a5a7def86ea2",
-   "octets": 1531435
+   "md5_logique": "0a89b19e3071b0a8b3f730030dc50c14",
+   "md5_octets": "0a89b19e3071b0a8b3f730030dc50c14",
+   "octets": 3199264
   },
   "plan_qui_-1_0.json": {
-   "md5_logique": "7919cd1f94bb8d34414d31f107bec6bd",
-   "md5_octets": "7919cd1f94bb8d34414d31f107bec6bd",
-   "octets": 1784853
+   "md5_logique": "512d5cd1da230b8950c015c58c75b27c",
+   "md5_octets": "512d5cd1da230b8950c015c58c75b27c",
+   "octets": 3849121
   },
   "plan_qui_-1_1.json": {
-   "md5_logique": "4bd86c9c779b726f62d6ee17f0cfe2b3",
-   "md5_octets": "4bd86c9c779b726f62d6ee17f0cfe2b3",
-   "octets": 1088682
+   "md5_logique": "cdb026581bdd4ee51e3e5a2ba43bf027",
+   "md5_octets": "cdb026581bdd4ee51e3e5a2ba43bf027",
+   "octets": 1796617
   },
   "plan_qui_-1_2.json": {
-   "md5_logique": "ec4baa3cd4fcd20a83d81b5f026be6ed",
-   "md5_octets": "ec4baa3cd4fcd20a83d81b5f026be6ed",
-   "octets": 1563655
+   "md5_logique": "0d0f2b3cea2ff100064b92435d228074",
+   "md5_octets": "0d0f2b3cea2ff100064b92435d228074",
+   "octets": 3827270
   },
   "plan_qui_-1_3.json": {
-   "md5_logique": "2c735fb849f3859080cc035cfea09064",
-   "md5_octets": "2c735fb849f3859080cc035cfea09064",
-   "octets": 173338
+   "md5_logique": "baa92444f363f25c99f3bc62cc8b688f",
+   "md5_octets": "baa92444f363f25c99f3bc62cc8b688f",
+   "octets": 411120
   },
   "plan_qui_-2_-1.json": {
-   "md5_logique": "bc1516a78929570287ae0c35a0af559f",
-   "md5_octets": "bc1516a78929570287ae0c35a0af559f",
-   "octets": 1431732
+   "md5_logique": "aba4df744cb663cfc5cd8ab4455c8977",
+   "md5_octets": "aba4df744cb663cfc5cd8ab4455c8977",
+   "octets": 3250091
   },
   "plan_qui_-2_-2.json": {
-   "md5_logique": "7101a624eba69b31fa55043141917a21",
-   "md5_octets": "7101a624eba69b31fa55043141917a21",
-   "octets": 1583927
+   "md5_logique": "1ddc1d8200c33b9c2d5935ce8028fdf9",
+   "md5_octets": "1ddc1d8200c33b9c2d5935ce8028fdf9",
+   "octets": 3802561
   },
   "plan_qui_-2_-3.json": {
-   "md5_logique": "ff25577a9e5541136b2aeacc2094fca3",
-   "md5_octets": "ff25577a9e5541136b2aeacc2094fca3",
-   "octets": 1610154
+   "md5_logique": "7d0d72dae49351b1df133d8ffc1bb231",
+   "md5_octets": "7d0d72dae49351b1df133d8ffc1bb231",
+   "octets": 3597996
   },
   "plan_qui_-2_0.json": {
-   "md5_logique": "1cc19839aec3b98e8b2213b083b7abaa",
-   "md5_octets": "1cc19839aec3b98e8b2213b083b7abaa",
-   "octets": 1203931
+   "md5_logique": "200a3ea6d9952bd5b6fddb9ca09f7b20",
+   "md5_octets": "200a3ea6d9952bd5b6fddb9ca09f7b20",
+   "octets": 2327517
   },
   "plan_qui_-2_1.json": {
-   "md5_logique": "0cdc5a11267cecb6bcb24a1c996ff2fe",
-   "md5_octets": "0cdc5a11267cecb6bcb24a1c996ff2fe",
-   "octets": 1959841
+   "md5_logique": "89cc591369d5a00c74f253ff8306834e",
+   "md5_octets": "89cc591369d5a00c74f253ff8306834e",
+   "octets": 4750671
   },
   "plan_qui_-2_2.json": {
-   "md5_logique": "aea4c8409d3aed89c2d7e24254100d4f",
-   "md5_octets": "aea4c8409d3aed89c2d7e24254100d4f",
-   "octets": 1209141
+   "md5_logique": "ae412feae3c8a953846aede512cb4a0b",
+   "md5_octets": "ae412feae3c8a953846aede512cb4a0b",
+   "octets": 2791903
   },
   "plan_qui_-2_3.json": {
-   "md5_logique": "e5674b95a3098b9850f0611bbffad516",
-   "md5_octets": "e5674b95a3098b9850f0611bbffad516",
-   "octets": 177920
+   "md5_logique": "38052e113b06c28ea050001d941d0ea9",
+   "md5_octets": "38052e113b06c28ea050001d941d0ea9",
+   "octets": 328069
   },
   "plan_qui_-3_-1.json": {
-   "md5_logique": "430d6286ba80b3a2996962471899650c",
-   "md5_octets": "430d6286ba80b3a2996962471899650c",
-   "octets": 1828735
+   "md5_logique": "3773650ae2fcb40242ae2e0de10b81d8",
+   "md5_octets": "3773650ae2fcb40242ae2e0de10b81d8",
+   "octets": 3788199
   },
   "plan_qui_-3_-2.json": {
-   "md5_logique": "2a0cd17f3d4b627b5ea12caca9c210da",
-   "md5_octets": "2a0cd17f3d4b627b5ea12caca9c210da",
-   "octets": 1101167
+   "md5_logique": "4b8f1b9b550fe81752e26ffdd6551062",
+   "md5_octets": "4b8f1b9b550fe81752e26ffdd6551062",
+   "octets": 2771996
   },
   "plan_qui_-3_-3.json": {
-   "md5_logique": "09d38f6e310a9ac4df21454ce48da6a5",
-   "md5_octets": "09d38f6e310a9ac4df21454ce48da6a5",
-   "octets": 887638
+   "md5_logique": "8c0e4e2ebeb485ea62b20b8f091d489e",
+   "md5_octets": "8c0e4e2ebeb485ea62b20b8f091d489e",
+   "octets": 1839344
   },
   "plan_qui_-3_0.json": {
-   "md5_logique": "975b2c38da82936f74a8a9ef465ec6e5",
-   "md5_octets": "975b2c38da82936f74a8a9ef465ec6e5",
-   "octets": 1020404
+   "md5_logique": "69dd3c78cfd9f52bb72a77e0f25ea1eb",
+   "md5_octets": "69dd3c78cfd9f52bb72a77e0f25ea1eb",
+   "octets": 1913681
   },
   "plan_qui_-3_1.json": {
-   "md5_logique": "57b59d8cf6e3bec096f8bc1537b178b2",
-   "md5_octets": "57b59d8cf6e3bec096f8bc1537b178b2",
-   "octets": 1573516
+   "md5_logique": "f64c308052e3b7259f6571de06e67bb8",
+   "md5_octets": "f64c308052e3b7259f6571de06e67bb8",
+   "octets": 3650819
   },
   "plan_qui_-3_2.json": {
-   "md5_logique": "d82cd660ec778df8fddf1b2083a57cb5",
-   "md5_octets": "d82cd660ec778df8fddf1b2083a57cb5",
-   "octets": 1438949
+   "md5_logique": "ca2f6fda07b2717c9d3d07a0a8485fb3",
+   "md5_octets": "ca2f6fda07b2717c9d3d07a0a8485fb3",
+   "octets": 3403860
   },
   "plan_qui_-3_3.json": {
-   "md5_logique": "42faf3101e6c77ea5c1664dd84a02aef",
-   "md5_octets": "42faf3101e6c77ea5c1664dd84a02aef",
-   "octets": 172855
+   "md5_logique": "2c0b6b86fcf66931f7b2bad419ea2f0a",
+   "md5_octets": "2c0b6b86fcf66931f7b2bad419ea2f0a",
+   "octets": 481717
   },
   "plan_qui_-4_-2.json": {
-   "md5_logique": "7141918fe09212838afd513df68c41ec",
-   "md5_octets": "7141918fe09212838afd513df68c41ec",
-   "octets": 247103
+   "md5_logique": "c15e0aa49789037528b5b0b42e82c638",
+   "md5_octets": "c15e0aa49789037528b5b0b42e82c638",
+   "octets": 728919
   },
   "plan_qui_0_-1.json": {
-   "md5_logique": "066b09d6454dd96a2784765a9436d70b",
-   "md5_octets": "066b09d6454dd96a2784765a9436d70b",
-   "octets": 2081494
+   "md5_logique": "0434023d614b6f83f56b64b0120debfb",
+   "md5_octets": "0434023d614b6f83f56b64b0120debfb",
+   "octets": 6713125
   },
   "plan_qui_0_-2.json": {
-   "md5_logique": "8725d16f16d5ba186f1a50e09c62c8d6",
-   "md5_octets": "8725d16f16d5ba186f1a50e09c62c8d6",
-   "octets": 1887685
+   "md5_logique": "e08cacbbc7f1e60e0ddae1f892e9506c",
+   "md5_octets": "e08cacbbc7f1e60e0ddae1f892e9506c",
+   "octets": 4911555
   },
   "plan_qui_0_-3.json": {
-   "md5_logique": "a8921a512235521bbc5cf68f4999cec3",
-   "md5_octets": "a8921a512235521bbc5cf68f4999cec3",
-   "octets": 1353901
+   "md5_logique": "7b9b6a9922b8cb2a8adfc419251f0867",
+   "md5_octets": "7b9b6a9922b8cb2a8adfc419251f0867",
+   "octets": 3552729
   },
   "plan_qui_0_0.json": {
-   "md5_logique": "78a1b1ee09926be324f43574f280d622",
-   "md5_octets": "78a1b1ee09926be324f43574f280d622",
-   "octets": 1692967
+   "md5_logique": "5e5df66ce1e7ddea913432529fbbf44a",
+   "md5_octets": "5e5df66ce1e7ddea913432529fbbf44a",
+   "octets": 3968901
   },
   "plan_qui_0_1.json": {
-   "md5_logique": "1dcc4ce076fa2487c08a6ea003219e1d",
-   "md5_octets": "1dcc4ce076fa2487c08a6ea003219e1d",
-   "octets": 1961422
+   "md5_logique": "503367aa4011ccd684545852a548d32c",
+   "md5_octets": "503367aa4011ccd684545852a548d32c",
+   "octets": 4567577
   },
   "plan_qui_0_2.json": {
-   "md5_logique": "3b602ef50c9dae75f35b14db17242450",
-   "md5_octets": "3b602ef50c9dae75f35b14db17242450",
-   "octets": 1547796
+   "md5_logique": "6b913793bbb8b22c40fd0e707bb4db5d",
+   "md5_octets": "6b913793bbb8b22c40fd0e707bb4db5d",
+   "octets": 3741225
   },
   "plan_qui_0_3.json": {
-   "md5_logique": "a5018ae6a58cec53694c70fa7bb2021e",
-   "md5_octets": "a5018ae6a58cec53694c70fa7bb2021e",
-   "octets": 150108
+   "md5_logique": "e4eebac8e7eabf49e002f0fe6608612a",
+   "md5_octets": "e4eebac8e7eabf49e002f0fe6608612a",
+   "octets": 473029
   },
   "plan_qui_1_-1.json": {
-   "md5_logique": "752963bbb9f1910838f81eb7633a179c",
-   "md5_octets": "752963bbb9f1910838f81eb7633a179c",
-   "octets": 1883391
+   "md5_logique": "718b146b19e7600ec0b1f3b1d273be12",
+   "md5_octets": "718b146b19e7600ec0b1f3b1d273be12",
+   "octets": 4617909
   },
   "plan_qui_1_-2.json": {
-   "md5_logique": "75818887a7b0ab6d0b63bc1329e3563d",
-   "md5_octets": "75818887a7b0ab6d0b63bc1329e3563d",
-   "octets": 1790997
+   "md5_logique": "83af4b8a71085dd75742ad379843810f",
+   "md5_octets": "83af4b8a71085dd75742ad379843810f",
+   "octets": 5306980
   },
   "plan_qui_1_-3.json": {
-   "md5_logique": "bbbabb5da22b7815b04213561802bd5e",
-   "md5_octets": "bbbabb5da22b7815b04213561802bd5e",
-   "octets": 996903
+   "md5_logique": "f2958d9831590d256ca034a393777085",
+   "md5_octets": "f2958d9831590d256ca034a393777085",
+   "octets": 1933351
   },
   "plan_qui_1_0.json": {
-   "md5_logique": "f19ad22ea2d7a244ea8c16def70c9fee",
-   "md5_octets": "f19ad22ea2d7a244ea8c16def70c9fee",
-   "octets": 1825735
+   "md5_logique": "16da86d2074e462384cba1ef0a435e0f",
+   "md5_octets": "16da86d2074e462384cba1ef0a435e0f",
+   "octets": 5209515
   },
   "plan_qui_1_1.json": {
-   "md5_logique": "85ed80c0ea9fd9f646f623794ff746d1",
-   "md5_octets": "85ed80c0ea9fd9f646f623794ff746d1",
-   "octets": 1347585
+   "md5_logique": "163a2d109d419f961ec1b8a65deee280",
+   "md5_octets": "163a2d109d419f961ec1b8a65deee280",
+   "octets": 3425459
   },
   "plan_qui_1_2.json": {
-   "md5_logique": "864bec7bcd57062804da79473c584f5e",
-   "md5_octets": "864bec7bcd57062804da79473c584f5e",
-   "octets": 1275430
+   "md5_logique": "b64c2d0509a80477bad7fadf97deee83",
+   "md5_octets": "b64c2d0509a80477bad7fadf97deee83",
+   "octets": 3010262
   },
   "plan_qui_1_3.json": {
-   "md5_logique": "fb9c37b5b1087fa356c525c24973d781",
-   "md5_octets": "fb9c37b5b1087fa356c525c24973d781",
-   "octets": 136748
+   "md5_logique": "0170ecb6304c9c31416007e001338505",
+   "md5_octets": "0170ecb6304c9c31416007e001338505",
+   "octets": 414526
   },
   "plan_qui_2_-1.json": {
-   "md5_logique": "9d8163ad8edfc758a3da37179b53d1fc",
-   "md5_octets": "9d8163ad8edfc758a3da37179b53d1fc",
-   "octets": 1597509
+   "md5_logique": "8b955bc5ee5c56d6f636ff75bf1de1f9",
+   "md5_octets": "8b955bc5ee5c56d6f636ff75bf1de1f9",
+   "octets": 3058917
   },
   "plan_qui_2_-2.json": {
-   "md5_logique": "e109381ebfdf109e2663add7b545ec24",
-   "md5_octets": "e109381ebfdf109e2663add7b545ec24",
-   "octets": 1565188
+   "md5_logique": "28577d9dad3df8ec959b8264e1e17cd6",
+   "md5_octets": "28577d9dad3df8ec959b8264e1e17cd6",
+   "octets": 2844998
   },
   "plan_qui_2_-3.json": {
-   "md5_logique": "6f16d702df3d1b7f9fedbf540aea4053",
-   "md5_octets": "6f16d702df3d1b7f9fedbf540aea4053",
-   "octets": 1398858
+   "md5_logique": "ef82b02cd311766901875addd9721218",
+   "md5_octets": "ef82b02cd311766901875addd9721218",
+   "octets": 2623328
   },
   "plan_qui_2_0.json": {
-   "md5_logique": "c9084d7d434443c425bd98ac4afa343e",
-   "md5_octets": "c9084d7d434443c425bd98ac4afa343e",
-   "octets": 1324478
+   "md5_logique": "dfdf3bd925e799d75f6889fabdbd3b92",
+   "md5_octets": "dfdf3bd925e799d75f6889fabdbd3b92",
+   "octets": 2010441
   },
   "plan_qui_2_1.json": {
-   "md5_logique": "67040d735963fe76c2769f27cfbe1ef3",
-   "md5_octets": "67040d735963fe76c2769f27cfbe1ef3",
-   "octets": 1003545
+   "md5_logique": "48609622a72c0f0d2a3810992416a1ed",
+   "md5_octets": "48609622a72c0f0d2a3810992416a1ed",
+   "octets": 1457922
   },
   "plan_qui_2_2.json": {
-   "md5_logique": "3dd995639092ecae12b34298a8033d8f",
-   "md5_octets": "3dd995639092ecae12b34298a8033d8f",
-   "octets": 1306562
+   "md5_logique": "9b3d0942180e9f5e3186ee187a16269b",
+   "md5_octets": "9b3d0942180e9f5e3186ee187a16269b",
+   "octets": 2324520
   },
   "plan_qui_2_3.json": {
-   "md5_logique": "d972877b4aff5646cd9b97180f0ae644",
-   "md5_octets": "d972877b4aff5646cd9b97180f0ae644",
-   "octets": 176104
+   "md5_logique": "4770d4f23a550657b13009f19ccad094",
+   "md5_octets": "4770d4f23a550657b13009f19ccad094",
+   "octets": 472052
   },
   "plan_qui_3_-1.json": {
-   "md5_logique": "cfab34c9c9ab024b63ee75905024dd0e",
-   "md5_octets": "cfab34c9c9ab024b63ee75905024dd0e",
-   "octets": 244711
+   "md5_logique": "a5e91637e082d9a6eb395519cf9dfa61",
+   "md5_octets": "a5e91637e082d9a6eb395519cf9dfa61",
+   "octets": 670815
   },
   "plan_qui_3_-2.json": {
-   "md5_logique": "f6e5b81bd48fc74bc2030facc1cc96f8",
-   "md5_octets": "f6e5b81bd48fc74bc2030facc1cc96f8",
-   "octets": 216522
+   "md5_logique": "398b710441350d9eaffb6fc4bc50b38c",
+   "md5_octets": "398b710441350d9eaffb6fc4bc50b38c",
+   "octets": 458732
   },
   "plan_qui_3_-3.json": {
-   "md5_logique": "02410d655b487d396586cdec6519cd75",
-   "md5_octets": "02410d655b487d396586cdec6519cd75",
-   "octets": 353118
+   "md5_logique": "6365b4520404eb2c03e854ff7dc24e4f",
+   "md5_octets": "6365b4520404eb2c03e854ff7dc24e4f",
+   "octets": 963281
   },
   "plan_qui_3_0.json": {
-   "md5_logique": "9141905b43addbd2d91d1a48242c140e",
-   "md5_octets": "9141905b43addbd2d91d1a48242c140e",
-   "octets": 169108
+   "md5_logique": "90c6202ee74fecdfb1f69c66b7761328",
+   "md5_octets": "90c6202ee74fecdfb1f69c66b7761328",
+   "octets": 495921
   },
   "plan_qui_3_1.json": {
-   "md5_logique": "291e4a5d78292c2c2aa69fe04d93ff59",
-   "md5_octets": "291e4a5d78292c2c2aa69fe04d93ff59",
-   "octets": 122722
+   "md5_logique": "4b629534ab1932560da3684baa3bc486",
+   "md5_octets": "4b629534ab1932560da3684baa3bc486",
+   "octets": 321746
   },
   "plan_qui_3_2.json": {
-   "md5_logique": "84d4fc8fd12dbe09533b68b1f8137731",
-   "md5_octets": "84d4fc8fd12dbe09533b68b1f8137731",
-   "octets": 92075
+   "md5_logique": "5a78c0bc47e7e9e7cd8ad10b311e36a5",
+   "md5_octets": "5a78c0bc47e7e9e7cd8ad10b311e36a5",
+   "octets": 190168
   },
   "plan_semis_-1_-1.json": {
    "md5_logique": "25db69a3046d0f6366903b05cf18a23f",
@@ -598,14 +599,14 @@
    "octets": 6181926
   },
   "plan_semis_-2_-2.json": {
-   "md5_logique": "fed52868953680348df291c7978b20e7",
-   "md5_octets": "fed52868953680348df291c7978b20e7",
-   "octets": 10377066
+   "md5_logique": "4f7629b5120e898874232e5bef9ee4bd",
+   "md5_octets": "4f7629b5120e898874232e5bef9ee4bd",
+   "octets": 10376881
   },
   "plan_semis_-2_-3.json": {
-   "md5_logique": "b60fbf268c3b662040d123f914506bc4",
-   "md5_octets": "b60fbf268c3b662040d123f914506bc4",
-   "octets": 4873936
+   "md5_logique": "117ecd326a9195c3fb8989b4498766b1",
+   "md5_octets": "117ecd326a9195c3fb8989b4498766b1",
+   "octets": 4867412
   },
   "plan_semis_-2_0.json": {
    "md5_logique": "5042479d08103ec582f0d308f74a5574",
@@ -693,9 +694,9 @@
    "octets": 3250653
   },
   "plan_semis_0_2.json": {
-   "md5_logique": "b9afad26f6337025bd90ec29c70de1a9",
-   "md5_octets": "b9afad26f6337025bd90ec29c70de1a9",
-   "octets": 7192943
+   "md5_logique": "712afe8674fdfb88694a64861e15c262",
+   "md5_octets": "712afe8674fdfb88694a64861e15c262",
+   "octets": 7189627
   },
   "plan_semis_0_3.json": {
    "md5_logique": "a6e043b28d77080e7faf5abd804238c6",
@@ -728,9 +729,9 @@
    "octets": 9964352
   },
   "plan_semis_1_2.json": {
-   "md5_logique": "6df80d4888e9ec197d718484537967c8",
-   "md5_octets": "6df80d4888e9ec197d718484537967c8",
-   "octets": 13031664
+   "md5_logique": "0f81a19a562b554697cb5ea6b2a14e71",
+   "md5_octets": "0f81a19a562b554697cb5ea6b2a14e71",
+   "octets": 13024296
   },
   "plan_semis_1_3.json": {
    "md5_logique": "e6228229b6840a071c4d250590d045b5",
@@ -763,9 +764,9 @@
    "octets": 11887593
   },
   "plan_semis_2_2.json": {
-   "md5_logique": "3c807bfbc7f29fdf16625f0412600d4e",
-   "md5_octets": "3c807bfbc7f29fdf16625f0412600d4e",
-   "octets": 9536463
+   "md5_logique": "3aabb5accb7c20245fee69562152e015",
+   "md5_octets": "3aabb5accb7c20245fee69562152e015",
+   "octets": 9536091
   },
   "plan_semis_2_3.json": {
    "md5_logique": "ce086fd3a3c51452df096c28286bd6eb",
@@ -806,271 +807,275 @@
  "par_cellule": {
   "-1_-1": {
    "instances": 28472,
-   "interfaces": 3313,
-   "parcelles": 1520
+   "interfaces": 4158,
+   "parcelles": 1931
   },
   "-1_-2": {
    "instances": 3236,
-   "interfaces": 4364,
-   "parcelles": 2154
+   "interfaces": 5124,
+   "parcelles": 2567
   },
   "-1_-3": {
    "instances": 20598,
-   "interfaces": 2730,
-   "parcelles": 1510
+   "interfaces": 3294,
+   "parcelles": 1800
   },
   "-1_0": {
    "instances": 8728,
-   "interfaces": 3688,
-   "parcelles": 1728
+   "interfaces": 4590,
+   "parcelles": 2149
   },
   "-1_1": {
    "instances": 8914,
-   "interfaces": 2327,
-   "parcelles": 1051
+   "interfaces": 2626,
+   "parcelles": 1198
   },
   "-1_2": {
    "instances": 8540,
-   "interfaces": 2326,
-   "parcelles": 1208
+   "interfaces": 3308,
+   "parcelles": 1677
   },
   "-1_3": {
    "instances": 0,
-   "interfaces": 167,
-   "parcelles": 99
+   "interfaces": 282,
+   "parcelles": 150
   },
   "-2_-1": {
    "instances": 33330,
-   "interfaces": 2105,
-   "parcelles": 1114
+   "interfaces": 2918,
+   "parcelles": 1495
   },
   "-2_-2": {
-   "instances": 55888,
-   "interfaces": 2726,
-   "parcelles": 1335
+   "instances": 55887,
+   "interfaces": 3760,
+   "parcelles": 1799
   },
   "-2_-3": {
-   "instances": 26118,
-   "interfaces": 2605,
-   "parcelles": 1347
+   "instances": 26083,
+   "interfaces": 3429,
+   "parcelles": 1737
   },
   "-2_0": {
    "instances": 10042,
-   "interfaces": 1884,
-   "parcelles": 947
+   "interfaces": 2386,
+   "parcelles": 1182
   },
   "-2_1": {
    "instances": 42980,
-   "interfaces": 3727,
-   "parcelles": 1730
+   "interfaces": 4835,
+   "parcelles": 2250
   },
   "-2_2": {
    "instances": 40887,
-   "interfaces": 1929,
-   "parcelles": 946
+   "interfaces": 2552,
+   "parcelles": 1249
   },
   "-2_3": {
    "instances": 0,
-   "interfaces": 151,
-   "parcelles": 94
+   "interfaces": 229,
+   "parcelles": 127
   },
   "-3_-1": {
    "instances": 31143,
-   "interfaces": 2597,
-   "parcelles": 1425
+   "interfaces": 3449,
+   "parcelles": 1803
   },
   "-3_-2": {
    "instances": 41799,
-   "interfaces": 1509,
-   "parcelles": 781
+   "interfaces": 2355,
+   "parcelles": 1150
   },
   "-3_-3": {
    "instances": 35617,
-   "interfaces": 1309,
-   "parcelles": 709
+   "interfaces": 1771,
+   "parcelles": 911
   },
   "-3_0": {
    "instances": 21609,
-   "interfaces": 1298,
-   "parcelles": 678
+   "interfaces": 1722,
+   "parcelles": 882
   },
   "-3_1": {
    "instances": 29995,
-   "interfaces": 3282,
-   "parcelles": 1555
+   "interfaces": 4091,
+   "parcelles": 1953
   },
   "-3_2": {
    "instances": 46200,
-   "interfaces": 2579,
-   "parcelles": 1295
+   "interfaces": 3270,
+   "parcelles": 1645
   },
   "-3_3": {
    "instances": 0,
-   "interfaces": 143,
-   "parcelles": 89
+   "interfaces": 268,
+   "parcelles": 150
   },
   "-4_-2": {
    "instances": 0,
-   "interfaces": 314,
-   "parcelles": 164
+   "interfaces": 560,
+   "parcelles": 270
   },
   "0_-1": {
    "instances": 4922,
-   "interfaces": 3818,
-   "parcelles": 1826
+   "interfaces": 5485,
+   "parcelles": 2711
   },
   "0_-2": {
    "instances": 1168,
-   "interfaces": 4001,
-   "parcelles": 2032
+   "interfaces": 4947,
+   "parcelles": 2561
   },
   "0_-3": {
    "instances": 16247,
-   "interfaces": 2296,
-   "parcelles": 1246
+   "interfaces": 3113,
+   "parcelles": 1667
   },
   "0_0": {
    "instances": 4771,
-   "interfaces": 3613,
-   "parcelles": 1651
+   "interfaces": 4650,
+   "parcelles": 2138
   },
   "0_1": {
    "instances": 17694,
-   "interfaces": 4268,
-   "parcelles": 2003
+   "interfaces": 5244,
+   "parcelles": 2503
   },
   "0_2": {
-   "instances": 38988,
-   "interfaces": 2620,
-   "parcelles": 1362
+   "instances": 38970,
+   "interfaces": 3409,
+   "parcelles": 1781
   },
   "0_3": {
    "instances": 0,
-   "interfaces": 133,
-   "parcelles": 104
+   "interfaces": 248,
+   "parcelles": 160
   },
   "1_-1": {
    "instances": 3711,
-   "interfaces": 3408,
-   "parcelles": 1696
+   "interfaces": 4294,
+   "parcelles": 2191
   },
   "1_-2": {
    "instances": 1286,
-   "interfaces": 2911,
-   "parcelles": 1406
+   "interfaces": 4413,
+   "parcelles": 2112
   },
   "1_-3": {
    "instances": 14438,
-   "interfaces": 1767,
-   "parcelles": 911
+   "interfaces": 2194,
+   "parcelles": 1108
   },
   "1_0": {
    "instances": 10536,
-   "interfaces": 3582,
-   "parcelles": 1724
+   "interfaces": 4843,
+   "parcelles": 2377
   },
   "1_1": {
    "instances": 54252,
-   "interfaces": 2552,
-   "parcelles": 1171
+   "interfaces": 3484,
+   "parcelles": 1611
   },
   "1_2": {
-   "instances": 70573,
-   "interfaces": 2369,
-   "parcelles": 1158
+   "instances": 70533,
+   "interfaces": 3252,
+   "parcelles": 1538
   },
   "1_3": {
    "instances": 0,
-   "interfaces": 183,
-   "parcelles": 106
+   "interfaces": 338,
+   "parcelles": 168
   },
   "2_-1": {
    "instances": 12475,
-   "interfaces": 2930,
-   "parcelles": 1473
+   "interfaces": 3657,
+   "parcelles": 1777
   },
   "2_-2": {
    "instances": 56824,
-   "interfaces": 2535,
-   "parcelles": 1340
+   "interfaces": 3193,
+   "parcelles": 1627
   },
   "2_-3": {
    "instances": 35182,
-   "interfaces": 2113,
-   "parcelles": 1146
+   "interfaces": 2671,
+   "parcelles": 1393
   },
   "2_0": {
    "instances": 37132,
-   "interfaces": 2338,
-   "parcelles": 1265
+   "interfaces": 2627,
+   "parcelles": 1425
   },
   "2_1": {
    "instances": 64385,
-   "interfaces": 1929,
-   "parcelles": 964
+   "interfaces": 2138,
+   "parcelles": 1061
   },
   "2_2": {
-   "instances": 51381,
-   "interfaces": 2163,
-   "parcelles": 1120
+   "instances": 51379,
+   "interfaces": 2530,
+   "parcelles": 1300
   },
   "2_3": {
    "instances": 0,
-   "interfaces": 161,
-   "parcelles": 97
+   "interfaces": 283,
+   "parcelles": 157
   },
   "3_-1": {
    "instances": 0,
-   "interfaces": 183,
-   "parcelles": 104
+   "interfaces": 364,
+   "parcelles": 187
   },
   "3_-2": {
    "instances": 0,
-   "interfaces": 207,
-   "parcelles": 118
+   "interfaces": 360,
+   "parcelles": 180
   },
   "3_-3": {
    "instances": 0,
-   "interfaces": 319,
-   "parcelles": 168
+   "interfaces": 597,
+   "parcelles": 293
   },
   "3_0": {
    "instances": 0,
-   "interfaces": 185,
-   "parcelles": 116
+   "interfaces": 371,
+   "parcelles": 191
   },
   "3_1": {
    "instances": 0,
-   "interfaces": 159,
-   "parcelles": 88
+   "interfaces": 239,
+   "parcelles": 122
   },
   "3_2": {
    "instances": 0,
-   "interfaces": 93,
-   "parcelles": 60
+   "interfaces": 144,
+   "parcelles": 82
   }
+ },
+ "parcelles_aire_nulle_exclues": {
+  "ids": [],
+  "n": 0
  },
  "produit_par": "work/PLAN/c8_export.py",
  "tailles_par_famille": {
   "interfaces": {
-   "Mo": 57.118,
+   "Mo": 132.978,
    "fichiers": 49
   },
   "qui": {
-   "Mo": 56.906,
+   "Mo": 130.512,
    "fichiers": 49
   },
   "semis": {
-   "Mo": 183.537,
+   "Mo": 183.519,
    "fichiers": 49
   }
  },
  "totaux": {
-  "instances": 990061,
-  "interfaces_distinctes": 96986,
-  "interfaces_pieces": 99909,
-  "parcelles_distinctes": 46424,
-  "parcelles_pieces": 49934
+  "instances": 989965,
+  "interfaces_distinctes": 127011,
+  "interfaces_pieces": 130065,
+  "parcelles_distinctes": 60835,
+  "parcelles_pieces": 64496
  },
  "unites": {
   "geometries": "metres, arrondies au millimetre (3 decimales)",
