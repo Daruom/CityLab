@@ -160,7 +160,27 @@ du vrai terrain). Côté d'annexion à trancher (dur vs zone vs plus-long-contac
 restantes ~0 (parmi les ≤ 3 m), tour de la zone du cratère collé ≥ 99 %, idempotence,
 PNG A/B de la carte. STOP possible au même prix qu'É0.
 
-## 11. Références
+## 11. É0-bis — SNAPPING : verdict rendu (2026-08-07, STOP discipliné)
+
+Règle arbitrée implémentée exactement (carte `part/v2`, idempotente, invariants exacts à
+0,000000 m² près, PNG A/B) : **6 589 bandes annexées** (69 241 m² — voirie 58 540,
+bâtiment 8 785, ouvrage 1 887, zone 30), 5 859 681 m² de vrai terrain intouchés.
+Lecture de la règle validée par le coordinateur : les 3 690 bandes à voisin architectural
+UNIQUE sont annexées aussi (aucun choix de côté ne se pose).
+⛔ **Acceptation cratère non atteinte (87,24 % contre ≥ 99 %) → STOP appliqué.** Diagnostic
+complet : « 0 bande restante » était une tautologie (on retire des plages entières) ; le
+vrai résidu = les **APPENDICES** — parties minces (< 3 m) accrochées aux grandes plages
+organiques, **208 849 m² = 3× ce que la règle par plage a su annexer**. Simulation chiffrée
+(non implémentée) : la variante MORPHOLOGIQUE (annexer les PARTIES minces, ouverture
+r=1,5 m) porte le cratère à **97,92 %** et les 712 zones à 69,64 % ; plafond insensible au
+seuil (98,18 % à 5-6 m) ; les ~2 % ultimes = lacunes face à une AUTRE ZONE (classe à part) ;
+477 m² de vrai terrain mince (talus, berges) ne touchent aucun dur et resteraient organiques.
+**L'acceptation « ≥ 99 % » était elle-même mal calée** : la bonne mesure est « 0 lacune
+mince (0,05-3 m) restante » — le tour non collé résiduel doit être exclusivement de la
+VRAIE frontière (terrain ≥ 3 m).
+→ É0-ter proposé : variante morphologique + acceptation re-calée (arbitrage ci-dessous).
+
+## 12. Références
 
 Saga et nommages : `Reprise-Etat-Projet.md` (v3) + commits `6f5c3414..a8671110`.
 Doctrine : Playbook §13 (lois), §11 (boucle), Brief-Template.md (workflow agents).
