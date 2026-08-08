@@ -32,7 +32,8 @@ AIRE_MIN_AFF_M2 = 0.5      # sous cette aire, la parcelle n'est pas dessinee
 LONG_MIN_AFF_M = 1.0       # sous cette longueur, la frontiere n'est pas dessinee
 PAQUET = 4000              # parcelles par fichier .js
 
-PROPS = ["ouvrage", "voirie", "batiment", "zone", "organique"]
+# la liste des proprietaires vient du socle : elle a change en L1b
+from c0_socle import PROPS  # noqa: E402
 MATS = ["mineral", "vegetal", "eau"]
 LOIS = ["constante", "profil_troncon", "drapage"]
 TYPES = ["rien", "talus", "emmarchement", "affleurement", "bordure", "mur",
@@ -106,6 +107,18 @@ def main():
         lois = pickle.load(f)["lois"]
     with open(os.path.join(CACHE, "interfaces.pkl"), "rb") as f:
         fronts = pickle.load(f)["fronts"]
+    ECART = {}
+    TERR = []
+    try:
+        with open(os.path.join(CACHE, "l1b_solveur.pkl"), "rb") as f:
+            SV = pickle.load(f)
+        TERR = SV["terrassements"]
+        srep = json.load(io.open(os.path.join(OUT, "solveur.json"),
+                                 encoding="utf-8"))
+        for d in (srep.get("fidelite_pires") or []):
+            ECART[d["parcelle"]] = d["ecart_m"]
+    except Exception:
+        pass
 
     # ---------------------------------------------------------- PARCELLES ----
     t1 = time.time()
@@ -129,7 +142,7 @@ def main():
                     round(g.area, 1),
                     (info.get("veg_pc") if info else None),
                     (1 if (p.get("meta") or {}).get("heritee") else 0),
-                    rings])
+                    rings, ECART.get(p["id"])])
         n_aff += 1
         if len(cur) >= PAQUET:
             lots.append(cur)

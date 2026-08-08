@@ -2,7 +2,7 @@
  "biefs": {
   "amplitude_max_m": 7.5,
   "amplitude_mediane_m": 0.565,
-  "parcelles_eau_n": 704,
+  "parcelles_eau_n": 803,
   "pires": [
    {
     "amplitude_m": 7.5,
@@ -45,48 +45,48 @@
     "nature": "Canal"
    }
   ],
-  "z_max_m": 149.62,
-  "z_min_m": 126.27
+  "z_max_m": 147.185,
+  "z_min_m": 132.478
  },
  "compteurs_par_regle": {
   "HORS CATALOGUE": {
-   "appliquee_n": 11,
+   "appliquee_n": 1,
    "couverture_revue_pc": 100.0,
-   "revue_n": 11
+   "revue_n": 1
   },
   "annexion E0-bis": {
-   "appliquee_n": 6572,
-   "couverture_revue_pc": 0.1826,
+   "appliquee_n": 6709,
+   "couverture_revue_pc": 0.1789,
    "revue_n": 12
   },
   "catalogue: None": {
-   "appliquee_n": 11,
-   "couverture_revue_pc": 45.4545,
-   "revue_n": 5
+   "appliquee_n": 1,
+   "couverture_revue_pc": 200.0,
+   "revue_n": 2
   },
   "catalogue: affleurement": {
-   "appliquee_n": 39162,
-   "couverture_revue_pc": 0.0128,
+   "appliquee_n": 46129,
+   "couverture_revue_pc": 0.0108,
    "revue_n": 5
   },
   "catalogue: bordure": {
-   "appliquee_n": 62435,
-   "couverture_revue_pc": 0.008,
+   "appliquee_n": 47148,
+   "couverture_revue_pc": 0.0106,
    "revue_n": 5
   },
   "catalogue: emmarchement": {
-   "appliquee_n": 204,
-   "couverture_revue_pc": 2.451,
+   "appliquee_n": 209,
+   "couverture_revue_pc": 2.3923,
    "revue_n": 5
   },
   "catalogue: mur": {
-   "appliquee_n": 24730,
-   "couverture_revue_pc": 0.0202,
+   "appliquee_n": 23687,
+   "couverture_revue_pc": 0.0211,
    "revue_n": 5
   },
   "catalogue: rien": {
-   "appliquee_n": 465,
-   "couverture_revue_pc": 1.0753,
+   "appliquee_n": 467,
+   "couverture_revue_pc": 1.0707,
    "revue_n": 5
   },
   "catalogue: talus": {
@@ -95,23 +95,23 @@
    "revue_n": 5
   },
   "conflit donnee/visible": {
-   "appliquee_n": 2785,
-   "couverture_revue_pc": 0.4309,
+   "appliquee_n": 2567,
+   "couverture_revue_pc": 0.4675,
    "revue_n": 12
   },
   "constante p50": {
-   "appliquee_n": 38892,
-   "couverture_revue_pc": 0.0309,
+   "appliquee_n": 34835,
+   "couverture_revue_pc": 0.0344,
    "revue_n": 12
   },
   "drapage": {
-   "appliquee_n": 4908,
+   "appliquee_n": 4948,
    "couverture_revue_pc": 0.0,
    "revue_n": 0
   },
   "profil par troncon": {
-   "appliquee_n": 17169,
-   "couverture_revue_pc": 0.0699,
+   "appliquee_n": 16355,
+   "couverture_revue_pc": 0.0734,
    "revue_n": 12
   }
  },
@@ -132,9 +132,9 @@
   "invariant_retenues_sur_dur_n": 0,
   "regle": "une instance vit si son PIXEL de masque est herbe (R >= 128) ET si elle n'est pas sur une parcelle minerale du plan",
   "rejet_pixel_non_herbe_n": 99727,
-  "rejet_sur_dur_du_plan_n": 132720,
-  "retenues_n": 989965,
-  "retenues_pc": 80.985,
+  "rejet_sur_dur_du_plan_n": 141125,
+  "retenues_n": 981560,
+  "retenues_pc": 80.297,
   "verification": "sur les PIXELS des masques, pas sur une vectorisation"
  },
  "tournee": [
@@ -197,6 +197,13 @@
   {
    "detail": "0.000 m2, largeur 0.0000 m",
    "regle": "annexion E0-bis",
+   "titre": "bande la plus fine (voie_ferree)",
+   "x": -277.52,
+   "y": 1361.09
+  },
+  {
+   "detail": "0.000 m2, largeur 0.0000 m",
+   "regle": "annexion E0-bis",
    "titre": "bande la plus fine (voirie)",
    "x": -195.01,
    "y": 1106.1
@@ -214,13 +221,6 @@
    "titre": "bande la plus fine (voirie)",
    "x": -930.21,
    "y": -869.56
-  },
-  {
-   "detail": "0.001 m2, largeur 0.0001 m",
-   "regle": "annexion E0-bis",
-   "titre": "bande la plus fine (batiment)",
-   "x": 1256.03,
-   "y": -2.0
   },
   {
    "detail": "zone, 4193 m2, relief du MNT sous la parcelle 21.96 m, cote retenue 179.03 m",
@@ -307,151 +307,123 @@
    "y": 764.33
   },
   {
-   "detail": "pente max 356.75 % sur 12.3 m (plafond voirie 12 %)",
+   "detail": "pente max 153.73 % sur 18.0 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": -677.7,
-   "y": 1314.79
+   "x": -819.87,
+   "y": 77.61
   },
   {
-   "detail": "pente max 334.84 % sur 316.6 m (plafond voirie 12 %)",
+   "detail": "pente max 151.40 % sur 10.3 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": -676.41,
-   "y": 169.25
+   "x": -828.44,
+   "y": 382.14
   },
   {
-   "detail": "pente max 250.70 % sur 27.1 m (plafond voirie 12 %)",
+   "detail": "pente max 151.40 % sur 10.3 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 974.55,
-   "y": 399.88
+   "x": -822.32,
+   "y": 386.46
   },
   {
-   "detail": "pente max 250.70 % sur 27.1 m (plafond voirie 12 %)",
+   "detail": "pente max 150.50 % sur 14.9 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 970.79,
-   "y": 403.47
+   "x": -1111.8,
+   "y": -238.13
   },
   {
-   "detail": "pente max 206.71 % sur 234.8 m (plafond voirie 12 %)",
+   "detail": "pente max 150.50 % sur 14.9 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": -807.39,
-   "y": 357.94
+   "x": -1108.88,
+   "y": -237.09
   },
   {
-   "detail": "pente max 206.71 % sur 234.8 m (plafond voirie 12 %)",
+   "detail": "pente max 150.50 % sur 14.9 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": -777.62,
-   "y": 301.32
+   "x": -1114.12,
+   "y": -239.13
   },
   {
-   "detail": "pente max 183.75 % sur 844.9 m (plafond voirie 12 %)",
+   "detail": "pente max 150.50 % sur 14.9 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 1007.4,
-   "y": 93.3
+   "x": -1117.69,
+   "y": -232.05
   },
   {
-   "detail": "pente max 183.75 % sur 844.9 m (plafond voirie 12 %)",
+   "detail": "pente max 150.50 % sur 14.9 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 961.47,
-   "y": 584.29
+   "x": -1114.06,
+   "y": -229.3
   },
   {
-   "detail": "pente max 151.51 % sur 81.3 m (plafond voirie 12 %)",
+   "detail": "pente max 128.78 % sur 5.8 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": -321.76,
-   "y": 1301.45
+   "x": 1098.13,
+   "y": -91.71
   },
   {
-   "detail": "pente max 151.51 % sur 81.3 m (plafond voirie 12 %)",
+   "detail": "pente max 113.74 % sur 4.3 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": -319.32,
-   "y": 1318.62
+   "x": 1099.03,
+   "y": -91.73
   },
   {
-   "detail": "pente max 135.13 % sur 5.8 m (plafond voirie 12 %)",
+   "detail": "pente max 109.92 % sur 8.6 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": -235.39,
-   "y": 749.85
+   "x": 1139.28,
+   "y": 751.39
   },
   {
-   "detail": "pente max 131.53 % sur 5.8 m (plafond voirie 12 %)",
+   "detail": "pente max 109.92 % sur 8.6 m (plafond voirie 12 %)",
    "regle": "profil par troncon",
    "titre": "troncon le plus pentu",
-   "x": 1095.68,
-   "y": -90.55
+   "x": 1140.69,
+   "y": 754.21
   },
   {
-   "detail": "106.8 m, dZ 12.210 m, mineral|eau",
+   "detail": "6.0 m, dZ 12.533 m, mineral|vegetal",
    "regle": "catalogue: None",
    "titre": "plus longue interface `None`",
-   "x": -540.8,
-   "y": 534.31
+   "x": 1264.16,
+   "y": -919.63
   },
   {
-   "detail": "105.6 m, dZ 12.580 m, mineral|eau",
-   "regle": "catalogue: None",
-   "titre": "plus longue interface `None`",
-   "x": -1254.01,
-   "y": 264.13
-  },
-  {
-   "detail": "46.0 m, dZ 14.120 m, mineral|eau",
-   "regle": "catalogue: None",
-   "titre": "plus longue interface `None`",
-   "x": -731.69,
-   "y": 138.32
-  },
-  {
-   "detail": "dZ 14.120 m sur 46.0 m",
+   "detail": "dZ 12.533 m sur 6.0 m",
    "regle": "catalogue: None",
    "titre": "plus fort dZ pour `None`",
-   "x": -731.69,
-   "y": 138.32
+   "x": 1264.16,
+   "y": -919.63
   },
   {
-   "detail": "dZ 13.858 m sur 16.6 m",
-   "regle": "catalogue: None",
-   "titre": "plus fort dZ pour `None`",
-   "x": -798.65,
-   "y": 93.57
-  },
-  {
-   "detail": "387.1 m, dZ 0.000 m, mineral|mineral",
+   "detail": "866.5 m, dZ 0.000 m, eau|eau",
    "regle": "catalogue: affleurement",
    "titre": "plus longue interface `affleurement`",
-   "x": 255.86,
-   "y": 1175.05
+   "x": -8.67,
+   "y": -1179.21
   },
   {
-   "detail": "344.5 m, dZ 0.000 m, eau|eau",
+   "detail": "482.1 m, dZ 0.000 m, eau|eau",
    "regle": "catalogue: affleurement",
    "titre": "plus longue interface `affleurement`",
-   "x": -854.2,
-   "y": -76.3
+   "x": 962.47,
+   "y": 916.39
   },
   {
-   "detail": "306.3 m, dZ 0.000 m, mineral|mineral",
+   "detail": "468.7 m, dZ 0.000 m, eau|eau",
    "regle": "catalogue: affleurement",
    "titre": "plus longue interface `affleurement`",
-   "x": -1173.31,
-   "y": 1633.5
-  },
-  {
-   "detail": "dZ 0.020 m sur 113.7 m",
-   "regle": "catalogue: affleurement",
-   "titre": "plus fort dZ pour `affleurement`",
-   "x": 429.04,
-   "y": -1067.84
+   "x": 966.47,
+   "y": 916.38
   },
   {
    "detail": "dZ 0.020 m sur 80.4 m",
@@ -461,6 +433,13 @@
    "y": 971.19
   },
   {
+   "detail": "dZ 0.020 m sur 47.7 m",
+   "regle": "catalogue: affleurement",
+   "titre": "plus fort dZ pour `affleurement`",
+   "x": 1610.87,
+   "y": -439.14
+  },
+  {
    "detail": "642.6 m, dZ 0.029 m, mineral|vegetal",
    "regle": "catalogue: bordure",
    "titre": "plus longue interface `bordure`",
@@ -468,25 +447,18 @@
    "y": 1239.97
   },
   {
-   "detail": "616.7 m, dZ 0.087 m, mineral|mineral",
+   "detail": "616.7 m, dZ 0.020 m, mineral|mineral",
    "regle": "catalogue: bordure",
    "titre": "plus longue interface `bordure`",
    "x": 184.54,
    "y": 1812.33
   },
   {
-   "detail": "536.1 m, dZ 0.128 m, mineral|mineral",
+   "detail": "577.2 m, dZ 0.182 m, mineral|mineral",
    "regle": "catalogue: bordure",
    "titre": "plus longue interface `bordure`",
-   "x": -1210.59,
-   "y": -1264.04
-  },
-  {
-   "detail": "dZ 0.200 m sur 26.2 m",
-   "regle": "catalogue: bordure",
-   "titre": "plus fort dZ pour `bordure`",
-   "x": 305.75,
-   "y": 1465.45
+   "x": -332.96,
+   "y": 1724.48
   },
   {
    "detail": "dZ 0.200 m sur 24.5 m",
@@ -496,11 +468,11 @@
    "y": 1446.85
   },
   {
-   "detail": "33.3 m, dZ 0.206 m, mineral|mineral",
-   "regle": "catalogue: emmarchement",
-   "titre": "plus longue interface `emmarchement`",
-   "x": 1192.16,
-   "y": 1101.64
+   "detail": "dZ 0.200 m sur 18.5 m",
+   "regle": "catalogue: bordure",
+   "titre": "plus fort dZ pour `bordure`",
+   "x": -170.11,
+   "y": 507.15
   },
   {
    "detail": "30.2 m, dZ 0.222 m, mineral|mineral",
@@ -510,21 +482,28 @@
    "y": -9.53
   },
   {
-   "detail": "24.5 m, dZ 0.811 m, eau|eau",
+   "detail": "24.5 m, dZ 0.000 m, eau|eau",
    "regle": "catalogue: emmarchement",
    "titre": "plus longue interface `emmarchement`",
    "x": -321.94,
    "y": 1403.59
   },
   {
-   "detail": "dZ 5.237 m sur 1.5 m",
+   "detail": "22.0 m, dZ 0.709 m, mineral|mineral",
+   "regle": "catalogue: emmarchement",
+   "titre": "plus longue interface `emmarchement`",
+   "x": 1371.12,
+   "y": -930.77
+  },
+  {
+   "detail": "dZ 5.567 m sur 1.5 m",
    "regle": "catalogue: emmarchement",
    "titre": "plus fort dZ pour `emmarchement`",
    "x": -840.37,
    "y": 420.98
   },
   {
-   "detail": "dZ 4.876 m sur 4.5 m",
+   "detail": "dZ 4.760 m sur 4.5 m",
    "regle": "catalogue: emmarchement",
    "titre": "plus fort dZ pour `emmarchement`",
    "x": 1422.65,
@@ -545,25 +524,25 @@
    "y": -776.72
   },
   {
-   "detail": "652.5 m, dZ 2.606 m, vegetal|eau",
+   "detail": "652.5 m, dZ 1.853 m, vegetal|eau",
    "regle": "catalogue: mur",
    "titre": "plus longue interface `mur`",
    "x": -784.56,
    "y": 1714.71
   },
   {
-   "detail": "dZ 11.910 m sur 79.8 m",
+   "detail": "dZ 11.477 m sur 1.7 m",
    "regle": "catalogue: mur",
    "titre": "plus fort dZ pour `mur`",
-   "x": -1167.92,
-   "y": 293.94
+   "x": 1266.6,
+   "y": -918.5
   },
   {
-   "detail": "dZ 11.910 m sur 46.8 m",
+   "detail": "dZ 11.336 m sur 72.3 m",
    "regle": "catalogue: mur",
    "titre": "plus fort dZ pour `mur`",
-   "x": -1144.65,
-   "y": 299.8
+   "x": 1316.71,
+   "y": -650.27
   },
   {
    "detail": "154.9 m, dZ 0.000 m, vegetal|vegetal",
@@ -650,7 +629,7 @@
    "y": -907.3
   },
   {
-   "detail": "7 membres, 15429 m2, relief du MNT 15.68 m, cote retenue 167.64 m",
+   "detail": "7 membres, 15428 m2, relief du MNT 15.68 m, cote retenue 167.64 m",
    "regle": "communaute de nivellement",
    "titre": "communaute au plus fort relief (vegetal)",
    "x": 1360.2,
@@ -678,11 +657,11 @@
    "y": -944.4
   },
   {
-   "detail": "2 membres, 1358 m2, relief du MNT 11.76 m, cote retenue 161.57 m",
+   "detail": "2 membres, 1266 m2, relief du MNT 11.73 m, cote retenue 161.43 m",
    "regle": "communaute de nivellement",
    "titre": "communaute au plus fort relief (vegetal)",
-   "x": 1249.2,
-   "y": -976.6
+   "x": 1248.8,
+   "y": -974.7
   },
   {
    "detail": "4 membres, 7382 m2, relief du MNT 11.50 m, cote retenue 172.71 m",
@@ -727,137 +706,1362 @@
    "y": -11.66
   },
   {
-   "detail": "ouv/187#0, 1.9 m2, 3 interfaces ; plus forte marche 1.12 m (emmarchement)",
+   "detail": "ouv/187#0, 1.9 m2, 2 interfaces ; plus forte marche 1.12 m (emmarchement)",
    "regle": "Saint-Pierre (grief utilisateur)",
    "titre": "escalier de la place Saint-Pierre",
    "x": -677.4,
    "y": 131.83
   },
   {
-   "detail": "dZ 11.002 m sur 8.1 m, resolution DECLAREE `mur`",
+   "detail": "dZ 9.550 m sur 0.4 m, resolution DECLAREE `mur`",
    "regle": "marche entre chaussees",
    "titre": "plus forte marche chaussee|chaussee restante",
-   "x": 1178.65,
-   "y": -107.26
+   "x": 808.61,
+   "y": -546.56
   },
   {
-   "detail": "dZ 10.995 m sur 6.8 m, resolution DECLAREE `mur`",
+   "detail": "dZ 9.410 m sur 3.6 m, resolution DECLAREE `mur`",
    "regle": "marche entre chaussees",
    "titre": "plus forte marche chaussee|chaussee restante",
-   "x": -677.7,
-   "y": 1312.56
+   "x": 817.95,
+   "y": -536.84
   },
   {
-   "detail": "dZ 10.991 m sur 2.5 m, resolution DECLAREE `mur`",
+   "detail": "dZ 9.410 m sur 0.6 m, resolution DECLAREE `mur`",
    "regle": "marche entre chaussees",
    "titre": "plus forte marche chaussee|chaussee restante",
-   "x": -677.58,
-   "y": 1312.98
+   "x": 817.58,
+   "y": -538.03
   },
   {
-   "detail": "dZ 10.891 m sur 0.4 m, resolution DECLAREE `mur`",
+   "detail": "dZ 8.960 m sur 1.4 m, resolution DECLAREE `mur`",
    "regle": "marche entre chaussees",
    "titre": "plus forte marche chaussee|chaussee restante",
-   "x": 1176.79,
-   "y": -105.01
+   "x": 785.44,
+   "y": -541.04
   },
   {
-   "detail": "dZ 10.791 m sur 6.5 m, resolution DECLAREE `mur`",
+   "detail": "dZ 8.960 m sur 1.4 m, resolution DECLAREE `mur`",
    "regle": "marche entre chaussees",
    "titre": "plus forte marche chaussee|chaussee restante",
-   "x": 1178.46,
-   "y": -106.34
+   "x": 786.39,
+   "y": -540.09
   },
   {
-   "detail": "dZ 10.791 m sur 1.0 m, resolution DECLAREE `mur`",
+   "detail": "dZ 8.846 m sur 0.4 m, resolution DECLAREE `mur`",
    "regle": "marche entre chaussees",
    "titre": "plus forte marche chaussee|chaussee restante",
-   "x": 1178.38,
-   "y": -103.65
+   "x": 799.76,
+   "y": -523.44
   },
   {
-   "detail": "dZ 10.743 m sur 9.4 m, resolution DECLAREE `mur`",
+   "detail": "dZ 8.830 m sur 0.1 m, resolution DECLAREE `mur`",
    "regle": "marche entre chaussees",
    "titre": "plus forte marche chaussee|chaussee restante",
-   "x": 1182.77,
-   "y": -108.37
+   "x": -808.13,
+   "y": 359.23
   },
   {
-   "detail": "dZ 10.622 m sur 9.0 m, resolution DECLAREE `mur`",
+   "detail": "dZ 8.761 m sur 1.2 m, resolution DECLAREE `mur`",
    "regle": "marche entre chaussees",
    "titre": "plus forte marche chaussee|chaussee restante",
-   "x": 1179.88,
-   "y": -105.89
+   "x": 798.7,
+   "y": -556.83
   },
   {
-   "detail": "dZ 10.434 m sur 6.5 m, resolution DECLAREE `mur`",
+   "detail": "dZ 8.622 m sur 1.6 m, resolution DECLAREE `mur`",
    "regle": "marche entre chaussees",
    "titre": "plus forte marche chaussee|chaussee restante",
-   "x": 1186.18,
-   "y": -106.63
+   "x": 951.67,
+   "y": -204.15
   },
   {
-   "detail": "dZ 10.424 m sur 2.1 m, resolution DECLAREE `mur`",
+   "detail": "dZ 8.424 m sur 2.1 m, resolution DECLAREE `mur`",
    "regle": "marche entre chaussees",
    "titre": "plus forte marche chaussee|chaussee restante",
-   "x": 1529.66,
-   "y": -202.99
+   "x": 981.64,
+   "y": -218.17
   },
   {
-   "detail": "dZ 10.423 m sur 7.8 m, resolution DECLAREE `mur`",
+   "detail": "dZ 8.262 m sur 1.3 m, resolution DECLAREE `mur`",
    "regle": "marche entre chaussees",
    "titre": "plus forte marche chaussee|chaussee restante",
-   "x": 1528.74,
-   "y": -198.16
+   "x": 980.89,
+   "y": -217.68
   },
   {
-   "detail": "dZ 10.382 m sur 1.1 m, resolution DECLAREE `mur`",
+   "detail": "dZ 8.262 m sur 0.2 m, resolution DECLAREE `mur`",
    "regle": "marche entre chaussees",
    "titre": "plus forte marche chaussee|chaussee restante",
-   "x": 1533.95,
-   "y": -195.14
+   "x": 981.64,
+   "y": -218.17
   },
   {
-   "detail": "voi/12316#0 : 1478 m2, 100.0 % de pixels herbe",
+   "detail": "zon/391#2 (sol_vegetal) : 10.40 m — projet 180.94, releve 170.54 ; origine p50 de la COMMUNAUTE de nivellement (parcelles contigues de meme matiere) : un seul platea",
+   "regle": "ecart au releve",
+   "titre": "plus fort ecart |z_projet - z_releve|",
+   "x": 1271.8,
+   "y": -907.3
+  },
+  {
+   "detail": "zon/401#0 (sol_vegetal) : 9.10 m — projet 179.03, releve 169.93 ; origine p50 de la COMMUNAUTE de nivellement (parcelles contigues de meme matiere) : un seul platea",
+   "regle": "ecart au releve",
+   "titre": "plus fort ecart |z_projet - z_releve|",
+   "x": 1322.8,
+   "y": -634.2
+  },
+  {
+   "detail": "zon/409#0 (sol_vegetal) : 8.98 m — projet 179.03, releve 188.01 ; origine p50 de la COMMUNAUTE de nivellement (parcelles contigues de meme matiere) : un seul platea",
+   "regle": "ecart au releve",
+   "titre": "plus fort ecart |z_projet - z_releve|",
+   "x": 1402.0,
+   "y": -703.1
+  },
+  {
+   "detail": "ouv/14#0 (mur_sout) : 8.91 m — projet 138.85, releve 129.94 ; origine cote DECLAREE par le side-car de l'ouvrage (mediane des points de cote de sa NATURE sous l",
+   "regle": "ecart au releve",
+   "titre": "plus fort ecart |z_projet - z_releve|",
+   "x": -1296.9,
+   "y": 263.5
+  },
+  {
+   "detail": "bnd/4159#0 (mur_sout) : 8.10 m — projet 155.49, releve 147.38 ; origine loi du voisin dur porteur, de plain-pied",
+   "regle": "ecart au releve",
+   "titre": "plus fort ecart |z_projet - z_releve|",
+   "x": 1130.6,
+   "y": 158.4
+  },
+  {
+   "detail": "bnd/3754#0 (mur_sout) : 7.29 m — projet 137.69, releve 144.98 ; origine loi du voisin dur porteur, de plain-pied",
+   "regle": "ecart au releve",
+   "titre": "plus fort ecart |z_projet - z_releve|",
+   "x": -299.2,
+   "y": 551.9
+  },
+  {
+   "detail": "bnd/3753#0 (mur_sout) : 7.25 m — projet 137.69, releve 144.94 ; origine loi du voisin dur porteur, de plain-pied",
+   "regle": "ecart au releve",
+   "titre": "plus fort ecart |z_projet - z_releve|",
+   "x": -296.5,
+   "y": 555.0
+  },
+  {
+   "detail": "bnd/3756#0 (mur_sout) : 7.10 m — projet 137.69, releve 144.79 ; origine loi du voisin dur porteur, de plain-pied",
+   "regle": "ecart au releve",
+   "titre": "plus fort ecart |z_projet - z_releve|",
+   "x": -303.7,
+   "y": 527.2
+  },
+  {
+   "detail": "ouv/33#0 (mur_sout) : 7.00 m — projet 141.22, releve 134.22 ; origine cote DECLAREE par le side-car de l'ouvrage (mediane des points de cote de sa NATURE sous l",
+   "regle": "ecart au releve",
+   "titre": "plus fort ecart |z_projet - z_releve|",
+   "x": -709.3,
+   "y": 1308.6
+  },
+  {
+   "detail": "voi/1808#0 (carrefour) : 7.00 m — projet 141.44, releve 134.44 ; origine cote du NOEUD du reseau noue : un carrefour EST un plateau, et il separe desormais les cha",
+   "regle": "ecart au releve",
+   "titre": "plus fort ecart |z_projet - z_releve|",
+   "x": -805.3,
+   "y": 355.8
+  },
+  {
+   "detail": "voi/1781#0 (carrefour) : 6.89 m — projet 141.32, releve 134.44 ; origine cote du NOEUD du reseau noue : un carrefour EST un plateau, et il separe desormais les cha",
+   "regle": "ecart au releve",
+   "titre": "plus fort ecart |z_projet - z_releve|",
+   "x": -812.9,
+   "y": 353.3
+  },
+  {
+   "detail": "bnd/3700#0 (mur_sout) : 6.61 m — projet 135.13, releve 141.74 ; origine loi du voisin dur porteur, de plain-pied",
+   "regle": "ecart au releve",
+   "titre": "plus fort ecart |z_projet - z_releve|",
+   "x": -525.8,
+   "y": 604.0
+  },
+  {
+   "detail": "dZ 12.20 m sur 31.3 m, largeur 24.4 m, place disponible 5 %",
+   "regle": "terrassement",
+   "titre": "plus fort raccord au terrain (soutenement)",
+   "x": 1266.8,
+   "y": -910.4
+  },
+  {
+   "detail": "dZ 9.55 m sur 72.3 m, largeur 19.1 m, place disponible 30 %",
+   "regle": "terrassement",
+   "titre": "plus fort raccord au terrain (soutenement)",
+   "x": 1316.7,
+   "y": -650.3
+  },
+  {
+   "detail": "dZ 9.48 m sur 21.1 m, largeur 19.0 m, place disponible 70 %",
+   "regle": "terrassement",
+   "titre": "plus fort raccord au terrain (talus)",
+   "x": 1330.4,
+   "y": -616.1
+  },
+  {
+   "detail": "dZ 8.99 m sur 31.0 m, largeur 18.0 m, place disponible 9 %",
+   "regle": "terrassement",
+   "titre": "plus fort raccord au terrain (soutenement)",
+   "x": 1290.8,
+   "y": -883.8
+  },
+  {
+   "detail": "dZ 8.91 m sur 9.0 m, largeur 17.8 m, place disponible 280 %",
+   "regle": "terrassement",
+   "titre": "plus fort raccord au terrain (talus)",
+   "x": 1294.4,
+   "y": -721.5
+  },
+  {
+   "detail": "dZ 7.56 m sur 71.8 m, largeur 15.1 m, place disponible 51 %",
+   "regle": "terrassement",
+   "titre": "plus fort raccord au terrain (soutenement)",
+   "x": 1448.9,
+   "y": 657.3
+  },
+  {
+   "detail": "dZ 7.21 m sur 5.9 m, largeur 14.4 m, place disponible 117 %",
+   "regle": "terrassement",
+   "titre": "plus fort raccord au terrain (quai)",
+   "x": -381.1,
+   "y": 1479.8
+  },
+  {
+   "detail": "dZ 7.06 m sur 170.6 m, largeur 14.1 m, place disponible 99 %",
+   "regle": "terrassement",
+   "titre": "plus fort raccord au terrain (quai)",
+   "x": -401.1,
+   "y": 1588.2
+  },
+  {
+   "detail": "dZ 7.05 m sur 27.3 m, largeur 14.1 m, place disponible 87 %",
+   "regle": "terrassement",
+   "titre": "plus fort raccord au terrain (quai)",
+   "x": -403.3,
+   "y": 1541.4
+  },
+  {
+   "detail": "dZ 7.04 m sur 8.5 m, largeur 14.1 m, place disponible 115 %",
+   "regle": "terrassement",
+   "titre": "plus fort raccord au terrain (quai)",
+   "x": 796.6,
+   "y": -554.6
+  },
+  {
+   "detail": "dZ 6.59 m sur 1.8 m, largeur 13.2 m, place disponible 464 %",
+   "regle": "terrassement",
+   "titre": "plus fort raccord au terrain (talus)",
+   "x": -249.1,
+   "y": 759.0
+  },
+  {
+   "detail": "dZ 6.57 m sur 0.9 m, largeur 13.1 m, place disponible 246 %",
+   "regle": "terrassement",
+   "titre": "plus fort raccord au terrain (quai)",
+   "x": 681.0,
+   "y": -770.9
+  },
+  {
+   "detail": "dZ 3.90 m sur 2.6 m",
+   "regle": "quai",
+   "titre": "piece de rive contre l'eau",
+   "x": 537.9,
+   "y": -1051.2
+  },
+  {
+   "detail": "dZ 0.24 m sur 62.5 m",
+   "regle": "quai",
+   "titre": "piece de rive contre l'eau",
+   "x": -1948.2,
+   "y": -737.6
+  },
+  {
+   "detail": "dZ 1.32 m sur 3.5 m",
+   "regle": "quai",
+   "titre": "piece de rive contre l'eau",
+   "x": -1533.0,
+   "y": -841.4
+  },
+  {
+   "detail": "dZ 2.48 m sur 2.3 m",
+   "regle": "quai",
+   "titre": "piece de rive contre l'eau",
+   "x": -1530.9,
+   "y": -831.8
+  },
+  {
+   "detail": "dZ 2.75 m sur 2.1 m",
+   "regle": "quai",
+   "titre": "piece de rive contre l'eau",
+   "x": -1536.1,
+   "y": -831.7
+  },
+  {
+   "detail": "dZ 6.48 m sur 59.7 m",
+   "regle": "quai",
+   "titre": "piece de rive contre l'eau",
+   "x": 725.0,
+   "y": -662.7
+  },
+  {
+   "detail": "ouv/216#0, 25 m2",
+   "regle": "famille nouvelle",
+   "titre": "premiere emprise de la famille `edicule`",
+   "x": -689.07,
+   "y": -661.16
+  },
+  {
+   "detail": "ouv/336#0, 279 m2",
+   "regle": "famille nouvelle",
+   "titre": "premiere emprise de la famille `ouvrage_hydro`",
+   "x": -312.59,
+   "y": 1301.35
+  },
+  {
+   "detail": "ouv/351#0, 117 m2",
+   "regle": "famille nouvelle",
+   "titre": "premiere emprise de la famille `tremie`",
+   "x": -1078.51,
+   "y": 739.36
+  },
+  {
+   "detail": "fer/0#0, 4038 m2",
+   "regle": "famille nouvelle",
+   "titre": "premiere emprise de la famille `voie_ferree`",
+   "x": 1411.32,
+   "y": 1706.6
+  },
+  {
+   "detail": "can/1#0, 2246 m2",
+   "regle": "famille nouvelle",
+   "titre": "premiere emprise de la famille `canal`",
+   "x": 1302.47,
+   "y": 1754.53
+  },
+  {
+   "detail": "sur/0#0, 550 m2",
+   "regle": "famille nouvelle",
+   "titre": "premiere emprise de la famille `parking`",
+   "x": -1271.56,
+   "y": -58.77
+  },
+  {
+   "detail": "sur/44#0, 1077 m2",
+   "regle": "famille nouvelle",
+   "titre": "premiere emprise de la famille `terrain_sport`",
+   "x": -1436.88,
+   "y": 1874.81
+  },
+  {
+   "detail": "bnd/207#0 (bief/663) : 4.6 m2, cote retenue 147.19 m — a juger en maquette",
+   "regle": "eau sans cote declaree",
+   "titre": "plan d'eau dont aucun side-car ne donne la cote",
+   "x": 1298.41,
+   "y": 1596.78
+  },
+  {
+   "detail": "voi/13034#1 (bief/496) : 8.0 m2, cote retenue 146.34 m — a juger en maquette",
+   "regle": "eau sans cote declaree",
+   "titre": "plan d'eau dont aucun side-car ne donne la cote",
+   "x": 680.94,
+   "y": -766.2
+  },
+  {
+   "detail": "voi/8863#2 (bief/402) : 4.0 m2, cote retenue 146.24 m — a juger en maquette",
+   "regle": "eau sans cote declaree",
+   "titre": "plan d'eau dont aucun side-car ne donne la cote",
+   "x": 1247.28,
+   "y": 1455.59
+  },
+  {
+   "detail": "voi/8924#1 (bief/403) : 9.3 m2, cote retenue 146.63 m — a juger en maquette",
+   "regle": "eau sans cote declaree",
+   "titre": "plan d'eau dont aucun side-car ne donne la cote",
+   "x": 1267.76,
+   "y": 1481.35
+  },
+  {
+   "detail": "voie pietonne de classe `pedestrian` a 52.7 % de pente : au-dela de 10.0 % le reel construit des marches, pas une rampe (arrete du 15/01/2007). Le pla",
+   "regle": "voie reclassee en emmarchement",
+   "titre": "voie pietonne trop pentue pour etre une rampe",
+   "x": -633.12,
+   "y": 108.05
+  },
+  {
+   "detail": "voie pietonne de classe `pedestrian` a 52.7 % de pente : au-dela de 10.0 % le reel construit des marches, pas une rampe (arrete du 15/01/2007). Le pla",
+   "regle": "voie reclassee en emmarchement",
+   "titre": "voie pietonne trop pentue pour etre une rampe",
+   "x": -658.03,
+   "y": 160.97
+  },
+  {
+   "detail": "voie pietonne de classe `pedestrian` a 52.7 % de pente : au-dela de 10.0 % le reel construit des marches, pas une rampe (arrete du 15/01/2007). Le pla",
+   "regle": "voie reclassee en emmarchement",
+   "titre": "voie pietonne trop pentue pour etre une rampe",
+   "x": -744.14,
+   "y": 113.41
+  },
+  {
+   "detail": "voie pietonne de classe `pedestrian` a 52.7 % de pente : au-dela de 10.0 % le reel construit des marches, pas une rampe (arrete du 15/01/2007). Le pla",
+   "regle": "voie reclassee en emmarchement",
+   "titre": "voie pietonne trop pentue pour etre une rampe",
+   "x": -667.92,
+   "y": 157.74
+  },
+  {
+   "detail": "voie pietonne de classe `pedestrian` a 52.7 % de pente : au-dela de 10.0 % le reel construit des marches, pas une rampe (arrete du 15/01/2007). Le pla",
+   "regle": "voie reclassee en emmarchement",
+   "titre": "voie pietonne trop pentue pour etre une rampe",
+   "x": -699.89,
+   "y": 119.7
+  },
+  {
+   "detail": "voie pietonne de classe `footway` a 23.1 % de pente : au-dela de 10.0 % le reel construit des marches, pas une rampe (arrete du 15/01/2007). Le plan l",
+   "regle": "voie reclassee en emmarchement",
+   "titre": "voie pietonne trop pentue pour etre une rampe",
+   "x": -381.95,
+   "y": 328.67
+  },
+  {
+   "detail": "voie pietonne de classe `footway` a 23.1 % de pente : au-dela de 10.0 % le reel construit des marches, pas une rampe (arrete du 15/01/2007). Le plan l",
+   "regle": "voie reclassee en emmarchement",
+   "titre": "voie pietonne trop pentue pour etre une rampe",
+   "x": -435.45,
+   "y": 306.5
+  },
+  {
+   "detail": "voie pietonne de classe `footway` a 23.1 % de pente : au-dela de 10.0 % le reel construit des marches, pas une rampe (arrete du 15/01/2007). Le plan l",
+   "regle": "voie reclassee en emmarchement",
+   "titre": "voie pietonne trop pentue pour etre une rampe",
+   "x": -356.0,
+   "y": 345.47
+  },
+  {
+   "detail": "voie pietonne de classe `path` a 11.3 % de pente : au-dela de 10.0 % le reel construit des marches, pas une rampe (arrete du 15/01/2007). Le plan la d",
+   "regle": "voie reclassee en emmarchement",
+   "titre": "voie pietonne trop pentue pour etre une rampe",
+   "x": -288.15,
+   "y": 643.66
+  },
+  {
+   "detail": "voie pietonne de classe `path` a 11.3 % de pente : au-dela de 10.0 % le reel construit des marches, pas une rampe (arrete du 15/01/2007). Le plan la d",
+   "regle": "voie reclassee en emmarchement",
+   "titre": "voie pietonne trop pentue pour etre une rampe",
+   "x": -285.77,
+   "y": 648.99
+  },
+  {
+   "detail": "ouv/107#0 : portee 238.6 m, epaisseur 2.50 m (portee/20 bornee), extrados 142.50 m, intrados 140.00 m",
+   "regle": "tablier",
+   "titre": "plus grande portee de tablier",
+   "x": -815.0,
+   "y": 364.9
+  },
+  {
+   "detail": "ouv/97#1 : portee 80.5 m, epaisseur 2.50 m (portee/20 bornee), extrados 142.90 m, intrados 140.40 m",
+   "regle": "tablier",
+   "titre": "plus grande portee de tablier",
+   "x": -180.3,
+   "y": 1366.8
+  },
+  {
+   "detail": "ouv/98#0 : portee 80.5 m, epaisseur 2.50 m (portee/20 bornee), extrados 142.90 m, intrados 140.40 m",
+   "regle": "tablier",
+   "titre": "plus grande portee de tablier",
+   "x": -177.6,
+   "y": 1361.6
+  },
+  {
+   "detail": "ouv/96#0 : portee 75.6 m, epaisseur 2.50 m (portee/20 bornee), extrados 142.90 m, intrados 140.40 m",
+   "regle": "tablier",
+   "titre": "plus grande portee de tablier",
+   "x": -184.7,
+   "y": 1380.3
+  },
+  {
+   "detail": "ouv/121#0 : portee 73.9 m, epaisseur 2.50 m (portee/20 bornee), extrados 137.00 m, intrados 134.50 m",
+   "regle": "tablier",
+   "titre": "plus grande portee de tablier",
+   "x": -1300.4,
+   "y": -11.7
+  },
+  {
+   "detail": "ouv/79#0 : portee 70.0 m, epaisseur 2.50 m (portee/20 bornee), extrados 143.05 m, intrados 140.55 m",
+   "regle": "tablier",
+   "titre": "plus grande portee de tablier",
+   "x": -246.7,
+   "y": 762.9
+  },
+  {
+   "detail": "ouv/131#0 : portee 49.1 m, epaisseur 2.46 m (portee/20 bornee), extrados 133.47 m, intrados 131.01 m",
+   "regle": "tablier",
+   "titre": "plus grande portee de tablier",
+   "x": -1308.8,
+   "y": 147.7
+  },
+  {
+   "detail": "ouv/112#0 : portee 43.9 m, epaisseur 2.20 m (portee/20 bornee), extrados 133.47 m, intrados 131.27 m",
+   "regle": "tablier",
+   "titre": "plus grande portee de tablier",
+   "x": -417.9,
+   "y": 569.8
+  },
+  {
+   "detail": "ouv/108#0 : portee 40.0 m, epaisseur 2.00 m (portee/20 bornee), extrados 133.47 m, intrados 131.47 m",
+   "regle": "tablier",
+   "titre": "plus grande portee de tablier",
+   "x": -736.3,
+   "y": 215.5
+  },
+  {
+   "detail": "ouv/116#0 : portee 37.6 m, epaisseur 1.88 m (portee/20 bornee), extrados 133.47 m, intrados 131.59 m",
+   "regle": "tablier",
+   "titre": "plus grande portee de tablier",
+   "x": -561.0,
+   "y": 1318.0
+  },
+  {
+   "detail": "voi/5957#0 | voi/14079#0 sur 3.6 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 9.410 m",
+   "x": 817.95,
+   "y": -536.84
+  },
+  {
+   "detail": "voi/5859#0 | voi/10974#0 sur 1.4 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 8.960 m",
+   "x": 785.44,
+   "y": -541.04
+  },
+  {
+   "detail": "voi/6250#0 | voi/13414#2 sur 0.8 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 8.004 m",
+   "x": 957.2,
+   "y": -204.89
+  },
+  {
+   "detail": "voi/1781#0 | voi/13366#0 sur 0.2 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 7.855 m",
+   "x": -812.91,
+   "y": 353.25
+  },
+  {
+   "detail": "voi/1771#0 | voi/13046#0 sur 2.2 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 7.529 m",
+   "x": -815.38,
+   "y": 352.88
+  },
+  {
+   "detail": "voi/1774#0 | voi/13366#0 sur 0.8 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 7.438 m",
+   "x": -814.57,
+   "y": 355.84
+  },
+  {
+   "detail": "voi/1763#0 | voi/13046#0 sur 2.6 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 7.137 m",
+   "x": -816.7,
+   "y": 355.47
+  },
+  {
+   "detail": "voi/6393#0 | voi/15323#0 sur 0.3 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 6.771 m",
+   "x": 1016.08,
+   "y": -67.84
+  },
+  {
+   "detail": "voi/5572#0 | voi/13034#0 sur 2.8 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 6.504 m",
+   "x": 688.23,
+   "y": -769.78
+  },
+  {
+   "detail": "voi/5500#1 | voi/10841#0 sur 3.0 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 4.850 m",
+   "x": 676.68,
+   "y": -772.79
+  },
+  {
+   "detail": "voi/2380#0 | voi/15841#0 sur 1.9 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 4.535 m",
+   "x": -572.77,
+   "y": -1269.09
+  },
+  {
+   "detail": "voi/5100#0 | voi/16035#1 sur 0.3 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 3.940 m",
+   "x": 540.09,
+   "y": -1047.8
+  },
+  {
+   "detail": "voi/5053#0 | voi/16035#0 sur 0.2 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 3.769 m",
+   "x": 523.67,
+   "y": -1027.27
+  },
+  {
+   "detail": "voi/6293#0 | voi/10694#1 sur 1.3 m — raison : rampe d'acces a un ouvrage (voi/10694#1)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 3.030 m",
+   "x": 981.52,
+   "y": 659.53
+  },
+  {
+   "detail": "voi/6424#0 | voi/8862#0 sur 3.9 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 1.705 m",
+   "x": 1030.05,
+   "y": 1129.51
+  },
+  {
+   "detail": "voi/1802#0 | voi/13050#0 sur 5.2 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 1.026 m",
+   "x": -805.67,
+   "y": 358.05
+  },
+  {
+   "detail": "voi/1550#0 | voi/9033#0 sur 2.8 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.950 m",
+   "x": -918.27,
+   "y": 320.02
+  },
+  {
+   "detail": "voi/5003#0 | voi/7814#1 sur 2.8 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.866 m",
+   "x": 502.49,
+   "y": 1332.98
+  },
+  {
+   "detail": "voi/5003#0 | voi/7815#0 sur 1.6 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.866 m",
+   "x": 500.27,
+   "y": 1332.98
+  },
+  {
+   "detail": "voi/6397#0 | voi/15322#2 sur 1.5 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.736 m",
+   "x": 1018.9,
+   "y": -58.14
+  },
+  {
+   "detail": "voi/1082#0 | voi/9535#5 sur 2.6 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.686 m",
+   "x": -1086.85,
+   "y": -993.25
+  },
+  {
+   "detail": "voi/2456#0 | voi/15841#2 sur 0.6 m — raison : voie reclassee en emmarchement (voi/15841#2)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.677 m",
+   "x": -541.46,
+   "y": -1276.38
+  },
+  {
+   "detail": "voi/2419#0 | voi/8430#0 sur 0.3 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.551 m",
+   "x": -558.32,
+   "y": 1432.98
+  },
+  {
+   "detail": "voi/5204#0 | voi/7910#0 sur 2.7 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.390 m",
+   "x": 573.26,
+   "y": 1351.91
+  },
+  {
+   "detail": "voi/6279#1 | voi/14571#2 sur 2.7 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.346 m",
+   "x": 977.32,
+   "y": 375.31
+  },
+  {
+   "detail": "voi/2117#0 | voi/15819#0 sur 10.3 m — raison : voie reclassee en emmarchement (voi/15819#0)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.328 m",
+   "x": -679.44,
+   "y": -1066.29
+  },
+  {
+   "detail": "voi/4928#0 | voi/8242#0 sur 2.6 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.310 m",
+   "x": 474.66,
+   "y": 1350.13
+  },
+  {
+   "detail": "voi/5105#0 | voi/7814#2 sur 1.4 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.266 m",
+   "x": 540.38,
+   "y": 1342.23
+  },
+  {
+   "detail": "voi/5105#0 | voi/7812#0 sur 4.0 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.266 m",
+   "x": 543.29,
+   "y": 1341.5
+  },
+  {
+   "detail": "voi/1814#0 | voi/16191#4 sur 3.9 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.185 m",
+   "x": -802.49,
+   "y": -1201.35
+  },
+  {
+   "detail": "voi/1892#0 | voi/16195#0 sur 2.8 m — raison : voie reclassee en emmarchement (voi/16195#0)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.152 m",
+   "x": -766.8,
+   "y": -1222.16
+  },
+  {
+   "detail": "voi/6378#0 | voi/10977#0 sur 1.7 m — raison : voie reclassee en emmarchement (voi/10977#0)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.148 m",
+   "x": 1007.23,
+   "y": 105.85
+  },
+  {
+   "detail": "voi/1847#0 | voi/16196#1 sur 2.6 m — raison : voie reclassee en emmarchement (voi/16196#1)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.145 m",
+   "x": -784.87,
+   "y": -1211.64
+  },
+  {
+   "detail": "voi/7152#0 | voi/16629#0 sur 14.1 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.138 m",
+   "x": 1528.77,
+   "y": -1186.67
+  },
+  {
+   "detail": "voi/1887#0 | voi/11806#4 sur 12.0 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.130 m",
+   "x": -768.9,
+   "y": 381.87
+  },
+  {
+   "detail": "voi/4782#0 | voi/12820#1 sur 6.4 m — raison : voie reclassee en emmarchement (voi/12820#1)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.116 m",
+   "x": 418.06,
+   "y": 265.61
+  },
+  {
+   "detail": "voi/3192#0 | voi/11500#0 sur 4.4 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.111 m",
+   "x": -196.12,
+   "y": -292.69
+  },
+  {
+   "detail": "voi/6854#0 | voi/15385#0 sur 5.2 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.110 m",
+   "x": 1347.92,
+   "y": -160.16
+  },
+  {
+   "detail": "voi/2476#0 | voi/10618#1 sur 4.6 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.108 m",
+   "x": -536.35,
+   "y": 637.22
+  },
+  {
+   "detail": "voi/5072#0 | voi/11276#0 sur 3.6 m — raison : voie reclassee en emmarchement (voi/11276#0)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.107 m",
+   "x": 526.57,
+   "y": 170.31
+  },
+  {
+   "detail": "voi/5874#0 | voi/13030#1 sur 10.2 m — raison : voie reclassee en emmarchement (voi/13030#1)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.105 m",
+   "x": 791.76,
+   "y": -296.0
+  },
+  {
+   "detail": "voi/6379#0 | voi/10977#0 sur 1.7 m — raison : voie reclassee en emmarchement (voi/10977#0)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.094 m",
+   "x": 1007.21,
+   "y": 101.32
+  },
+  {
+   "detail": "voi/6729#0 | voi/8863#2 sur 0.1 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.083 m",
+   "x": 1252.05,
+   "y": 1461.28
+  },
+  {
+   "detail": "voi/6835#0 | voi/15289#0 sur 14.3 m — raison : voie reclassee en emmarchement (voi/15289#0)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.082 m",
+   "x": 1333.15,
+   "y": -1011.52
+  },
+  {
+   "detail": "voi/6311#0 | voi/8249#0 sur 4.7 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.078 m",
+   "x": 992.29,
+   "y": 1148.78
+  },
+  {
+   "detail": "voi/4708#0 | voi/10870#4 sur 2.5 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.073 m",
+   "x": 388.98,
+   "y": -551.64
+  },
+  {
+   "detail": "voi/2665#0 | voi/13330#0 sur 2.8 m — raison : voie reclassee en emmarchement (voi/13330#0)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.071 m",
+   "x": -439.73,
+   "y": -193.96
+  },
+  {
+   "detail": "voi/1739#0 | voi/13208#2 sur 2.9 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.069 m",
+   "x": -825.09,
+   "y": -704.1
+  },
+  {
+   "detail": "voi/5620#0 | voi/8082#6 sur 1.6 m — raison : voie reclassee en emmarchement (voi/8082#6)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.062 m",
+   "x": 697.83,
+   "y": 1063.76
+  },
+  {
+   "detail": "voi/7198#0 | voi/15358#0 sur 3.6 m — raison : voie reclassee en emmarchement (voi/15358#0)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.056 m",
+   "x": 1551.36,
+   "y": -378.26
+  },
+  {
+   "detail": "voi/1995#0 | voi/13393#1 sur 2.5 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.048 m",
+   "x": -725.69,
+   "y": 430.34
+  },
+  {
+   "detail": "voi/5840#0 | voi/13032#1 sur 8.1 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.045 m",
+   "x": 775.85,
+   "y": -335.44
+  },
+  {
+   "detail": "voi/1361#0 | voi/10480#0 sur 2.8 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.041 m",
+   "x": -975.59,
+   "y": -812.15
+  },
+  {
+   "detail": "voi/6360#0 | voi/15043#0 sur 6.0 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.040 m",
+   "x": 1007.99,
+   "y": 482.67
+  },
+  {
+   "detail": "voi/6360#0 | voi/15218#0 sur 7.7 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.040 m",
+   "x": 1004.12,
+   "y": 476.87
+  },
+  {
+   "detail": "voi/6360#0 | voi/15047#0 sur 7.6 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.040 m",
+   "x": 1004.12,
+   "y": 487.39
+  },
+  {
+   "detail": "voi/6068#0 | voi/11918#0 sur 7.2 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.039 m",
+   "x": 874.64,
+   "y": -636.64
+  },
+  {
+   "detail": "voi/5970#0 | voi/11540#0 sur 2.5 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.038 m",
+   "x": 822.06,
+   "y": -494.63
+  },
+  {
+   "detail": "voi/5514#0 | voi/13034#1 sur 2.8 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.038 m",
+   "x": 679.64,
+   "y": -765.57
+  },
+  {
+   "detail": "voi/3133#0 | voi/12842#0 sur 14.1 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.035 m",
+   "x": -226.64,
+   "y": -592.04
+  },
+  {
+   "detail": "voi/1890#0 | voi/13897#2 sur 1.7 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.035 m",
+   "x": -767.75,
+   "y": 407.63
+  },
+  {
+   "detail": "voi/271#0 | voi/7321#0 sur 12.9 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.033 m",
+   "x": -1435.8,
+   "y": 1249.7
+  },
+  {
+   "detail": "voi/1878#0 | voi/10873#0 sur 3.6 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.032 m",
+   "x": -774.08,
+   "y": 651.63
+  },
+  {
+   "detail": "voi/3100#0 | voi/7851#0 sur 15.7 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.032 m",
+   "x": -231.69,
+   "y": 1145.08
+  },
+  {
+   "detail": "voi/5958#0 | voi/13635#0 sur 8.9 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.029 m",
+   "x": 818.83,
+   "y": 534.11
+  },
+  {
+   "detail": "voi/1977#0 | voi/11513#2 sur 5.9 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.029 m",
+   "x": -735.1,
+   "y": -732.89
+  },
+  {
+   "detail": "voi/743#0 | voi/9330#0 sur 6.3 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.028 m",
+   "x": -1232.23,
+   "y": -982.07
+  },
+  {
+   "detail": "voi/7043#0 | voi/15132#0 sur 3.0 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.025 m",
+   "x": 1458.53,
+   "y": -549.32
+  },
+  {
+   "detail": "voi/3302#0 | voi/10431#0 sur 15.1 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.024 m",
+   "x": -158.87,
+   "y": 489.04
+  },
+  {
+   "detail": "voi/1556#0 | voi/12596#0 sur 3.1 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.024 m",
+   "x": -909.83,
+   "y": -155.33
+  },
+  {
+   "detail": "voi/3382#0 | voi/8334#0 sur 5.0 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.023 m",
+   "x": -130.68,
+   "y": 1015.79
+  },
+  {
+   "detail": "voi/6921#0 | voi/15018#1 sur 8.0 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.022 m",
+   "x": 1393.09,
+   "y": 37.46
+  },
+  {
+   "detail": "voi/4863#0 | voi/10367#1 sur 6.2 m — raison : cause NON ETABLIE",
+   "regle": "rouge residuel",
+   "titre": "chaussee x carrefour — dZ 0.021 m",
+   "x": 447.85,
+   "y": 535.97
+  },
+  {
+   "detail": "voi/15085#5 | zon/391#2 sur 6.0 m — raison : voie reclassee en emmarchement (voi/15085#5)",
+   "regle": "rouge residuel",
+   "titre": "chaussee x sol_vegetal — dZ 12.533 m",
+   "x": 1264.16,
+   "y": -919.63
+  },
+  {
+   "detail": "troncon 2161 : 3.51 m de denivele sur 2.78 m, il en faudrait 29.29 m au plafond de 12 % -> pente residuelle DECLAREE 126.64 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -1032.0,
+   "y": 331.9
+  },
+  {
+   "detail": "troncon 5954 : 3.94 m de denivele sur 3.97 m, il en faudrait 32.88 m au plafond de 12 % -> pente residuelle DECLAREE 99.49 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -523.0,
+   "y": 605.1
+  },
+  {
+   "detail": "troncon 5955 : 2.93 m de denivele sur 2.99 m, il en faudrait 24.42 m au plafond de 12 % -> pente residuelle DECLAREE 97.98 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -523.0,
+   "y": 601.6
+  },
+  {
+   "detail": "troncon 4334 : 3.09 m de denivele sur 4.10 m, il en faudrait 25.75 m au plafond de 12 % -> pente residuelle DECLAREE 75.32 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -821.1,
+   "y": 77.3
+  },
+  {
+   "detail": "troncon 5544 : 1.45 m de denivele sur 2.03 m, il en faudrait 12.12 m au plafond de 12 % -> pente residuelle DECLAREE 71.64 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -332.4,
+   "y": 752.3
+  },
+  {
+   "detail": "troncon 3119 : 2.66 m de denivele sur 4.08 m, il en faudrait 22.19 m au plafond de 12 % -> pente residuelle DECLAREE 65.25 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -397.3,
+   "y": 375.6
+  },
+  {
+   "detail": "troncon 4248 : 1.31 m de denivele sur 2.03 m, il en faudrait 10.93 m au plafond de 12 % -> pente residuelle DECLAREE 64.55 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -312.0,
+   "y": 606.9
+  },
+  {
+   "detail": "troncon 8172 : 3.76 m de denivele sur 5.84 m, il en faudrait 31.32 m au plafond de 12 % -> pente residuelle DECLAREE 64.40 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": 1098.5,
+   "y": -90.6
+  },
+  {
+   "detail": "troncon 474 : 3.58 m de denivele sur 5.81 m, il en faudrait 29.85 m au plafond de 12 % -> pente residuelle DECLAREE 61.71 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -171.5,
+   "y": 1347.4
+  },
+  {
+   "detail": "troncon 8180 : 2.45 m de denivele sur 4.31 m, il en faudrait 20.42 m au plafond de 12 % -> pente residuelle DECLAREE 56.87 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": 1102.4,
+   "y": -92.3
+  },
+  {
+   "detail": "troncon 1120 : 0.84 m de denivele sur 1.49 m, il en faudrait 7.00 m au plafond de 12 % -> pente residuelle DECLAREE 56.30 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -333.5,
+   "y": 1275.5
+  },
+  {
+   "detail": "troncon 8175 : 3.82 m de denivele sur 7.25 m, il en faudrait 31.81 m au plafond de 12 % -> pente residuelle DECLAREE 52.63 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": 1094.9,
+   "y": -80.8
+  },
+  {
+   "detail": "troncon 2252 : 2.50 m de denivele sur 4.80 m, il en faudrait 20.81 m au plafond de 12 % -> pente residuelle DECLAREE 52.00 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -1122.6,
+   "y": 68.0
+  },
+  {
+   "detail": "troncon 1870 : 0.93 m de denivele sur 1.82 m, il en faudrait 7.76 m au plafond de 12 % -> pente residuelle DECLAREE 51.10 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -1022.9,
+   "y": 337.0
+  },
+  {
+   "detail": "troncon 5339 : 4.15 m de denivele sur 8.27 m, il en faudrait 34.58 m au plafond de 12 % -> pente residuelle DECLAREE 50.17 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -378.3,
+   "y": 371.2
+  },
+  {
+   "detail": "troncon 6745 : 0.82 m de denivele sur 1.75 m, il en faudrait 6.87 m au plafond de 12 % -> pente residuelle DECLAREE 47.23 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -309.6,
+   "y": 632.1
+  },
+  {
+   "detail": "troncon 4334 : 1.88 m de denivele sur 4.08 m, il en faudrait 15.65 m au plafond de 12 % -> pente residuelle DECLAREE 46.00 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -819.2,
+   "y": 73.6
+  },
+  {
+   "detail": "troncon 2090 : 2.78 m de denivele sur 6.15 m, il en faudrait 23.19 m au plafond de 12 % -> pente residuelle DECLAREE 45.28 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -1326.3,
+   "y": 263.9
+  },
+  {
+   "detail": "troncon 5285 : 1.67 m de denivele sur 3.73 m, il en faudrait 13.90 m au plafond de 12 % -> pente residuelle DECLAREE 44.67 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -803.0,
+   "y": 84.0
+  },
+  {
+   "detail": "troncon 5338 : 1.26 m de denivele sur 2.85 m, il en faudrait 10.52 m au plafond de 12 % -> pente residuelle DECLAREE 44.31 % (cotes gelees : [False, False] — aucune, c'est donc une rupture de terrain, pas une rampe coincee)",
+   "regle": "rupture de terrain",
+   "titre": "deux noeuds proches, fort denivele",
+   "x": -386.1,
+   "y": 368.8
+  },
+  {
+   "detail": "ouv/80#0 : 280 m2, hauteur declaree 1.59 m (< 2,20 m) ; son dessus adopte le profil de voi/10784#0",
+   "regle": "dalot",
+   "titre": "ouvrage affleurant (dalot, buse, ponceau)",
+   "x": -190.68,
+   "y": 749.67
+  },
+  {
+   "detail": "ouv/81#0 : 245 m2, hauteur declaree 0.93 m (< 2,20 m) ; son dessus adopte le profil de voi/10240#0",
+   "regle": "dalot",
+   "titre": "ouvrage affleurant (dalot, buse, ponceau)",
+   "x": -289.5,
+   "y": 768.45
+  },
+  {
+   "detail": "ouv/83#0 : 201 m2, hauteur declaree 1.82 m (< 2,20 m) ; son dessus adopte le profil de sa voie",
+   "regle": "dalot",
+   "titre": "ouvrage affleurant (dalot, buse, ponceau)",
+   "x": -393.02,
+   "y": 1504.04
+  },
+  {
+   "detail": "ouv/84#0 : 100 m2, hauteur declaree 0.99 m (< 2,20 m) ; son dessus adopte le profil de sa voie",
+   "regle": "dalot",
+   "titre": "ouvrage affleurant (dalot, buse, ponceau)",
+   "x": -353.45,
+   "y": 1360.72
+  },
+  {
+   "detail": "ouv/85#0 : 102 m2, hauteur declaree 2.05 m (< 2,20 m) ; son dessus adopte le profil de sa voie",
+   "regle": "dalot",
+   "titre": "ouvrage affleurant (dalot, buse, ponceau)",
+   "x": -351.49,
+   "y": 1346.58
+  },
+  {
+   "detail": "ouv/86#0 : 78 m2, hauteur declaree 1.30 m (< 2,20 m) ; son dessus adopte le profil de sa voie",
+   "regle": "dalot",
+   "titre": "ouvrage affleurant (dalot, buse, ponceau)",
+   "x": -331.4,
+   "y": 1364.17
+  },
+  {
+   "detail": "ouv/87#0 : 93 m2, hauteur declaree 1.42 m (< 2,20 m) ; son dessus adopte le profil de sa voie",
+   "regle": "dalot",
+   "titre": "ouvrage affleurant (dalot, buse, ponceau)",
+   "x": -332.15,
+   "y": 1348.58
+  },
+  {
+   "detail": "ouv/89#0 : 130 m2, hauteur declaree 1.66 m (< 2,20 m) ; son dessus adopte le profil de sa voie",
+   "regle": "dalot",
+   "titre": "ouvrage affleurant (dalot, buse, ponceau)",
+   "x": -289.07,
+   "y": 1352.68
+  },
+  {
+   "detail": "ouv/91#0 : 63 m2, hauteur declaree 1.76 m (< 2,20 m) ; son dessus adopte le profil de sa voie",
+   "regle": "dalot",
+   "titre": "ouvrage affleurant (dalot, buse, ponceau)",
+   "x": -263.51,
+   "y": 1356.35
+  },
+  {
+   "detail": "ouv/94#0 : 77 m2, hauteur declaree 1.74 m (< 2,20 m) ; son dessus adopte le profil de sa voie",
+   "regle": "dalot",
+   "titre": "ouvrage affleurant (dalot, buse, ponceau)",
+   "x": -335.83,
+   "y": 1341.97
+  },
+  {
+   "detail": "ouv/132#0 : hauteur declaree 2.29 m — un vieux pont bas est une realite, a juger sur place",
+   "regle": "pont bas",
+   "titre": "vrai pont sous le gabarit routier de 4,30 m",
+   "x": -1312.8,
+   "y": 283.33
+  },
+  {
+   "detail": "ouv/153#0 : hauteur declaree 2.33 m — un vieux pont bas est une realite, a juger sur place",
+   "regle": "pont bas",
+   "titre": "vrai pont sous le gabarit routier de 4,30 m",
+   "x": 525.04,
+   "y": -1043.82
+  },
+  {
+   "detail": "ouv/90#0 : hauteur declaree 2.44 m — un vieux pont bas est une realite, a juger sur place",
+   "regle": "pont bas",
+   "titre": "vrai pont sous le gabarit routier de 4,30 m",
+   "x": -269.12,
+   "y": 1370.77
+  },
+  {
+   "detail": "ouv/90#1 : hauteur declaree 2.44 m — un vieux pont bas est une realite, a juger sur place",
+   "regle": "pont bas",
+   "titre": "vrai pont sous le gabarit routier de 4,30 m",
+   "x": -261.67,
+   "y": 1369.5
+  },
+  {
+   "detail": "ouv/126#0 : hauteur declaree 2.48 m — un vieux pont bas est une realite, a juger sur place",
+   "regle": "pont bas",
+   "titre": "vrai pont sous le gabarit routier de 4,30 m",
+   "x": -1121.09,
+   "y": -219.7
+  },
+  {
+   "detail": "ouv/148#0 : hauteur declaree 2.50 m — un vieux pont bas est une realite, a juger sur place",
+   "regle": "pont bas",
+   "titre": "vrai pont sous le gabarit routier de 4,30 m",
+   "x": 845.96,
+   "y": -586.05
+  },
+  {
+   "detail": "ouv/170#0 : hauteur declaree 2.54 m — un vieux pont bas est une realite, a juger sur place",
+   "regle": "pont bas",
+   "titre": "vrai pont sous le gabarit routier de 4,30 m",
+   "x": 1023.83,
+   "y": -64.49
+  },
+  {
+   "detail": "ouv/92#0 : hauteur declaree 2.55 m — un vieux pont bas est une realite, a juger sur place",
+   "regle": "pont bas",
+   "titre": "vrai pont sous le gabarit routier de 4,30 m",
+   "x": -344.88,
+   "y": 1340.61
+  },
+  {
+   "detail": "ouv/166#0 : hauteur declaree 2.63 m — un vieux pont bas est une realite, a juger sur place",
+   "regle": "pont bas",
+   "titre": "vrai pont sous le gabarit routier de 4,30 m",
+   "x": 966.87,
+   "y": 649.16
+  },
+  {
+   "detail": "ouv/124#0 : hauteur declaree 2.68 m — un vieux pont bas est une realite, a juger sur place",
+   "regle": "pont bas",
+   "titre": "vrai pont sous le gabarit routier de 4,30 m",
+   "x": -1126.62,
+   "y": -208.1
+  },
+  {
+   "detail": "sur/14#10 : 1595 m2, 100.0 % de pixels herbe",
+   "regle": "conflit donnee/visible",
+   "titre": "du dur peint en herbe",
+   "x": -716.57,
+   "y": 1143.49
+  },
+  {
+   "detail": "voi/7940#0 : 1486 m2, 92.9 % de pixels herbe",
+   "regle": "conflit donnee/visible",
+   "titre": "du dur peint en herbe",
+   "x": 338.21,
+   "y": 1136.64
+  },
+  {
+   "detail": "voi/7381#0 : 1478 m2, 100.0 % de pixels herbe",
    "regle": "conflit donnee/visible",
    "titre": "du dur peint en herbe",
    "x": -973.75,
    "y": 1723.35
   },
   {
-   "detail": "voi/12875#0 : 1474 m2, 93.2 % de pixels herbe",
-   "regle": "conflit donnee/visible",
-   "titre": "du dur peint en herbe",
-   "x": 338.51,
-   "y": 1136.49
-  },
-  {
-   "detail": "voi/13069#9 : 1389 m2, 66.8 % de pixels herbe",
+   "detail": "voi/8134#7 : 1389 m2, 66.8 % de pixels herbe",
    "regle": "conflit donnee/visible",
    "titre": "du dur peint en herbe",
    "x": 224.79,
    "y": 1207.38
   },
   {
-   "detail": "voi/13069#8 : 1254 m2, 92.3 % de pixels herbe",
+   "detail": "voi/8134#6 : 1262 m2, 92.2 % de pixels herbe",
    "regle": "conflit donnee/visible",
    "titre": "du dur peint en herbe",
    "x": 150.9,
    "y": 1225.41
   },
   {
-   "detail": "voi/19055#0 : 883 m2, 59.3 % de pixels herbe",
+   "detail": "sur/14#8 : 1128 m2, 100.0 % de pixels herbe",
    "regle": "conflit donnee/visible",
    "titre": "du dur peint en herbe",
-   "x": -783.35,
-   "y": -107.82
-  },
-  {
-   "detail": "voi/20741#0 : 830 m2, 99.4 % de pixels herbe",
-   "regle": "conflit donnee/visible",
-   "titre": "du dur peint en herbe",
-   "x": 358.19,
-   "y": -1134.76
+   "x": -665.69,
+   "y": 975.55
   },
   {
    "detail": "zon/598#1 : 148 m2, 0.0 % de pixels herbe",
@@ -884,8 +2088,8 @@
    "detail": "zon/39#5 : 49 m2, 27.4 % de pixels herbe",
    "regle": "conflit donnee/visible",
    "titre": "une zone OCS GE sans herbe visible",
-   "x": -1158.1,
-   "y": -267.63
+   "x": -1157.99,
+   "y": -267.57
   },
   {
    "detail": "zon/39#4 : 40 m2, 0.0 % de pixels herbe",
@@ -902,81 +2106,11 @@
    "y": 231.29
   },
   {
-   "detail": "dZ 14.12 m sur 46.0 m, mineral|eau",
-   "regle": "HORS CATALOGUE",
-   "titre": "arbitrage demande",
-   "x": -731.69,
-   "y": 138.32
-  },
-  {
-   "detail": "dZ 13.86 m sur 16.6 m, eau|eau",
-   "regle": "HORS CATALOGUE",
-   "titre": "arbitrage demande",
-   "x": -798.65,
-   "y": 93.57
-  },
-  {
-   "detail": "dZ 13.50 m sur 18.1 m, mineral|eau",
-   "regle": "HORS CATALOGUE",
-   "titre": "arbitrage demande",
-   "x": -943.65,
-   "y": 1.42
-  },
-  {
-   "detail": "dZ 12.96 m sur 3.5 m, mineral|eau",
-   "regle": "HORS CATALOGUE",
-   "titre": "arbitrage demande",
-   "x": -809.4,
-   "y": 361.67
-  },
-  {
-   "detail": "dZ 12.66 m sur 6.0 m, mineral|vegetal",
+   "detail": "dZ 12.53 m sur 6.0 m, mineral|vegetal",
    "regle": "HORS CATALOGUE",
    "titre": "arbitrage demande",
    "x": 1264.16,
    "y": -919.63
-  },
-  {
-   "detail": "dZ 12.58 m sur 37.8 m, mineral|eau",
-   "regle": "HORS CATALOGUE",
-   "titre": "arbitrage demande",
-   "x": -1343.55,
-   "y": 232.18
-  },
-  {
-   "detail": "dZ 12.58 m sur 5.0 m, mineral|eau",
-   "regle": "HORS CATALOGUE",
-   "titre": "arbitrage demande",
-   "x": -1322.68,
-   "y": 238.32
-  },
-  {
-   "detail": "dZ 12.58 m sur 12.2 m, mineral|eau",
-   "regle": "HORS CATALOGUE",
-   "titre": "arbitrage demande",
-   "x": -1312.92,
-   "y": 239.99
-  },
-  {
-   "detail": "dZ 12.58 m sur 20.5 m, mineral|eau",
-   "regle": "HORS CATALOGUE",
-   "titre": "arbitrage demande",
-   "x": -1303.19,
-   "y": 241.87
-  },
-  {
-   "detail": "dZ 12.58 m sur 105.6 m, mineral|eau",
-   "regle": "HORS CATALOGUE",
-   "titre": "arbitrage demande",
-   "x": -1254.01,
-   "y": 264.13
-  },
-  {
-   "detail": "dZ 12.21 m sur 106.8 m, mineral|eau",
-   "regle": "HORS CATALOGUE",
-   "titre": "arbitrage demande",
-   "x": -540.8,
-   "y": 534.31
   }
  ]
 }

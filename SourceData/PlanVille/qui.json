@@ -5,12 +5,15 @@
   "heritee": true,
   "preseance_dur": [
    "ouvrage",
+   "voie_ferree",
+   "canal",
    "voirie",
-   "batiment"
+   "batiment",
+   "surface_reglee"
   ],
   "regle": "E0-bis (work/PART/p5_snap.py)"
  },
- "carrefours_n": 12250,
+ "carrefours_n": 7315,
  "couche": "QUI",
  "domaine_cellules": [
   "-4_-2",
@@ -94,57 +97,102 @@
   "interstices_m2": 0.0,
   "interstices_n": 0,
   "interstices_seuil_m": 0.05,
-  "parcelles_n": 60969,
+  "parcelles_n": 56138,
   "recouvrements_m2": 0.0,
   "recouvrements_n": 0,
-  "reparations_m2": 95.185219,
-  "reparations_n": 3,
+  "reparations_m2": 93.187829,
+  "reparations_n": 7,
   "tours_de_garde": 2,
-  "trous_m2": 95.18522,
-  "trous_n": 4
+  "trous_m2": 93.187829,
+  "trous_n": 5
+ },
+ "largeur_ferroviaire": {
+  "base_m": 6.0,
+  "par_voie_sup_m": 4.0,
+  "provenance": "reel + donnee",
+  "reference": "entraxe standard 4,00 m entre voies ; plateforme d'une voie ~6 m ; le nombre de voies est lu dans la donnee (`nombre_de_voies`, BD TOPO)"
  },
  "par_proprietaire": {
   "batiment": {
-   "aire_m2": 3200976.9,
-   "bandes_annexees_m2": 8596.2,
+   "aire_m2": 3190213.0,
+   "bandes_annexees_m2": 8613.1,
    "bandes_annexees_n": 2420,
    "objets": 20780,
-   "parcelles": 24271
+   "parcelles": 24236
+  },
+  "canal": {
+   "aire_m2": 27466.4,
+   "bandes_annexees_m2": 104.2,
+   "bandes_annexees_n": 14,
+   "objets": 12,
+   "parcelles": 40
   },
   "organique": {
-   "aire_m2": 5861364.0,
-   "objets": 4964,
-   "parcelles": 4964
+   "aire_m2": 5608566.4,
+   "objets": 5019,
+   "parcelles": 5019
   },
   "ouvrage": {
-   "aire_m2": 219720.6,
-   "bandes_annexees_m2": 2559.9,
-   "bandes_annexees_n": 239,
-   "objets": 216,
-   "parcelles": 474
+   "aire_m2": 338828.8,
+   "bandes_annexees_m2": 2900.0,
+   "bandes_annexees_n": 326,
+   "objets": 357,
+   "parcelles": 725
+  },
+  "surface_reglee": {
+   "aire_m2": 81393.1,
+   "bandes_annexees_m2": 15.5,
+   "bandes_annexees_n": 14,
+   "objets": 71,
+   "parcelles": 195
+  },
+  "voie_ferree": {
+   "aire_m2": 67739.1,
+   "bandes_annexees_m2": 244.4,
+   "bandes_annexees_n": 30,
+   "objets": 72,
+   "parcelles": 108
   },
   "voirie": {
-   "aire_m2": 1898286.6,
-   "bandes_annexees_m2": 57527.3,
-   "bandes_annexees_n": 3900,
-   "objets": 21623,
-   "parcelles": 29154
+   "aire_m2": 1875675.7,
+   "bandes_annexees_m2": 57188.8,
+   "bandes_annexees_n": 3892,
+   "objets": 16688,
+   "parcelles": 23700
   },
   "zone": {
-   "aire_m2": 1069651.8,
+   "aire_m2": 1060117.5,
    "bandes_annexees_m2": 29.6,
    "bandes_annexees_n": 14,
    "objets": 712,
-   "parcelles": 2104
+   "parcelles": 2115
   }
  },
  "preseance": [
   "ouvrage",
+  "voie_ferree",
+  "canal",
   "voirie",
   "batiment",
+  "surface_reglee",
   "zone",
   "organique"
  ],
+ "preseance_provenance": {
+  "ordre": [
+   "ouvrage",
+   "voie_ferree",
+   "canal",
+   "voirie",
+   "batiment",
+   "surface_reglee",
+   "zone",
+   "organique"
+  ],
+  "provenance": "reel",
+  "reference": "plafonds de conception : voie guidee (pente <= 35 pour mille, grands rayons — referentiels SNCF Reseau) contre route (12 % et rayons courts — guide CEREMA « Voirie urbaine ») ; une structure d'ouvrage ne se deplace pas",
+  "regle": "le rang d'une famille suit son degre de CONTRAINTE GEOMETRIQUE : moins elle peut ceder, plus elle est haute"
+ },
  "regle_emprise_ouvrage": "axe du side-car tamponne de largeur_m/2, bouts francs (largeur_m = donnee BD TOPO)",
  "reseau_noue": {
   "MARGE_CARREFOUR_M": 0.5,
@@ -152,13 +200,14 @@
   "SNAP_NOEUD_M": 0.1,
   "axes": 9373,
   "axes_portes_par_un_ouvrage": 491,
-  "carrefours": 12257,
+  "carrefours": 7565,
   "croisements": 17668,
   "croisements_deniveles": 1120,
   "deniveles_par_ecart_z": 0,
   "deniveles_par_ouvrage": 1120,
   "extremites": 18746,
-  "noeuds": 14730,
-  "rayon_disque_median_m": 1.647
+  "fusions_de_carrefour": 3089,
+  "noeuds": 11641,
+  "rayon_disque_median_m": 1.75
  }
 }

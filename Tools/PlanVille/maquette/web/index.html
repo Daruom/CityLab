@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAQUETTE BLANCHE — plan_ville/v1 — la ville a survoler</title>
+<style>
+ html,body{margin:0;height:100%;overflow:hidden;background:#0e1013;color:#e8e8ea;
+   font:13px/1.45 system-ui,Segoe UI,Roboto,sans-serif}
+ canvas{position:absolute;inset:0;display:block;cursor:crosshair}
+ .panel{position:absolute;background:rgba(16,18,22,.94);border:1px solid #2c313a;
+   border-radius:8px;padding:10px 12px;backdrop-filter:blur(5px);
+   box-shadow:0 8px 28px rgba(0,0,0,.5)}
+ #ctl{top:10px;left:10px;width:250px;max-height:calc(100% - 20px);overflow:auto}
+ #fiche{top:10px;right:10px;width:330px;max-height:calc(100% - 20px);
+   overflow:auto;display:none}
+ #hud{bottom:10px;left:10px;font-variant-numeric:tabular-nums;font-size:11.5px;
+   color:#aeb6c2;padding:7px 11px}
+ #aide{bottom:10px;right:10px;font-size:11px;color:#7f8794;padding:7px 11px;
+   max-width:270px}
+ h1{font-size:13.5px;margin:0 0 2px;letter-spacing:.02em}
+ .sub{color:#79818f;font-size:11px;margin:0 0 9px}
+ h2{font-size:10.5px;margin:12px 0 5px;color:#8d97a6;text-transform:uppercase;
+   letter-spacing:.09em;font-weight:600}
+ label{display:flex;align-items:center;gap:7px;padding:2px 0;cursor:pointer;
+   font-size:12px}
+ input[type=checkbox],input[type=radio]{accent-color:#5a9bd8;margin:0}
+ input[type=range]{width:100%;accent-color:#5a9bd8}
+ .sw{width:11px;height:11px;border-radius:2px;flex:0 0 auto;border:1px solid #0006}
+ button{width:100%;margin:3px 0;padding:5px 8px;background:#232833;color:#dfe4ec;
+   border:1px solid #39404d;border-radius:5px;cursor:pointer;font-size:11.5px;
+   text-align:left}
+ button:hover{background:#2c333f;border-color:#4d566a}
+ button.on{background:#2b4160;border-color:#5a9bd8}
+ select{width:100%;background:#1b1f27;color:#dfe4ec;border:1px solid #39404d;
+   border-radius:5px;padding:4px;font-size:11.5px}
+ .kv{display:flex;justify-content:space-between;gap:10px;font-size:11.5px;
+   padding:2px 0;border-bottom:1px solid #21252d}
+ .kv b{font-weight:600;color:#fff}
+ .kv span:first-child{color:#8d97a6}
+ .sig{padding:4px 6px;border-radius:4px;cursor:pointer;font-size:11.5px;
+   border-bottom:1px solid #1d212a}
+ .sig:hover{background:#232833}
+ .sig i{color:#8d97a6;font-style:normal;font-size:10.5px;display:block}
+ .leg{display:flex;align-items:center;gap:6px;font-size:11px;padding:1px 0;
+   color:#c3c9d2}
+ .warn{color:#e0a04a}
+ #sigl{max-height:230px;overflow:auto;margin-top:4px}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<div id="ctl" class="panel">
+  <h1>MAQUETTE BLANCHE</h1>
+  <p class="sub" id="sub">chargement du plan…</p>
+
+  <h2>Couches</h2>
+  <div id="couches"></div>
+
+  <h2>Coloration</h2>
+  <select id="mode">
+    <option value="fam">famille du plan</option>
+    <option value="dz">CARTE DES MARCHES (classe de dZ)</option>
+    <option value="blanc">maquette blanche (teinte unique)</option>
+  </select>
+  <div id="leg"></div>
+
+  <h2>Domaine</h2>
+  <label><input type="checkbox" id="auto" checked> charger autour de la caméra</label>
+  <div style="font-size:11px;color:#8d97a6">rayon <span id="rv">1200</span> m</div>
+  <input type="range" id="rayon" min="300" max="4000" step="100" value="1200">
+  <button id="tout">TOUT CHARGER (49 cellules)</button>
+  <button id="banc">BANC DE MESURE (vol de 20 s)</button>
+
+  <h2>Végétation</h2>
+  <div style="font-size:11px;color:#8d97a6">densité <span id="dv">100</span> %</div>
+  <input type="range" id="dens" min="0" max="100" step="5" value="100">
+
+  <h2>Tournée (<span id="nsig">0</span> signets)</h2>
+  <select id="filtre"><option value="">— toutes les règles —</option></select>
+  <div id="sigl"></div>
+</div>
+
+<div id="fiche" class="panel"></div>
+<div id="hud" class="panel"></div>
+<div id="aide" class="panel">
+  <b>Vol</b> — clic dans la vue pour capturer la souris, <b>ZQSD/WASD</b> +
+  <b>A/E</b> monter-descendre, <b>Maj</b> vite, <b>Ctrl</b> lent, molette =
+  vitesse. <b>Échap</b> relâche. <b>Clic</b> sur la ville = fiche.
+</div>
+
+<script src="mq_index.js"></script>
+<script src="mq_vue.js"></script>
+</body>
+</html>

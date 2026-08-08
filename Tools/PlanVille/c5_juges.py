@@ -225,6 +225,157 @@ def main():
             "dZ %.3f m sur %.1f m, resolution DECLAREE `%s`"
             % (f["dz_m"], f["longueur_m"], f["type"]))
 
+    # -- L1b : les familles nouvelles, les terrassements, les ecarts au releve
+    try:
+        with open(os.path.join(CACHE, "l1b_solveur.pkl"), "rb") as f:
+            SV = pickle.load(f)
+        FAMP = SV["familles"]
+        srep = json.load(io.open(os.path.join(OUT, "solveur.json"),
+                                 encoding="utf-8"))
+        for d in (srep.get("fidelite_pires") or [])[:N_TOURNEE]:
+            sig("ecart au releve", "plus fort ecart |z_projet - z_releve|",
+                d["x"], d["y"], "%s (%s) : %.2f m — projet %.2f, releve %.2f ; "
+                "origine %s" % (d["parcelle"], d["famille"], d["ecart_m"],
+                                d["z_projet_m"], d["z_releve_m"], d["origine"]))
+        T2 = sorted(SV["terrassements"], key=lambda t: -t["dz_m"])
+        for t in T2[:N_TOURNEE]:
+            sig("terrassement", "plus fort raccord au terrain (%s)" % t["piece"],
+                t["x"], t["y"], "dZ %.2f m sur %.1f m, largeur %.1f m, place "
+                "disponible %.0f %%" % (t["dz_m"], t["longueur_m"],
+                                        t["largeur_m"],
+                                        t["place_disponible_pc"]))
+        for t in [x for x in SV["terrassements"] if x["piece"] == "quai"][:6]:
+            sig("quai", "piece de rive contre l'eau", t["x"], t["y"],
+                "dZ %.2f m sur %.1f m" % (t["dz_m"], t["longueur_m"]))
+        vus = set()
+        for p2 in P:
+            f2 = FAMP.get(p2["id"])
+            if f2 not in ("canal", "voie_ferree", "terrain_sport", "parking",
+                          "edicule", "ouvrage_hydro", "tremie") or f2 in vus:
+                continue
+            vus.add(f2)
+            r = p2["geom"].representative_point()
+            sig("famille nouvelle", "premiere emprise de la famille `%s`" % f2,
+                r.x, r.y, "%s, %.0f m2" % (p2["id"], p2["geom"].area))
+    except Exception as e:
+        jalon("C5/tournee L1b indisponible (%s)" % e)
+
+    # -- L1b-3 : les plans d'eau SANS cote declaree, et les voies reclassees
+    n_sc = 0
+    for pid, Lz in sorted(lois.items()):
+        if not isinstance(Lz, dict):
+            continue
+        if Lz.get("bief_composante") and "aucune cote declaree" in                 str(Lz.get("source") or ""):
+            p3 = byid.get(pid)
+            if p3 is None:
+                continue
+            r = p3["geom"].representative_point()
+            n_sc += 1
+            if n_sc <= 8:
+                sig("eau sans cote declaree",
+                    "plan d'eau dont aucun side-car ne donne la cote",
+                    r.x, r.y, "%s (%s) : %.1f m2, cote retenue %.2f m — a "
+                    "juger en maquette" % (pid, Lz["bief_composante"],
+                                           p3["geom"].area, Lz["z_m"]))
+    n_rc = 0
+    for pid, Lz in sorted(lois.items()):
+        if isinstance(Lz, dict) and Lz.get("reclasse") == "emmarchement":
+            p3 = byid.get(pid)
+            if p3 is None:
+                continue
+            n_rc += 1
+            if n_rc <= 10:
+                r = p3["geom"].representative_point()
+                sig("voie reclassee en emmarchement",
+                    "voie pietonne trop pentue pour etre une rampe",
+                    r.x, r.y, Lz.get("reclasse_motif", "")[:150])
+
+    # -- L1b-4 : les plus grandes portees de tablier (jugees en maquette)
+    for d in (srep.get("tabliers", {}).get("plus_grandes_portees") or [])[:10]:
+        sig("tablier", "plus grande portee de tablier", d["x"], d["y"],
+            "%s : portee %.1f m, epaisseur %.2f m (portee/20 bornee), "
+            "extrados %.2f m, intrados %.2f m"
+            % (d["parcelle"], d["portee_m"], d["epaisseur_m"],
+               d["cote_extrados_m"], d["cote_intrados_m"]))
+
+    # -- L1b-5 : CHAQUE cas rouge restant part en signet, un par un
+    try:
+        mrep2 = json.load(io.open(os.path.join(OUT, "matrice_mesuree.json"),
+                                  encoding="utf-8"))
+        for d in (mrep2.get("rouges_cas_par_cas") or []):
+            L1 = lois.get(d["a"]) or {}
+            L2 = lois.get(d["b"]) or {}
+            raison = "cause NON ETABLIE"
+            for Lx, qui in ((L1, d["a"]), (L2, d["b"])):
+                if Lx.get("rampe_acces_ouvrage"):
+                    raison = "rampe d'acces a un ouvrage (%s)" % qui
+                    break
+                if Lx.get("reclasse"):
+                    raison = "voie reclassee en emmarchement (%s)" % qui
+                    break
+                if Lx.get("porteur"):
+                    raison = "profil adopte d'un porteur (%s)" % qui
+                    break
+            sig("rouge residuel", "%s — dZ %.3f m" % (d["case"], d["dz_m"]),
+                d["x"], d["y"],
+                "%s | %s sur %.1f m — raison : %s"
+                % (d["a"], d["b"], d["m"], raison))
+    except Exception as e:
+        jalon("C5/signets des rouges indisponibles (%s)" % e)
+
+    # -- L1b-6 : les rampes CONTRAINTES (la longueur necessaire ne tient pas)
+    try:
+        nrep2 = json.load(io.open(os.path.join(OUT, "niveaux.json"),
+                                  encoding="utf-8"))
+        for d in (nrep2.get("rampes_acces", {}).get("contraintes") or [])[:20]:
+            sig("rupture de terrain", "deux noeuds proches, fort denivele",
+                d["x"], d["y"],
+                "troncon %s : %.2f m de denivele sur %.2f m, il en faudrait "
+                "%.2f m au plafond de 12 %% -> pente residuelle DECLAREE "
+                "%.2f %% (cotes gelees : %s — aucune, c'est donc une rupture "
+                "de terrain, pas une rampe coincee)"
+                % (d["troncon"], d["denivele_m"], d["longueur_m"],
+                   d["longueur_necessaire_m"], d["pente_residuelle_pc"],
+                   d["geles"]))
+    except Exception as e:
+        jalon("C5/signets de rampe contrainte indisponibles (%s)" % e)
+
+    # -- L1b-8 : la famille `dalot` et les ponts bas
+    try:
+        n_d = 0
+        for p2 in P:
+            if FAMP.get(p2["id"]) != "dalot" or n_d >= 10:
+                continue
+            L4 = lois.get(p2["id"]) or {}
+            r = p2["geom"].representative_point()
+            n_d += 1
+            sig("dalot", "ouvrage affleurant (dalot, buse, ponceau)", r.x, r.y,
+                "%s : %.0f m2, hauteur declaree %.2f m (< 2,20 m) ; son dessus "
+                "adopte le profil de %s"
+                % (p2["id"], p2["geom"].area,
+                   float((p2.get("meta") or {}).get("hauteur_moy_m") or 0.0),
+                   L4.get("porte_chaussee_de") or "sa voie"))
+        bas = []
+        for p2 in P:
+            if FAMP.get(p2["id"]) != "pont":
+                continue
+            L4 = lois.get(p2["id"]) or {}
+            h = (p2.get("meta") or {}).get("hauteur_moy_m")
+            try:
+                h = float(h)
+            except (TypeError, ValueError):
+                continue
+            if h < 4.30:
+                bas.append((h, p2, L4))
+        bas.sort(key=lambda t: t[0])
+        for h, p2, L4 in bas[:10]:
+            r = p2["geom"].representative_point()
+            sig("pont bas", "vrai pont sous le gabarit routier de 4,30 m",
+                r.x, r.y, "%s : hauteur declaree %.2f m — un vieux pont bas "
+                "est une realite, a juger sur place" % (p2["id"], h))
+    except Exception as e:
+        jalon("C5/signets dalot indisponibles (%s)" % e)
+
     # -- les pires conflits donnee/visible
     mrep = json.load(io.open(os.path.join(OUT, "matiere.json"),
                              encoding="utf-8"))

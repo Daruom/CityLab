@@ -35,8 +35,36 @@ from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
 sys.path.insert(0, r"C:\LidarPoC\work\PLAN")
-from c0_socle import (BLOC, CELL_M, ENT, OUT, PART, PLAN, PROPS, SRC, CACHE,
+# ⚠️ PREFIXE D'IDENTIFIANT PAR PROPRIETAIRE, explicite : les trois premieres
+# lettres ne suffisent plus depuis L1b — `voirie` et `voie_ferree` donnaient
+# toutes deux « voi » et 8 parcelles portaient un identifiant DOUBLE (defaut
+# trouve par la mesure de fidelite, qui attribuait a une voie ferree l'ecart
+# d'une chaussee).
+PREFIXE = {"ouvrage": "ouv", "voie_ferree": "fer", "canal": "can",
+           "voirie": "voi", "batiment": "bat", "surface_reglee": "sur",
+           "zone": "zon", "organique": "org"}
+
+from c0_socle import (BLOC, CELL_M, ENT, OUT, PART, PLAN, SRC, CACHE,
                       chrono, ecrire_json, jalon, md5_octets, charge_json)
+
+# --- LA PRESEANCE ETENDUE (L1b) : le rang suit le degre de contrainte --------
+PROPS = ["ouvrage", "voie_ferree", "canal", "voirie", "batiment",
+         "surface_reglee", "zone", "organique"]
+PRESEANCE_PROVENANCE = {
+    "regle": "le rang d'une famille suit son degre de CONTRAINTE GEOMETRIQUE : "
+             "moins elle peut ceder, plus elle est haute",
+    "provenance": "reel",
+    "reference": "plafonds de conception : voie guidee (pente <= 35 pour mille, "
+                 "grands rayons — referentiels SNCF Reseau) contre route "
+                 "(12 % et rayons courts — guide CEREMA « Voirie urbaine ») ; "
+                 "une structure d'ouvrage ne se deplace pas",
+    "ordre": PROPS}
+LARGEUR_FERROVIAIRE = {"base_m": 6.0, "par_voie_sup_m": 4.0,
+                       "provenance": "reel + donnee",
+                       "reference": "entraxe standard 4,00 m entre voies ; "
+                                    "plateforme d'une voie ~6 m ; le nombre de "
+                                    "voies est lu dans la donnee "
+                                    "(`nombre_de_voies`, BD TOPO)"}
 
 AIRE_MIN_M2 = 1e-6          # une piece plus petite n'est pas une parcelle
 BOUT = 2                    # cap_style=2 : bouts francs (comme p0_carte)
@@ -46,7 +74,12 @@ BOUT = 2                    # cap_style=2 : bouts francs (comme p0_carte)
 BANDE_MAX_M = 3.0           # au-dela, une plage est du vrai terrain
 COLLIER_M = 0.02            # epaisseur du collier de detection des voisins
 SEUIL_INTERSTICE_M = 0.05   # le juge d'interstice
-DUR = ["ouvrage", "voirie", "batiment"]
+# « dur » = tout proprietaire architectural, familles nouvelles
+# comprises : sans cela une lamelle coincee entre une voie ferree
+# et un parking n'aurait aucun voisin dur et resterait un
+# interstice (defaut mesure : 1 plage, 0,010 m2).
+DUR = ["ouvrage", "voie_ferree", "canal", "voirie", "batiment",
+       "surface_reglee"]
 
 
 def largeur(g):
@@ -107,6 +140,7 @@ def sources():
                     n_lg[nat if nat in n_lg else "pont"] += 1
                     meta = {"src": nom, "nature": nat, "id": it.get("id"),
                             "largeur_m": float(lg),
+                            "hauteur_moy_m": it.get("hauteur_moy_m"),
                             "emprise": "axe tamponne de largeur_m/2 "
                                        "(regle nationale, largeur = donnee "
                                        "BD TOPO du side-car)"}
@@ -177,6 +211,83 @@ def sources():
             zon.append((g, {"src": "ocsge_verts.json", "i": i,
                             "cs": z.get("cs"), "us": z.get("us")}))
     src["zone"] = zon
+
+    # ---- ⑤ LES FAMILLES NOUVELLES (L1b) ------------------------------------
+    import pickle as _pk
+    fp = os.path.join(CACHE, "l1b_familles.pkl")
+    src["voie_ferree"] = []
+    src["canal"] = []
+    src["surface_reglee"] = []
+    n_new = {}
+    if os.path.exists(fp):
+        with open(fp, "rb") as f:
+            NF = _pk.load(f)["familles"]
+        for fam, d in sorted(NF.items()):
+            for i, o in enumerate(d["objets"]):
+                g = shapely.from_wkb(o["geom"])
+                at = o.get("attrs") or {}
+                if g.is_empty:
+                    continue
+                if fam == "voie_ferree":
+                    nv = at.get("nombre_de_voies")
+                    try:
+                        nv = max(1, int(nv))
+                    except Exception:
+                        nv = 1
+                    w = LARGEUR_FERROVIAIRE["base_m"] + \
+                        LARGEUR_FERROVIAIRE["par_voie_sup_m"] * (nv - 1)
+                    q = valide(g.buffer(0.5 * w, cap_style=BOUT)) \
+                        if g.geom_type in ("LineString", "MultiLineString") \
+                        else valide(g)
+                    src["voie_ferree"].append((q, {
+                        "src": "BD TOPO troncon_de_voie_ferree", "i": i,
+                        "famille": fam, "nature": at.get("nature"),
+                        "voies": nv, "largeur_m": w,
+                        "axe": [[round(float(a), 3), round(float(b), 3)]
+                                for a, b in g.coords]
+                        if g.geom_type == "LineString" else None}))
+                elif fam == "canal":
+                    # l'emprise du canal est celle de sa surface d'eau (donnee) ;
+                    # la largeur des berges et du halage n'est PAS dans la
+                    # donnee -> case ARBITRAGE, on n'invente pas de largeur.
+                    q = valide(g.buffer(2.0, cap_style=BOUT)) \
+                        if g.geom_type in ("LineString", "MultiLineString") \
+                        else valide(g)
+                    src["canal"].append((q, {
+                        "src": "BD TOPO troncon_hydrographique", "i": i,
+                        "famille": fam, "nature": at.get("nature"),
+                        "largeur_arbitrage": True,
+                        "axe": [[round(float(a), 3), round(float(b), 3)]
+                                for a, b in g.coords]
+                        if g.geom_type == "LineString" else None}))
+                elif fam in ("terrain_sport", "parking"):
+                    if g.geom_type not in ("Polygon", "MultiPolygon"):
+                        continue
+                    src["surface_reglee"].append((valide(g), {
+                        "src": "BD TOPO " + ("terrain_de_sport" if
+                                             fam == "terrain_sport"
+                                             else "equipement_de_transport"),
+                        "i": i, "famille": fam, "nature": at.get("nature"),
+                        "assiette_plane": True}))
+                elif fam in ("edicule", "ouvrage_hydro", "tremie",
+                             "mur_declare"):
+                    if g.geom_type in ("LineString", "MultiLineString"):
+                        q = valide(g.buffer(1.0, cap_style=BOUT))
+                    elif g.geom_type in ("Polygon", "MultiPolygon"):
+                        q = valide(g)
+                    else:
+                        continue
+                    ouv.append((q, {"src": "BD TOPO", "famille": fam,
+                                    "nature": at.get("nature"),
+                                    "nature_detaillee":
+                                        at.get("nature_detaillee"),
+                                    "declare": True}))
+                n_new[fam] = n_new.get(fam, 0) + 1
+    src["ouvrage"] = ouv
+    jalon("C1/FAMILLES NOUVELLES integrees a la partition : %s ; preseance "
+          "etendue (provenance %s) : %s"
+          % (json.dumps(n_new, sort_keys=True),
+             PRESEANCE_PROVENANCE["provenance"], " > ".join(PROPS)))
     jalon("C1/SOURCES : %d ouvrages (dont %d ponts et %d escaliers a emprise "
           "derivee de l'axe x largeur_m), %d troncons de voirie, %d emprises de "
           "batiment, %d polygones OCS GE"
@@ -218,7 +329,7 @@ def partition(src, DOM):
             for n, q in enumerate(eclate(g)):
                 if q.area <= AIRE_MIN_M2:
                     continue
-                parcelles.append({"id": "%s/%d#%d" % (k[:3], i, n),
+                parcelles.append({"id": "%s/%d#%d" % (PREFIXE[k], i, n),
                                   "proprietaire": k, "geom": q, "meta": meta})
                 aire += q.area
                 n_ok += 1
@@ -241,8 +352,8 @@ def partition(src, DOM):
     t0 = time.time()
     arch = [p for p in parcelles]          # les parcelles architecturales
     T = STRtree([p["geom"] for p in arch])
-    n_bande = {"ouvrage": 0, "voirie": 0, "batiment": 0, "zone": 0}
-    m_bande = {"ouvrage": 0.0, "voirie": 0.0, "batiment": 0.0, "zone": 0.0}
+    n_bande = {k: 0 for k in DUR + ["zone"]}
+    m_bande = {k: 0.0 for k in DUR + ["zone"]}
     n_large = n_sansvoisin = 0
     aire_org = 0.0
     n_org = 0
@@ -603,6 +714,8 @@ def main():
                "hors_carte": ["%d_%d" % c for c in hors],
                "manquantes_sur_disque": ["%d_%d" % c for c in manq]},
            "preseance": PROPS,
+           "preseance_provenance": PRESEANCE_PROVENANCE,
+           "largeur_ferroviaire": LARGEUR_FERROVIAIRE,
            "reseau_noue": stres,
            "carrefours_n": len(carre),
            "annexion": {"regle": "E0-bis (work/PART/p5_snap.py)",

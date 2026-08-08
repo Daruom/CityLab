@@ -2,199 +2,59 @@
  "arbitrage": {
   "cas": [
    {
-    "a": "ouv/28#0",
-    "b": "org/662#0",
-    "dz_m": 14.12,
-    "dz_max_m": 14.12,
-    "longueur_m": 45.957,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 14.12 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -731.69,
-    "y": 138.32
-   },
-   {
-    "a": "voi/17999#0",
-    "b": "org/662#0",
-    "dz_m": 13.8577,
-    "dz_max_m": 14.0885,
-    "longueur_m": 16.624,
-    "mat": [
-     "eau",
-     "eau"
-    ],
-    "motif": "dZ = 13.86 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -798.65,
-    "y": 93.57
-   },
-   {
-    "a": "ouv/27#0",
-    "b": "org/662#0",
-    "dz_m": 13.5,
-    "dz_max_m": 13.5,
-    "longueur_m": 18.12,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 13.50 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -943.65,
-    "y": 1.42
-   },
-   {
-    "a": "ouv/107#0",
-    "b": "ouv/108#0",
-    "dz_m": 12.96,
-    "dz_max_m": 12.96,
-    "longueur_m": 3.5,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.96 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -809.4,
-    "y": 361.67
-   },
-   {
-    "a": "voi/20020#5",
+    "a": "voi/15085#5",
     "b": "zon/391#2",
-    "dz_m": 12.6579,
-    "dz_max_m": 12.9697,
+    "dz_m": 12.5328,
+    "dz_max_m": 12.9222,
     "longueur_m": 5.996,
     "mat": [
      "mineral",
      "vegetal"
     ],
-    "motif": "dZ = 12.66 m au-dessus du plafond de mur (12.0 m)",
+    "motif": "dZ = 12.53 m au-dessus du plafond de mur (12.0 m)",
     "type": null,
     "x": 1264.16,
     "y": -919.63
-   },
-   {
-    "a": "ouv/14#0",
-    "b": "zon/634#0",
-    "dz_m": 12.58,
-    "dz_max_m": 12.58,
-    "longueur_m": 37.755,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -1343.55,
-    "y": 232.18
-   },
-   {
-    "a": "ouv/14#0",
-    "b": "ouv/129#0",
-    "dz_m": 12.58,
-    "dz_max_m": 12.58,
-    "longueur_m": 4.968,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -1322.68,
-    "y": 238.32
-   },
-   {
-    "a": "ouv/14#0",
-    "b": "ouv/131#0",
-    "dz_m": 12.58,
-    "dz_max_m": 12.58,
-    "longueur_m": 12.167,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -1312.92,
-    "y": 239.99
-   },
-   {
-    "a": "ouv/14#0",
-    "b": "ouv/134#0",
-    "dz_m": 12.58,
-    "dz_max_m": 12.58,
-    "longueur_m": 20.467,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -1303.19,
-    "y": 241.87
-   },
-   {
-    "a": "ouv/14#0",
-    "b": "org/662#0",
-    "dz_m": 12.58,
-    "dz_max_m": 12.58,
-    "longueur_m": 105.566,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -1254.01,
-    "y": 264.13
-   },
-   {
-    "a": "ouv/30#0",
-    "b": "org/1152#0",
-    "dz_m": 12.21,
-    "dz_max_m": 12.21,
-    "longueur_m": 106.753,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.21 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -540.8,
-    "y": 534.31
    }
   ],
-  "m": 377.9,
-  "n": 11
+  "m": 6.0,
+  "n": 1
  },
  "couches": {
   "interfaces.json": {
-   "md5_logique": "bbf3185ae6df3848e03196e2923dd502",
-   "md5_octets": "bbf3185ae6df3848e03196e2923dd502",
-   "octets": 4401
+   "md5_logique": "92dae9a5a3d1e2ba58dcdc14f176d918",
+   "md5_octets": "92dae9a5a3d1e2ba58dcdc14f176d918",
+   "octets": 1826
   },
   "juges.json": {
-   "md5_logique": "122c18bfad8f9cdcd3f83adaa065aeef",
-   "md5_octets": "122c18bfad8f9cdcd3f83adaa065aeef",
-   "octets": 24748
+   "md5_logique": "352094d3729f94c1656b715e29339063",
+   "md5_octets": "352094d3729f94c1656b715e29339063",
+   "octets": 64231
   },
   "matiere.json": {
-   "md5_logique": "220faf6a7b2a919f1597d82b30f19db6",
-   "md5_octets": "220faf6a7b2a919f1597d82b30f19db6",
-   "octets": 4174
+   "md5_logique": "bfa6726a0bbbee5e69fcfaa84e9da428",
+   "md5_octets": "bfa6726a0bbbee5e69fcfaa84e9da428",
+   "octets": 4221
+  },
+  "matrice_mesuree.json": {
+   "md5_logique": "5323ea49feff23d13b5d9097832dfb8d",
+   "md5_octets": "5323ea49feff23d13b5d9097832dfb8d",
+   "octets": 21159
   },
   "niveaux.json": {
-   "md5_logique": "ff43e11b3f655511e2a0cc5c401fa3bf",
-   "md5_octets": "ff43e11b3f655511e2a0cc5c401fa3bf",
-   "octets": 8486
+   "md5_logique": "e4681d2d39da5f2480732c52f9e384ee",
+   "md5_octets": "e4681d2d39da5f2480732c52f9e384ee",
+   "octets": 20168
   },
   "qui.json": {
-   "md5_logique": "b4ee2ef106abd692b73cf5e4d9c79e90",
-   "md5_octets": "b4ee2ef106abd692b73cf5e4d9c79e90",
-   "octets": 3204
+   "md5_logique": "a6f890336d1519ec9f009c06fcd8c6b4",
+   "md5_octets": "a6f890336d1519ec9f009c06fcd8c6b4",
+   "octets": 4575
+  },
+  "solveur.json": {
+   "md5_logique": "12fd1e916ce1f32da68c393e708ccdb2",
+   "md5_octets": "12fd1e916ce1f32da68c393e708ccdb2",
+   "octets": 12797
   }
  },
  "domaine": {
@@ -255,12 +115,12 @@
  "ecarts_chiffres": {
   "conflits_donnee_visible": {
    "dur_peint_vegetal": {
-    "m2": 113108.1,
-    "parcelles": 2653
+    "m2": 121119.5,
+    "parcelles": 2434
    },
    "zone_verte_minerale": {
-    "m2": 936.0,
-    "parcelles": 132
+    "m2": 939.3,
+    "parcelles": 133
    }
   },
   "contre_preuve_z": {
@@ -288,8 +148,8 @@
   "emprise_des_masques": {
    "cellules_masque": 36,
    "cellules_plan": 49,
-   "m2": 615898.3,
-   "parcelles": 344
+   "m2": 616932.7,
+   "parcelles": 352
   }
  },
  "empreintes_sources": {
@@ -302,15 +162,15 @@
  "index_donnees": {
   "convention_decoupe": "parcelle et frontiere DECOUPEES PAR CELLULE",
   "fichier": "data/plan_index.json",
-  "md5_logique": "e4903233bc7570a54b186f9464e2ab47",
-  "md5_octets": "e4903233bc7570a54b186f9464e2ab47",
-  "octets": 31283,
+  "md5_logique": "fd01cf3ccf8376bc00b95fefca72e26d",
+  "md5_octets": "fd01cf3ccf8376bc00b95fefca72e26d",
+  "octets": 52249,
   "totaux": {
-   "instances": 989965,
-   "interfaces_distinctes": 127011,
-   "interfaces_pieces": 130065,
-   "parcelles_distinctes": 60835,
-   "parcelles_pieces": 64496
+   "instances": 981560,
+   "interfaces_distinctes": 117645,
+   "interfaces_pieces": 120734,
+   "parcelles_distinctes": 56006,
+   "parcelles_pieces": 59705
   }
  },
  "invariants": {

@@ -1,23 +1,23 @@
 {
  "ancrage_ouvrages": {
-  "ouvrages_cotes": 79,
-  "parcelles_ancrees": 32
+  "ouvrages_cotes": 25,
+  "parcelles_ancrees": 20
  },
  "bandes": {
-  "en_offset_bordure": 3500,
-  "n": 6575
+  "en_offset_bordure": 3609,
+  "n": 6655
  },
  "carrefours": {
-  "parcelles": 11585
+  "parcelles": 6850
  },
  "communautes": {
-  "communautes_n": 224,
-  "membres_candidats": 2015,
-  "parcelles_couvertes": 649,
+  "communautes_n": 223,
+  "membres_candidats": 2025,
+  "parcelles_couvertes": 650,
   "pires_reliefs": [
    {
     "aire_m2": 10502.1,
-    "id": "comm/1395",
+    "id": "comm/1400",
     "matiere": "vegetal",
     "membres": 5,
     "relief_m": 21.958,
@@ -27,7 +27,7 @@
    },
    {
     "aire_m2": 6708.4,
-    "id": "comm/1390",
+    "id": "comm/1395",
     "matiere": "vegetal",
     "membres": 5,
     "relief_m": 18.298,
@@ -36,8 +36,8 @@
     "z_m": 180.94
    },
    {
-    "aire_m2": 15428.6,
-    "id": "comm/1055",
+    "aire_m2": 15428.4,
+    "id": "comm/1057",
     "matiere": "vegetal",
     "membres": 7,
     "relief_m": 15.682,
@@ -47,7 +47,7 @@
    },
    {
     "aire_m2": 3625.1,
-    "id": "comm/1355",
+    "id": "comm/1357",
     "matiere": "vegetal",
     "membres": 2,
     "relief_m": 14.154,
@@ -57,7 +57,7 @@
    },
    {
     "aire_m2": 4546.1,
-    "id": "comm/1459",
+    "id": "comm/1464",
     "matiere": "vegetal",
     "membres": 2,
     "relief_m": 14.017,
@@ -67,7 +67,7 @@
    },
    {
     "aire_m2": 3519.2,
-    "id": "comm/1387",
+    "id": "comm/1392",
     "matiere": "vegetal",
     "membres": 2,
     "relief_m": 13.395,
@@ -76,18 +76,18 @@
     "z_m": 173.686
    },
    {
-    "aire_m2": 1357.7,
-    "id": "comm/1370",
+    "aire_m2": 1266.4,
+    "id": "comm/1374",
     "matiere": "vegetal",
     "membres": 2,
-    "relief_m": 11.758,
-    "x": 1249.2,
-    "y": -976.6,
-    "z_m": 161.567
+    "relief_m": 11.735,
+    "x": 1248.8,
+    "y": -974.7,
+    "z_m": 161.426
    },
    {
     "aire_m2": 7382.5,
-    "id": "comm/1346",
+    "id": "comm/1348",
     "matiere": "vegetal",
     "membres": 4,
     "relief_m": 11.499,
@@ -97,7 +97,7 @@
    },
    {
     "aire_m2": 11009.2,
-    "id": "comm/1603",
+    "id": "comm/1610",
     "matiere": "vegetal",
     "membres": 4,
     "relief_m": 9.603,
@@ -107,7 +107,7 @@
    },
    {
     "aire_m2": 189.6,
-    "id": "comm/1371",
+    "id": "comm/1375",
     "matiere": "vegetal",
     "membres": 2,
     "relief_m": 9.53,
@@ -117,7 +117,7 @@
    },
    {
     "aire_m2": 1204.8,
-    "id": "comm/1012",
+    "id": "comm/1013",
     "matiere": "vegetal",
     "membres": 2,
     "relief_m": 8.73,
@@ -127,7 +127,7 @@
    },
    {
     "aire_m2": 2851.1,
-    "id": "comm/1350",
+    "id": "comm/1352",
     "matiere": "vegetal",
     "membres": 2,
     "relief_m": 8.637,
@@ -136,8 +136,8 @@
     "z_m": 170.25
    },
    {
-    "aire_m2": 9994.2,
-    "id": "comm/1058",
+    "aire_m2": 9993.8,
+    "id": "comm/1060",
     "matiere": "vegetal",
     "membres": 3,
     "relief_m": 8.501,
@@ -147,7 +147,7 @@
    },
    {
     "aire_m2": 1438.5,
-    "id": "comm/1429",
+    "id": "comm/1434",
     "matiere": "vegetal",
     "membres": 2,
     "relief_m": 7.837,
@@ -157,7 +157,7 @@
    },
    {
     "aire_m2": 9232.9,
-    "id": "comm/1063",
+    "id": "comm/1065",
     "matiere": "vegetal",
     "membres": 2,
     "relief_m": 7.819,
@@ -167,7 +167,7 @@
    },
    {
     "aire_m2": 1717.8,
-    "id": "comm/1558",
+    "id": "comm/1565",
     "matiere": "vegetal",
     "membres": 2,
     "relief_m": 7.801,
@@ -187,7 +187,7 @@
    },
    {
     "aire_m2": 814.6,
-    "id": "comm/1344",
+    "id": "comm/1346",
     "matiere": "vegetal",
     "membres": 2,
     "relief_m": 7.627,
@@ -197,7 +197,7 @@
    },
    {
     "aire_m2": 4396.0,
-    "id": "comm/1053",
+    "id": "comm/1055",
     "matiere": "vegetal",
     "membres": 3,
     "relief_m": 7.448,
@@ -207,7 +207,7 @@
    },
    {
     "aire_m2": 7317.4,
-    "id": "comm/1460",
+    "id": "comm/1465",
     "matiere": "vegetal",
     "membres": 4,
     "relief_m": 7.304,
@@ -217,7 +217,7 @@
    },
    {
     "aire_m2": 8046.2,
-    "id": "comm/1059",
+    "id": "comm/1061",
     "matiere": "vegetal",
     "membres": 3,
     "relief_m": 7.16,
@@ -227,7 +227,7 @@
    },
    {
     "aire_m2": 6298.3,
-    "id": "comm/1045",
+    "id": "comm/1047",
     "matiere": "vegetal",
     "membres": 2,
     "relief_m": 6.869,
@@ -237,7 +237,7 @@
    },
    {
     "aire_m2": 2815.7,
-    "id": "comm/1019",
+    "id": "comm/1020",
     "matiere": "vegetal",
     "membres": 3,
     "relief_m": 6.819,
@@ -247,7 +247,7 @@
    },
    {
     "aire_m2": 7153.9,
-    "id": "comm/1444",
+    "id": "comm/1449",
     "matiere": "vegetal",
     "membres": 4,
     "relief_m": 6.646,
@@ -257,7 +257,7 @@
    },
    {
     "aire_m2": 4107.4,
-    "id": "comm/1056",
+    "id": "comm/1058",
     "matiere": "vegetal",
     "membres": 2,
     "relief_m": 6.389,
@@ -268,8 +268,8 @@
   ],
   "relief": {
    "max_m": 21.958,
-   "median_m": 1.222,
-   "p95_m": 8.617
+   "median_m": 1.22,
+   "p95_m": 8.623
   }
  },
  "constantes_de_norme": {
@@ -309,8 +309,8 @@
  ],
  "lecteur": "work/BERGES/b_lib.py::SolRendu (bilineaire FTerrainSampler + enveloppe des deux triangulations)",
  "noeuds": {
-  "ancres_sur_ouvrage": 256,
-  "n": 14730,
+  "ancres_sur_ouvrage": 42,
+  "n": 11641,
   "rayon_plateau_max_m": 5.5,
   "rayon_plateau_median_m": 1.75
  },
@@ -325,118 +325,813 @@
   "organique drape"
  ],
  "parcelles_par_loi": {
-  "constante": 38892,
-  "drapage": 4908,
-  "profil_troncon": 17169
+  "constante": 34535,
+  "drapage": 4948,
+  "profil_troncon": 16710
  },
  "pente_voirie": {
-  "hors_plafond_cheminement_n": 3714,
-  "hors_plafond_voirie_n": 1580,
-  "max_pc": 356.749,
-  "mediane_pc": 2.353,
-  "p95_pc": 22.134,
+  "hors_plafond_cheminement_n": 3846,
+  "hors_plafond_voirie_n": 1755,
+  "max_pc": 153.731,
+  "mediane_pc": 2.421,
+  "p95_pc": 26.177,
   "pires": [
    {
-    "L_m": 12.327,
-    "id": "voi/13360#0",
-    "pente_pc": 356.749
+    "L_m": 18.014,
+    "id": "voi/11649#0",
+    "pente_pc": 153.731
    },
    {
-    "L_m": 316.602,
-    "id": "voi/16849#0",
-    "pente_pc": 334.84
+    "L_m": 10.322,
+    "id": "voi/13051#0",
+    "pente_pc": 151.398
    },
    {
-    "L_m": 27.123,
-    "id": "voi/15647#0",
-    "pente_pc": 250.696
+    "L_m": 10.322,
+    "id": "voi/13051#1",
+    "pente_pc": 151.398
    },
    {
-    "L_m": 27.123,
-    "id": "voi/15647#1",
-    "pente_pc": 250.696
+    "L_m": 14.939,
+    "id": "voi/9349#0",
+    "pente_pc": 150.503
    },
    {
-    "L_m": 234.796,
-    "id": "voi/14906#0",
-    "pente_pc": 206.709
+    "L_m": 14.939,
+    "id": "voi/9349#1",
+    "pente_pc": 150.503
    },
    {
-    "L_m": 234.796,
-    "id": "voi/14906#1",
-    "pente_pc": 206.709
+    "L_m": 14.939,
+    "id": "voi/9349#2",
+    "pente_pc": 150.503
    },
    {
-    "L_m": 844.859,
-    "id": "voi/15912#1",
-    "pente_pc": 183.75
-   },
-   {
-    "L_m": 844.859,
-    "id": "voi/15912#3",
-    "pente_pc": 183.75
-   },
-   {
-    "L_m": 81.271,
-    "id": "voi/13179#0",
-    "pente_pc": 151.508
-   },
-   {
-    "L_m": 81.271,
-    "id": "voi/13179#1",
-    "pente_pc": 151.508
-   },
-   {
-    "L_m": 5.811,
-    "id": "voi/16607#0",
-    "pente_pc": 135.134
-   },
-   {
-    "L_m": 5.837,
-    "id": "voi/20422#1",
-    "pente_pc": 131.528
+    "L_m": 14.939,
+    "id": "voi/9349#3",
+    "pente_pc": 150.503
    },
    {
     "L_m": 222.107,
-    "id": "voi/18173#0",
-    "pente_pc": 131.328
+    "id": "voi/13238#0",
+    "pente_pc": 147.426
    },
    {
-    "L_m": 93.637,
-    "id": "voi/15914#0",
-    "pente_pc": 125.384
+    "L_m": 5.837,
+    "id": "voi/15487#1",
+    "pente_pc": 128.777
    },
    {
-    "L_m": 93.637,
-    "id": "voi/15914#1",
-    "pente_pc": 125.384
+    "L_m": 222.42,
+    "id": "voi/11280#0",
+    "pente_pc": 118.444
    },
    {
-    "L_m": 40.023,
-    "id": "voi/14360#0",
-    "pente_pc": 124.464
+    "L_m": 221.916,
+    "id": "voi/10563#0",
+    "pente_pc": 115.904
    },
    {
-    "L_m": 40.023,
-    "id": "voi/14360#1",
-    "pente_pc": 124.464
+    "L_m": 4.308,
+    "id": "voi/15495#0",
+    "pente_pc": 113.742
    },
    {
-    "L_m": 40.023,
-    "id": "voi/14360#2",
-    "pente_pc": 124.464
+    "L_m": 8.565,
+    "id": "voi/15200#0",
+    "pente_pc": 109.92
    },
    {
-    "L_m": 40.023,
-    "id": "voi/14360#3",
-    "pente_pc": 124.464
+    "L_m": 246.964,
+    "id": "voi/9218#0",
+    "pente_pc": 105.846
    },
    {
-    "L_m": 40.023,
-    "id": "voi/14360#4",
-    "pente_pc": 124.464
+    "L_m": 4.802,
+    "id": "voi/9567#0",
+    "pente_pc": 103.998
+   },
+   {
+    "L_m": 7.254,
+    "id": "voi/15490#0",
+    "pente_pc": 101.678
+   },
+   {
+    "L_m": 2.081,
+    "id": "voi/15494#0",
+    "pente_pc": 99.359
+   },
+   {
+    "L_m": 2.081,
+    "id": "voi/15494#1",
+    "pente_pc": 99.359
+   },
+   {
+    "L_m": 28.721,
+    "id": "voi/15483#0",
+    "pente_pc": 98.848
+   },
+   {
+    "L_m": 28.721,
+    "id": "voi/15483#1",
+    "pente_pc": 98.848
    }
   ]
+ },
+ "pentes_hors_plafond": {
+  "franchit une rupture de terrain DECLAREE (talus, levee ou mur de soutenement de la donnee)": 33,
+  "le RELEVE lui-meme est a cette pente": 382,
+  "le plateau de carrefour reporte le denivele sur la rampe restante (consequence de la piece nodale)": 545,
+  "rampe d'acces a un ouvrage": 106,
+  "voie pietonne reclassee en emmarchement": 746
+ },
+ "rampes_acces": {
+  "contraintes": [
+   {
+    "denivele_m": 3.514,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 2.78,
+    "longueur_necessaire_m": 29.29,
+    "noeuds": [
+     1810,
+     1808
+    ],
+    "pente_residuelle_pc": 126.64,
+    "troncon": 2161,
+    "x": -1032.0,
+    "y": 331.9
+   },
+   {
+    "denivele_m": 3.945,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 3.97,
+    "longueur_necessaire_m": 32.88,
+    "noeuds": [
+     3786,
+     3803
+    ],
+    "pente_residuelle_pc": 99.49,
+    "troncon": 5954,
+    "x": -523.0,
+    "y": 605.1
+   },
+   {
+    "denivele_m": 2.93,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 2.99,
+    "longueur_necessaire_m": 24.42,
+    "noeuds": [
+     3785,
+     3799
+    ],
+    "pente_residuelle_pc": 97.98,
+    "troncon": 5955,
+    "x": -523.0,
+    "y": 601.6
+   },
+   {
+    "denivele_m": 3.09,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 4.1,
+    "longueur_necessaire_m": 25.75,
+    "noeuds": [
+     2600,
+     2605
+    ],
+    "pente_residuelle_pc": 75.32,
+    "troncon": 4334,
+    "x": -821.1,
+    "y": 77.3
+   },
+   {
+    "denivele_m": 1.454,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 2.03,
+    "longueur_necessaire_m": 12.12,
+    "noeuds": [
+     4417,
+     4406
+    ],
+    "pente_residuelle_pc": 71.64,
+    "troncon": 5544,
+    "x": -332.4,
+    "y": 752.3
+   },
+   {
+    "denivele_m": 2.663,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 4.08,
+    "longueur_necessaire_m": 22.19,
+    "noeuds": [
+     4186,
+     4197
+    ],
+    "pente_residuelle_pc": 65.25,
+    "troncon": 3119,
+    "x": -397.3,
+    "y": 375.6
+   },
+   {
+    "denivele_m": 1.312,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 2.03,
+    "longueur_necessaire_m": 10.93,
+    "noeuds": [
+     4507,
+     4515
+    ],
+    "pente_residuelle_pc": 64.55,
+    "troncon": 4248,
+    "x": -312.0,
+    "y": 606.9
+   },
+   {
+    "denivele_m": 3.759,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 5.84,
+    "longueur_necessaire_m": 31.32,
+    "noeuds": [
+     10473,
+     10467
+    ],
+    "pente_residuelle_pc": 64.4,
+    "troncon": 8172,
+    "x": 1098.5,
+    "y": -90.6
+   },
+   {
+    "denivele_m": 3.582,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 5.81,
+    "longueur_necessaire_m": 29.85,
+    "noeuds": [
+     5103,
+     5128
+    ],
+    "pente_residuelle_pc": 61.71,
+    "troncon": 474,
+    "x": -171.5,
+    "y": 1347.4
+   },
+   {
+    "denivele_m": 2.45,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 4.31,
+    "longueur_necessaire_m": 20.42,
+    "noeuds": [
+     10481,
+     10473
+    ],
+    "pente_residuelle_pc": 56.87,
+    "troncon": 8180,
+    "x": 1102.4,
+    "y": -92.3
+   },
+   {
+    "denivele_m": 0.84,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 1.49,
+    "longueur_necessaire_m": 7.0,
+    "noeuds": [
+     4413,
+     4418
+    ],
+    "pente_residuelle_pc": 56.3,
+    "troncon": 1120,
+    "x": -333.5,
+    "y": 1275.5
+   },
+   {
+    "denivele_m": 3.817,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 7.25,
+    "longueur_necessaire_m": 31.81,
+    "noeuds": [
+     10470,
+     10478
+    ],
+    "pente_residuelle_pc": 52.63,
+    "troncon": 8175,
+    "x": 1094.9,
+    "y": -80.8
+   },
+   {
+    "denivele_m": 2.497,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 4.8,
+    "longueur_necessaire_m": 20.81,
+    "noeuds": [
+     1439,
+     1442
+    ],
+    "pente_residuelle_pc": 52.0,
+    "troncon": 2252,
+    "x": -1122.6,
+    "y": 68.0
+   },
+   {
+    "denivele_m": 0.931,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 1.82,
+    "longueur_necessaire_m": 7.76,
+    "noeuds": [
+     1843,
+     1847
+    ],
+    "pente_residuelle_pc": 51.1,
+    "troncon": 1870,
+    "x": -1022.9,
+    "y": 337.0
+   },
+   {
+    "denivele_m": 4.15,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 8.27,
+    "longueur_necessaire_m": 34.58,
+    "noeuds": [
+     4248,
+     4237
+    ],
+    "pente_residuelle_pc": 50.17,
+    "troncon": 5339,
+    "x": -378.3,
+    "y": 371.2
+   },
+   {
+    "denivele_m": 0.825,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 1.75,
+    "longueur_necessaire_m": 6.87,
+    "noeuds": [
+     4518,
+     4526
+    ],
+    "pente_residuelle_pc": 47.23,
+    "troncon": 6745,
+    "x": -309.6,
+    "y": 632.1
+   },
+   {
+    "denivele_m": 1.878,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 4.08,
+    "longueur_necessaire_m": 15.65,
+    "noeuds": [
+     2605,
+     2614
+    ],
+    "pente_residuelle_pc": 46.0,
+    "troncon": 4334,
+    "x": -819.2,
+    "y": 73.6
+   },
+   {
+    "denivele_m": 2.783,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 6.15,
+    "longueur_necessaire_m": 23.19,
+    "noeuds": [
+     709,
+     693
+    ],
+    "pente_residuelle_pc": 45.28,
+    "troncon": 2090,
+    "x": -1326.3,
+    "y": 263.9
+   },
+   {
+    "denivele_m": 1.668,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 3.73,
+    "longueur_necessaire_m": 13.9,
+    "noeuds": [
+     2690,
+     2694
+    ],
+    "pente_residuelle_pc": 44.67,
+    "troncon": 5285,
+    "x": -803.0,
+    "y": 84.0
+   },
+   {
+    "denivele_m": 1.263,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 2.85,
+    "longueur_necessaire_m": 10.52,
+    "noeuds": [
+     4227,
+     4219
+    ],
+    "pente_residuelle_pc": 44.31,
+    "troncon": 5338,
+    "x": -386.1,
+    "y": 368.8
+   },
+   {
+    "denivele_m": 1.503,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 3.46,
+    "longueur_necessaire_m": 12.52,
+    "noeuds": [
+     852,
+     849
+    ],
+    "pente_residuelle_pc": 43.38,
+    "troncon": 2435,
+    "x": -1291.7,
+    "y": 15.0
+   },
+   {
+    "denivele_m": 1.896,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 5.05,
+    "longueur_necessaire_m": 15.8,
+    "noeuds": [
+     4421,
+     4407
+    ],
+    "pente_residuelle_pc": 37.52,
+    "troncon": 4053,
+    "x": -331.6,
+    "y": 758.0
+   },
+   {
+    "denivele_m": 1.793,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 5.08,
+    "longueur_necessaire_m": 14.94,
+    "noeuds": [
+     3607,
+     3604
+    ],
+    "pente_residuelle_pc": 35.26,
+    "troncon": 8645,
+    "x": -571.6,
+    "y": -1263.8
+   },
+   {
+    "denivele_m": 0.297,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 0.84,
+    "longueur_necessaire_m": 2.47,
+    "noeuds": [
+     2192,
+     2184
+    ],
+    "pente_residuelle_pc": 35.21,
+    "troncon": 4546,
+    "x": -943.9,
+    "y": -6.5
+   },
+   {
+    "denivele_m": 2.817,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 8.05,
+    "longueur_necessaire_m": 23.47,
+    "noeuds": [
+     3574,
+     3589
+    ],
+    "pente_residuelle_pc": 35.01,
+    "troncon": 8645,
+    "x": -580.9,
+    "y": -1289.4
+   },
+   {
+    "denivele_m": 2.726,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 7.91,
+    "longueur_necessaire_m": 22.72,
+    "noeuds": [
+     1856,
+     1881
+    ],
+    "pente_residuelle_pc": 34.45,
+    "troncon": 2162,
+    "x": -1019.1,
+    "y": 334.5
+   },
+   {
+    "denivele_m": 0.428,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 1.3,
+    "longueur_necessaire_m": 3.56,
+    "noeuds": [
+     2628,
+     2636
+    ],
+    "pente_residuelle_pc": 32.79,
+    "troncon": 6861,
+    "x": -814.4,
+    "y": 51.6
+   },
+   {
+    "denivele_m": 1.726,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 5.5,
+    "longueur_necessaire_m": 14.39,
+    "noeuds": [
+     3979,
+     3996
+    ],
+    "pente_residuelle_pc": 31.4,
+    "troncon": 4186,
+    "x": -457.2,
+    "y": 319.1
+   },
+   {
+    "denivele_m": 1.324,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 4.24,
+    "longueur_necessaire_m": 11.03,
+    "noeuds": [
+     1184,
+     1191
+    ],
+    "pente_residuelle_pc": 31.2,
+    "troncon": 1796,
+    "x": -1201.5,
+    "y": 48.1
+   },
+   {
+    "denivele_m": 0.778,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 2.49,
+    "longueur_necessaire_m": 6.48,
+    "noeuds": [
+     1644,
+     1638
+    ],
+    "pente_residuelle_pc": 31.19,
+    "troncon": 2167,
+    "x": -1075.2,
+    "y": 321.5
+   },
+   {
+    "denivele_m": 2.087,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 6.7,
+    "longueur_necessaire_m": 17.39,
+    "noeuds": [
+     785,
+     810
+    ],
+    "pente_residuelle_pc": 31.15,
+    "troncon": 2378,
+    "x": -1304.0,
+    "y": 265.0
+   },
+   {
+    "denivele_m": 3.282,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 10.55,
+    "longueur_necessaire_m": 27.35,
+    "noeuds": [
+     9604,
+     9573
+    ],
+    "pente_residuelle_pc": 31.1,
+    "troncon": 5610,
+    "x": 825.3,
+    "y": -576.0
+   },
+   {
+    "denivele_m": 0.639,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 2.08,
+    "longueur_necessaire_m": 5.33,
+    "noeuds": [
+     9759,
+     9762
+    ],
+    "pente_residuelle_pc": 30.71,
+    "troncon": 3360,
+    "x": 874.2,
+    "y": -591.8
+   },
+   {
+    "denivele_m": 1.145,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 3.74,
+    "longueur_necessaire_m": 9.54,
+    "noeuds": [
+     9575,
+     9589
+    ],
+    "pente_residuelle_pc": 30.62,
+    "troncon": 6765,
+    "x": 818.0,
+    "y": -536.8
+   },
+   {
+    "denivele_m": 2.187,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 7.17,
+    "longueur_necessaire_m": 18.23,
+    "noeuds": [
+     10431,
+     10451
+    ],
+    "pente_residuelle_pc": 30.5,
+    "troncon": 8177,
+    "x": 1081.0,
+    "y": -76.6
+   },
+   {
+    "denivele_m": 1.874,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 6.24,
+    "longueur_necessaire_m": 15.61,
+    "noeuds": [
+     2182,
+     2219
+    ],
+    "pente_residuelle_pc": 30.02,
+    "troncon": 3237,
+    "x": -944.8,
+    "y": -11.6
+   },
+   {
+    "denivele_m": 1.28,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 4.26,
+    "longueur_necessaire_m": 10.66,
+    "noeuds": [
+     3601,
+     3607
+    ],
+    "pente_residuelle_pc": 30.01,
+    "troncon": 8645,
+    "x": -572.6,
+    "y": -1268.0
+   },
+   {
+    "denivele_m": 1.717,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 5.73,
+    "longueur_necessaire_m": 14.31,
+    "noeuds": [
+     780,
+     778
+    ],
+    "pente_residuelle_pc": 29.99,
+    "troncon": 2069,
+    "x": -1305.4,
+    "y": -115.4
+   },
+   {
+    "denivele_m": 0.563,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 1.9,
+    "longueur_necessaire_m": 4.69,
+    "noeuds": [
+     5233,
+     5227
+    ],
+    "pente_residuelle_pc": 29.69,
+    "troncon": 1409,
+    "x": -141.2,
+    "y": 1335.0
+   },
+   {
+    "denivele_m": 1.04,
+    "geles": [
+     false,
+     false
+    ],
+    "longueur_m": 3.63,
+    "longueur_necessaire_m": 8.67,
+    "noeuds": [
+     10097,
+     10088
+    ],
+    "pente_residuelle_pc": 28.62,
+    "troncon": 5769,
+    "x": 963.0,
+    "y": 421.7
+   }
+  ],
+  "cotes_gelees": null,
+  "note_mesure": "aucune de ces paires n'a de cote gelee : ce ne sont pas des rampes coincees mais des ruptures de terrain entre deux noeuds proches",
+  "regle": "la voie rejoint le tablier au plafond de pente de sa classe et s'etend en amont sur la longueur necessaire ; provenance reel (conception routiere des rampes d'acces d'ouvrage)",
+  "ruptures_de_terrain_n": 213
  },
  "reseau_noue": {
   "MARGE_CARREFOUR_M": 0.5,
@@ -444,18 +1139,19 @@
   "SNAP_NOEUD_M": 0.1,
   "axes": 9373,
   "axes_portes_par_un_ouvrage": 491,
-  "carrefours": 12257,
+  "carrefours": 7565,
   "croisements": 17668,
   "croisements_deniveles": 1120,
   "deniveles_par_ecart_z": 0,
   "deniveles_par_ouvrage": 1120,
   "extremites": 18746,
-  "noeuds": 14730,
-  "rayon_disque_median_m": 1.647
+  "fusions_de_carrefour": 3089,
+  "noeuds": 11641,
+  "rayon_disque_median_m": 1.75
  },
  "solidarite_voirie": {
-  "fusions": 859,
-  "parcelles_adoptantes": 859
+  "fusions": 35,
+  "parcelles_adoptantes": 35
  },
  "version": "v2 — solidarite"
 }

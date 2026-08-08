@@ -158,6 +158,18 @@ def main():
         lois = pickle.load(f)["lois"]
     with open(os.path.join(CACHE, "interfaces.pkl"), "rb") as f:
         fronts = pickle.load(f)["fronts"]
+    # L1b-4 : le contrat doit se suffire a lui-meme — familles de matrice,
+    # hauteur du bati, assiettes et terrassements sortent desormais du cache.
+    FAM, ASSIETTES, TERR = {}, [], []
+    try:
+        with open(os.path.join(CACHE, "l1b_solveur.pkl"), "rb") as f:
+            _SV = pickle.load(f)
+        FAM = _SV.get("familles") or {}
+        ASSIETTES = _SV.get("assiettes") or []
+        TERR = _SV.get("terrassements") or []
+    except Exception:
+        pass
+    A_PAR = {a["parcelle"]: a for a in ASSIETTES}
     jalon("C8/ENTREES : %d parcelles, %d frontieres, %d cellules"
           % (len(P), len(fronts), len(cells)))
 
@@ -168,11 +180,47 @@ def main():
     byid = {p["id"]: p for p in P}
     G = [p["geom"] for p in P]
     T = STRtree(G)
+    # ---- PASSE A : ou chaque parcelle a-t-elle REELLEMENT une piece ? -------
+    # (les memes filtres qu'a l'ecriture : aire nulle, intersection vide, et
+    # surtout la deduplication a 1 mm qui fait disparaitre les lamelles)
+    tA = time.time()
+    aires = {}
+    for cx, cy in cells:
+        nom = "%d_%d" % (cx, cy)
+        bx = box(cx * CELL_M, cy * CELL_M, (cx + 1) * CELL_M,
+                 (cy + 1) * CELL_M)
+        for j in T.query(bx):
+            p = P[int(j)]
+            if p["geom"].area <= AIRE_NULLE_M2:
+                continue
+            try:
+                q = valide(p["geom"].intersection(bx))
+            except Exception:
+                continue
+            if q.is_empty or q.area <= 1e-9:
+                continue
+            if not coords(q):
+                continue          # lamelle : rien a ecrire dans cette cellule
+            aires.setdefault(p["id"], {})[nom] = q.area
+    SANS_PIECE = set(p["id"] for p in P if p["id"] not in aires)
     porteuse = {}
-    for p in P:
-        c = p["geom"].representative_point()
-        porteuse[p["id"]] = "%d_%d" % (int(np.floor(c.x / CELL_M)),
-                                       int(np.floor(c.y / CELL_M)))
+    for pid, d in aires.items():
+        porteuse[pid] = sorted(d.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+    sans_piece = sorted(p["id"] for p in P if p["id"] not in aires)
+    chrono("C8/porteuse", time.time() - tA,
+           "%d parcelles situees, %d sans piece" % (len(porteuse),
+                                                    len(sans_piece)))
+    jalon("C8/PORTEUSE : la cellule porteuse est desormais celle ou la piece a "
+          "la PLUS GRANDE AIRE (a egalite, le plus petit nom de cellule) — plus "
+          "le point representatif. %d parcelles situees ; %d parcelles n'ont "
+          "AUCUNE piece emise (lamelles que la deduplication a %.0f mm reduit a "
+          "moins de 4 sommets ; aires de %.2e a %.2e m2) et sont exclues du "
+          "contrat, comptees ici."
+          % (len(porteuse), len(sans_piece), 1.0,
+             min([P[i]["geom"].area for i in range(len(P))
+                  if P[i]["id"] in set(sans_piece)] or [0.0]),
+             max([P[i]["geom"].area for i in range(len(P))
+                  if P[i]["id"] in set(sans_piece)] or [0.0])))
     # geometries de frontiere, calculees UNE fois
     t1 = time.time()
     fgeom = []
@@ -192,6 +240,7 @@ def main():
 
     fichiers = {}
     nulles = set()
+    n_vers = [0]
     par_cell = {}
     n_parc_pieces = n_int_pieces = n_sem = 0
     ids_parc, ids_int = set(), set()
@@ -229,7 +278,12 @@ def main():
             elif forme == "profil_troncon":
                 pr = loi.get("profil") or {}
                 src = loi.get("loi_heritee_de") or p["id"]
-                axe = (byid.get(src, {}).get("meta") or {}).get("axe")
+                # ⚠️ L'axe vit dans la LOI pour les ponts (profil du tablier
+                # declare) et dans la META pour la voirie. Le lire seulement
+                # dans la meta laissait 73 parcelles d'ouvrage avec une loi de
+                # profil SANS axe — les 190 polylignes sans Z de la maquette.
+                axe = loi.get("axe") \
+                    or (byid.get(src, {}).get("meta") or {}).get("axe")
                 lo["profil"] = pr.get("pts")
                 lo["L_m"] = pr.get("L_m")
                 lo["pente_max_pc"] = pr.get("pente_max_pc")
@@ -237,13 +291,48 @@ def main():
             if loi.get("loi_heritee_de"):
                 lo["loi_heritee_de"] = loi["loi_heritee_de"]
             r = {"id": p["id"], "proprietaire": p["proprietaire"],
+                 "famille": FAM.get(p["id"]),
                  "matiere": mat[p["id"]][0], "loi": lo,
                  "aire_m2": round(q.area, 3),
                  "aire_totale_m2": round(g.area, 3),
-                 "cellule_porteuse": porteuse[p["id"]],
+                 "cellule_porteuse": porteuse.get(p["id"], nom),
                  "entiere": bool(abs(q.area - g.area) < 1e-6),
                  "anneaux": an}
             me = p.get("meta") or {}
+            if me.get("h_m") is not None:
+                r["hauteur_m"] = me["h_m"]
+            elif loi.get("hauteur_heritee_m") is not None:
+                r["hauteur_m"] = loi["hauteur_heritee_m"]
+                r["hauteur_heritee_de"] = loi.get("hauteur_heritee_de")
+            # ⚠️ TOUTE EMPRISE D'OUVRAGE DECLARE SON INTRADOS — une cote si
+            # elle porte un tablier, `sans_objet` motive sinon. Le contrat ne
+            # se tait jamais : la maquette doit pouvoir lire un champ, pas
+            # deviner une absence.
+            if p["proprietaire"] == "ouvrage":
+                if loi.get("cote_intrados_m") is not None:
+                    r["intrados"] = loi["cote_intrados_m"]
+                    r["intrados_nature"] = "cote d'intrados de tablier"
+                elif FAM.get(p["id"]) == "dalot":
+                    r["intrados"] = "sans_objet"
+                    r["intrados_motif"] = (
+                        "ouvrage AFFLEURANT (dalot, buse, ponceau) : hauteur "
+                        "declaree inferieure au plus petit gabarit de passage "
+                        "du reel (2,20 m). La route passe dessus, rien ne "
+                        "passe dessous — aucune hauteur libre a exiger.")
+                else:
+                    r["intrados"] = "sans_objet"
+                    r["intrados_motif"] = (
+                        "cet ouvrage ne porte pas de tablier : il n'a pas "
+                        "d'intrados a declarer (famille %s)"
+                        % (FAM.get(p["id"]) or "ouvrage"))
+            if loi.get("profil_intrados"):
+                r["profil_intrados"] = loi["profil_intrados"]
+                r["intrados_note"] = loi.get("intrados_note")
+            for k2 in ("epaisseur_tablier_m", "cote_intrados_m", "portee_m",
+                       "portee_hypothese", "epaisseur_provenance",
+                       "reclasse", "reclasse_motif"):
+                if loi.get(k2) is not None:
+                    r[k2] = loi[k2]
             if me.get("heritee"):
                 r["heritee"] = True
                 r["provenance"] = me.get("provenance")
@@ -279,6 +368,7 @@ def main():
             if not pl:
                 continue
             res = f["type"] or "arbitrage_demande"
+            vers = [x for x in (f["a"], f["b"]) if x in SANS_PIECE]
             r = {"a": f["a"], "b": f["b"], "resolution": res,
                  "matieres": f["mat"], "dz_m": f["dz_m"],
                  "dz_max_m": f["dz_max_m"],
@@ -289,6 +379,12 @@ def main():
                 r["h_m"] = f.get("h_m", f["dz_m"])
             if res == "arbitrage_demande":
                 r["motif"] = f["motif"]
+            if vers:
+                # la parcelle d'en face n'a AUCUNE piece emise (lamelle
+                # reduite a moins de 4 sommets par la deduplication au mm) :
+                # la frontiere est tracable, elle n'est pas silencieuse
+                r["vers_parcelle_non_emise"] = vers
+                n_vers[0] += 1
             I.append(r)
             ids_int.add((f["a"], f["b"]))
         I.sort(key=lambda r: (r["a"], r["b"]))
@@ -318,17 +414,97 @@ def main():
         fichiers["plan_semis_%s.json" % nom] = ecrire(
             os.path.join(DATA, "plan_semis_%s.json" % nom), d)
 
+        # ---- ASSIETTES et TERRASSEMENTS de la cellule ---------------------
+        ids_c = set(r["id"] for r in L)
+        AS = sorted([a for a in ASSIETTES if a["parcelle"] in ids_c],
+                    key=lambda a: a["parcelle"])
+        d = dict(ent)
+        d["regle"] = ("emprise d'appui d'un objet declare ; le nivellement la "
+                      "regle a la cote de l'objet")
+        d["assiettes"] = AS
+        fichiers["plan_assiettes_%s.json" % nom] = ecrire(
+            os.path.join(DATA, "plan_assiettes_%s.json" % nom), d)
+        TE = sorted([t for t in TERR
+                     if t["regle"] in ids_c or t["terrain"] in ids_c],
+                    key=lambda t: (t["regle"], t["terrain"]))
+        d = dict(ent)
+        d["regle"] = ("emprise de raccordement entre un element regle et le "
+                      "terrain : talus si la place existe, soutenement sinon, "
+                      "quai contre l'eau")
+        d["terrassements"] = TE
+        fichiers["plan_terrassements_%s.json" % nom] = ecrire(
+            os.path.join(DATA, "plan_terrassements_%s.json" % nom), d)
         par_cell[nom] = {"parcelles": len(L), "interfaces": len(I),
-                         "instances": len(S)}
+                         "instances": len(S), "assiettes": len(AS),
+                         "terrassements": len(TE)}
         if (n + 1) % 10 == 0:
             jalon("C8/  export : %d / %d cellules (%.0f s)"
                   % (n + 1, len(cells), time.time() - t2))
     chrono("C8/export", time.time() - t2, "%d fichiers" % len(fichiers))
 
+    # ---- LE REGISTRE DES REGLES ENTRE AU CONTRAT ---------------------------
+    # Une mesure de conformite doit etre rejouable depuis le SEUL contrat :
+    # sans le registre, le lecteur connait les valeurs mais pas les regles.
+    try:
+        _reg = json.load(io.open(os.path.join(CACHE, "l1a_matrice.json"),
+                                 encoding="utf-8"))
+        _rj = {"version": "registre/v1",
+               "note": "les regles que le plan applique, avec leur enonce, "
+                       "leur provenance, leur reference, leur invariant et la "
+                       "mesure qui le verifie. Le contrat se suffit ainsi a "
+                       "lui-meme : une conformite se rejoue sans le "
+                       "compilateur.",
+               "contrats": _reg.get("contrats"),
+               "familles": _reg.get("familles"),
+               "regles": _reg.get("registre"),
+               "compteurs_provenance": _reg.get("compteurs_provenance")}
+        fichiers["registre.json"] = ecrire(
+            os.path.join(DATA, "registre.json"), _rj)
+        n_reg = len(_rj["regles"] or [])
+    except Exception as _e:
+        n_reg = 0
+        jalon("C8/⚠️ registre non exporte (%s)" % _e)
+
+    # ---- LE JUGE : 0 piece batie sans hauteur ------------------------------
+    sans_h = []
+    for cx, cy in cells:
+        nom2 = "%d_%d" % (cx, cy)
+        try:
+            d2 = json.load(io.open(os.path.join(
+                DATA, "plan_qui_%s.json" % nom2), encoding="utf-8"))
+        except Exception:
+            continue
+        for r2 in d2["parcelles"]:
+            if r2.get("famille") == "batiment" and r2.get("hauteur_m") is None:
+                sans_h.append(r2["id"])
+    jalon("C8/⭐ JUGE DES HAUTEURS : %d piece(s) batie(s) sans hauteur "
+          "(cible 0)%s ; registre exporte au contrat (%d regles)"
+          % (len(sans_h), (" : %s" % sans_h[:5]) if sans_h else "", n_reg))
+
+    # ---- LE JUGE de la convention de decoupe -------------------------------
+    porteuse_orpheline = sorted(pid for pid, c in porteuse.items()
+                                if c not in aires.get(pid, {}))
+    reconstitue = len(set(porteuse.values() and porteuse.keys()))
+    juges = {
+        "porteuse_sans_piece_n": len(porteuse_orpheline),
+        "porteuse_sans_piece_ids": porteuse_orpheline[:20],
+        "parcelles_du_plan": len(P),
+        "parcelles_emises": len(ids_parc),
+        "parcelles_sans_piece": len(sans_piece),
+        "comptabilite_fermee": bool(len(P) == len(ids_parc) + len(sans_piece)),
+        "porteuses_distinctes_reconstituees": reconstitue}
+    jalon("C8/⭐ JUGE DE LA CONVENTION : %d parcelle(s) dont la porteuse ne "
+          "porte aucune piece (cible 0) | comptabilite : %d parcelles du plan "
+          "= %d emises + %d sans piece -> %s"
+          % (len(porteuse_orpheline), len(P), len(ids_parc), len(sans_piece),
+             "FERMEE" if len(P) == len(ids_parc) + len(sans_piece)
+             else "OUVERTE"))
+
     # ---- l'index ----------------------------------------------------------
     fam = {}
     for k, v in fichiers.items():
-        f = k.split("_")[1]
+        parts = k.split("_")
+        f = parts[1] if len(parts) > 2 else "registre"
         fam.setdefault(f, {"fichiers": 0, "octets": 0})
         fam[f]["fichiers"] += 1
         fam[f]["octets"] += v["octets"]
@@ -354,6 +530,25 @@ def main():
                                "RECOPIES entiers dans chaque cellule concernee"},
         "parcelles_aire_nulle_exclues": {"n": len(nulles),
                                          "ids": sorted(nulles)[:50]},
+        "frontieres_vers_parcelle_non_emise": n_vers[0],
+        "parcelles_sans_piece_exclues": {
+            "n": len(sans_piece), "ids": sans_piece,
+            "cause": "lamelle reduite a moins de 4 sommets par la "
+                     "deduplication a 1 mm"},
+        "champs_ajoutes_L1b4": [
+            "famille (famille de matrice, 19 peuplees)",
+            "hauteur_m (bati, de la donnee attestee par empreintes_sources)",
+            "epaisseur_tablier_m / cote_intrados_m / portee_m (ponts)",
+            "reclasse (voie pietonne hors norme declaree emmarchement)"],
+        "familles_peuplees": sorted(set(v for v in FAM.values() if v)),
+        "regle_cellule_porteuse": "cellule ou la piece a la plus grande aire ; "
+                                  "a egalite d'aire, le plus petit nom de "
+                                  "cellule. Calculee sur les pieces REELLEMENT "
+                                  "emises.",
+        "juges": juges,
+        "registre": {"fichier": "registre.json", "regles": n_reg},
+        "pieces_batie_sans_hauteur": {"n": len(sans_h),
+                                      "ids": sorted(sans_h)[:20]},
         "deduplication_sommets_mm": 1.0,
         "totaux": {"parcelles_distinctes": len(ids_parc),
                    "parcelles_pieces": n_parc_pieces,

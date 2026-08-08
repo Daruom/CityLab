@@ -1,0 +1,949 @@
+{
+ "compteurs_mesure": {
+  "non applicable": 36,
+  "non mesurable": 19,
+  "rouge": 2,
+  "sans objet": 236,
+  "vert": 113
+ },
+ "couche": "MATRICE MESUREE",
+ "non_mesurables": [
+  {
+   "a": "chaussee",
+   "b": "pont",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "trottoir",
+   "b": "pont",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "voie_ferree",
+   "b": "pont",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "canal",
+   "b": "pont",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "carrefour",
+   "b": "pont",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "dalot",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "escalier",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "gradins",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "mur_sout",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "ouvrage_hydro",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "edicule",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "tremie",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "sol_mineral",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "sol_vegetal",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "eau_surface",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "parking",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "terrain_sport",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "batiment",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  },
+  {
+   "a": "pont",
+   "b": "terrain_naturel",
+   "note": "la hauteur libre d'un franchissement n'est pas observable sur un plan 2,5D : le tablier et la voie franchie partagent la meme emprise, une seule des deux la gagne par preseance. Verite STRUCTURELLE a porter a l'etage 2 (le tablier est un objet pose, pas une parcelle de sol)."
+  }
+ ],
+ "population_familles": {
+  "batiment": {
+   "aire_m2": 3190213.0,
+   "parcelles": 24236
+  },
+  "canal": {
+   "aire_m2": 27466.4,
+   "parcelles": 40
+  },
+  "carrefour": {
+   "aire_m2": 99945.6,
+   "parcelles": 6850
+  },
+  "chaussee": {
+   "aire_m2": 1718463.3,
+   "parcelles": 12956
+  },
+  "dalot": {
+   "aire_m2": 7634.6,
+   "parcelles": 62
+  },
+  "eau_surface": {
+   "aire_m2": 704944.9,
+   "parcelles": 160
+  },
+  "edicule": {
+   "aire_m2": 91574.2,
+   "parcelles": 20
+  },
+  "escalier": {
+   "aire_m2": 1796.9,
+   "parcelles": 37
+  },
+  "gradins": {
+   "aire_m2": 294.9,
+   "parcelles": 1
+  },
+  "mur_sout": {
+   "aire_m2": 209369.9,
+   "parcelles": 531
+  },
+  "ouvrage_hydro": {
+   "aire_m2": 11234.3,
+   "parcelles": 13
+  },
+  "parking": {
+   "aire_m2": 44530.7,
+   "parcelles": 167
+  },
+  "pont": {
+   "aire_m2": 16167.7,
+   "parcelles": 56
+  },
+  "sol_mineral": {
+   "aire_m2": 4934859.9,
+   "parcelles": 5067
+  },
+  "sol_vegetal": {
+   "aire_m2": 1027979.0,
+   "parcelles": 1892
+  },
+  "terrain_naturel": {
+   "aire_m2": 915.2,
+   "parcelles": 15
+  },
+  "terrain_sport": {
+   "aire_m2": 36847.3,
+   "parcelles": 27
+  },
+  "tremie": {
+   "aire_m2": 834.2,
+   "parcelles": 6
+  },
+  "trottoir": {
+   "aire_m2": 57189.1,
+   "parcelles": 3894
+  },
+  "voie_ferree": {
+   "aire_m2": 67739.1,
+   "parcelles": 108
+  }
+ },
+ "rouges": [
+  {
+   "a": "chaussee",
+   "b": "carrefour",
+   "contrat": "continuite",
+   "invariant": "0 raccord dont le ressaut depasse 0,02 m entre une piece nodale et un gabarit qui lui est INCIDENT (c'est ce que la piece nodale promet) ; un gabarit qui passe a cote sans y aboutir releve de la jonction",
+   "mesure": {
+    "m_fautif": 328.9,
+    "n_cas": 73,
+    "n_total": 16765,
+    "note": null,
+    "part_pc": 0.44,
+    "pires": [
+     {
+      "a": "voi/5957#0",
+      "b": "voi/14079#0",
+      "dz_m": 9.41,
+      "m": 3.6,
+      "type": "mur",
+      "x": 817.95,
+      "y": -536.84
+     },
+     {
+      "a": "voi/5859#0",
+      "b": "voi/10974#0",
+      "dz_m": 8.96,
+      "m": 1.402,
+      "type": "mur",
+      "x": 785.44,
+      "y": -541.04
+     },
+     {
+      "a": "voi/6250#0",
+      "b": "voi/13414#2",
+      "dz_m": 8.004,
+      "m": 0.776,
+      "type": "mur",
+      "x": 957.2,
+      "y": -204.89
+     },
+     {
+      "a": "voi/1781#0",
+      "b": "voi/13366#0",
+      "dz_m": 7.855,
+      "m": 0.183,
+      "type": "mur",
+      "x": -812.91,
+      "y": 353.25
+     },
+     {
+      "a": "voi/1771#0",
+      "b": "voi/13046#0",
+      "dz_m": 7.529,
+      "m": 2.25,
+      "type": "mur",
+      "x": -815.38,
+      "y": 352.88
+     }
+    ],
+    "statut": "rouge"
+   }
+  },
+  {
+   "a": "chaussee",
+   "b": "sol_vegetal",
+   "contrat": "jonction",
+   "invariant": "0 contact entre deux matieres differentes sans piece du catalogue",
+   "mesure": {
+    "m_fautif": 6.0,
+    "n_cas": 1,
+    "n_total": 2812,
+    "note": null,
+    "part_pc": 0.04,
+    "pires": [
+     {
+      "a": "voi/15085#5",
+      "b": "zon/391#2",
+      "dz_m": 12.5328,
+      "m": 5.996,
+      "type": null,
+      "x": 1264.16,
+      "y": -919.63
+     }
+    ],
+    "statut": "rouge"
+   }
+  }
+ ],
+ "rouges_cas_par_cas": [
+  {
+   "a": "voi/5957#0",
+   "b": "voi/14079#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 9.41,
+   "m": 3.6,
+   "x": 817.95,
+   "y": -536.84
+  },
+  {
+   "a": "voi/5859#0",
+   "b": "voi/10974#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 8.96,
+   "m": 1.402,
+   "x": 785.44,
+   "y": -541.04
+  },
+  {
+   "a": "voi/6250#0",
+   "b": "voi/13414#2",
+   "case": "chaussee x carrefour",
+   "dz_m": 8.004,
+   "m": 0.776,
+   "x": 957.2,
+   "y": -204.89
+  },
+  {
+   "a": "voi/1781#0",
+   "b": "voi/13366#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 7.855,
+   "m": 0.183,
+   "x": -812.91,
+   "y": 353.25
+  },
+  {
+   "a": "voi/1771#0",
+   "b": "voi/13046#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 7.529,
+   "m": 2.25,
+   "x": -815.38,
+   "y": 352.88
+  },
+  {
+   "a": "voi/1774#0",
+   "b": "voi/13366#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 7.438,
+   "m": 0.811,
+   "x": -814.57,
+   "y": 355.84
+  },
+  {
+   "a": "voi/1763#0",
+   "b": "voi/13046#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 7.137,
+   "m": 2.616,
+   "x": -816.7,
+   "y": 355.47
+  },
+  {
+   "a": "voi/6393#0",
+   "b": "voi/15323#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 6.771,
+   "m": 0.273,
+   "x": 1016.08,
+   "y": -67.84
+  },
+  {
+   "a": "voi/5572#0",
+   "b": "voi/13034#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 6.504,
+   "m": 2.787,
+   "x": 688.23,
+   "y": -769.78
+  },
+  {
+   "a": "voi/5500#1",
+   "b": "voi/10841#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 4.85,
+   "m": 3.006,
+   "x": 676.68,
+   "y": -772.79
+  },
+  {
+   "a": "voi/2380#0",
+   "b": "voi/15841#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 4.535,
+   "m": 1.924,
+   "x": -572.77,
+   "y": -1269.09
+  },
+  {
+   "a": "voi/5100#0",
+   "b": "voi/16035#1",
+   "case": "chaussee x carrefour",
+   "dz_m": 3.94,
+   "m": 0.257,
+   "x": 540.09,
+   "y": -1047.8
+  },
+  {
+   "a": "voi/5053#0",
+   "b": "voi/16035#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 3.769,
+   "m": 0.216,
+   "x": 523.67,
+   "y": -1027.27
+  },
+  {
+   "a": "voi/6293#0",
+   "b": "voi/10694#1",
+   "case": "chaussee x carrefour",
+   "dz_m": 3.03,
+   "m": 1.315,
+   "x": 981.52,
+   "y": 659.53
+  },
+  {
+   "a": "voi/6424#0",
+   "b": "voi/8862#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 1.705,
+   "m": 3.93,
+   "x": 1030.05,
+   "y": 1129.51
+  },
+  {
+   "a": "voi/1802#0",
+   "b": "voi/13050#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 1.026,
+   "m": 5.232,
+   "x": -805.67,
+   "y": 358.05
+  },
+  {
+   "a": "voi/1550#0",
+   "b": "voi/9033#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.95,
+   "m": 2.787,
+   "x": -918.27,
+   "y": 320.02
+  },
+  {
+   "a": "voi/5003#0",
+   "b": "voi/7814#1",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.866,
+   "m": 2.787,
+   "x": 502.49,
+   "y": 1332.98
+  },
+  {
+   "a": "voi/5003#0",
+   "b": "voi/7815#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.866,
+   "m": 1.622,
+   "x": 500.27,
+   "y": 1332.98
+  },
+  {
+   "a": "voi/6397#0",
+   "b": "voi/15322#2",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.736,
+   "m": 1.516,
+   "x": 1018.9,
+   "y": -58.14
+  },
+  {
+   "a": "voi/1082#0",
+   "b": "voi/9535#5",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.686,
+   "m": 2.576,
+   "x": -1086.85,
+   "y": -993.25
+  },
+  {
+   "a": "voi/2456#0",
+   "b": "voi/15841#2",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.677,
+   "m": 0.614,
+   "x": -541.46,
+   "y": -1276.38
+  },
+  {
+   "a": "voi/2419#0",
+   "b": "voi/8430#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.551,
+   "m": 0.327,
+   "x": -558.32,
+   "y": 1432.98
+  },
+  {
+   "a": "voi/5204#0",
+   "b": "voi/7910#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.39,
+   "m": 2.702,
+   "x": 573.26,
+   "y": 1351.91
+  },
+  {
+   "a": "voi/6279#1",
+   "b": "voi/14571#2",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.346,
+   "m": 2.683,
+   "x": 977.32,
+   "y": 375.31
+  },
+  {
+   "a": "voi/2117#0",
+   "b": "voi/15819#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.3277,
+   "m": 10.336,
+   "x": -679.44,
+   "y": -1066.29
+  },
+  {
+   "a": "voi/4928#0",
+   "b": "voi/8242#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.31,
+   "m": 2.576,
+   "x": 474.66,
+   "y": 1350.13
+  },
+  {
+   "a": "voi/5105#0",
+   "b": "voi/7814#2",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.266,
+   "m": 1.442,
+   "x": 540.38,
+   "y": 1342.23
+  },
+  {
+   "a": "voi/5105#0",
+   "b": "voi/7812#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.266,
+   "m": 4.009,
+   "x": 543.29,
+   "y": 1341.5
+  },
+  {
+   "a": "voi/1814#0",
+   "b": "voi/16191#4",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.185,
+   "m": 3.886,
+   "x": -802.49,
+   "y": -1201.35
+  },
+  {
+   "a": "voi/1892#0",
+   "b": "voi/16195#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.152,
+   "m": 2.812,
+   "x": -766.8,
+   "y": -1222.16
+  },
+  {
+   "a": "voi/6378#0",
+   "b": "voi/10977#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.148,
+   "m": 1.655,
+   "x": 1007.23,
+   "y": 105.85
+  },
+  {
+   "a": "voi/1847#0",
+   "b": "voi/16196#1",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.145,
+   "m": 2.611,
+   "x": -784.87,
+   "y": -1211.64
+  },
+  {
+   "a": "voi/7152#0",
+   "b": "voi/16629#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.1382,
+   "m": 14.077,
+   "x": 1528.77,
+   "y": -1186.67
+  },
+  {
+   "a": "voi/1887#0",
+   "b": "voi/11806#4",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.13,
+   "m": 12.048,
+   "x": -768.9,
+   "y": 381.87
+  },
+  {
+   "a": "voi/4782#0",
+   "b": "voi/12820#1",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.1156,
+   "m": 6.375,
+   "x": 418.06,
+   "y": 265.61
+  },
+  {
+   "a": "voi/3192#0",
+   "b": "voi/11500#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.111,
+   "m": 4.382,
+   "x": -196.12,
+   "y": -292.69
+  },
+  {
+   "a": "voi/6854#0",
+   "b": "voi/15385#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.1102,
+   "m": 5.202,
+   "x": 1347.92,
+   "y": -160.16
+  },
+  {
+   "a": "voi/2476#0",
+   "b": "voi/10618#1",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.108,
+   "m": 4.555,
+   "x": -536.35,
+   "y": 637.22
+  },
+  {
+   "a": "voi/5072#0",
+   "b": "voi/11276#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.1073,
+   "m": 3.586,
+   "x": 526.57,
+   "y": 170.31
+  },
+  {
+   "a": "voi/5874#0",
+   "b": "voi/13030#1",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.1054,
+   "m": 10.236,
+   "x": 791.76,
+   "y": -296.0
+  },
+  {
+   "a": "voi/6379#0",
+   "b": "voi/10977#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.094,
+   "m": 1.665,
+   "x": 1007.21,
+   "y": 101.32
+  },
+  {
+   "a": "voi/6729#0",
+   "b": "voi/8863#2",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.083,
+   "m": 0.082,
+   "x": 1252.05,
+   "y": 1461.28
+  },
+  {
+   "a": "voi/6835#0",
+   "b": "voi/15289#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0823,
+   "m": 14.305,
+   "x": 1333.15,
+   "y": -1011.52
+  },
+  {
+   "a": "voi/6311#0",
+   "b": "voi/8249#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0783,
+   "m": 4.653,
+   "x": 992.29,
+   "y": 1148.78
+  },
+  {
+   "a": "voi/4708#0",
+   "b": "voi/10870#4",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0726,
+   "m": 2.479,
+   "x": 388.98,
+   "y": -551.64
+  },
+  {
+   "a": "voi/2665#0",
+   "b": "voi/13330#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0708,
+   "m": 2.826,
+   "x": -439.73,
+   "y": -193.96
+  },
+  {
+   "a": "voi/1739#0",
+   "b": "voi/13208#2",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0689,
+   "m": 2.871,
+   "x": -825.09,
+   "y": -704.1
+  },
+  {
+   "a": "voi/5620#0",
+   "b": "voi/8082#6",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0618,
+   "m": 1.57,
+   "x": 697.83,
+   "y": 1063.76
+  },
+  {
+   "a": "voi/7198#0",
+   "b": "voi/15358#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0559,
+   "m": 3.632,
+   "x": 1551.36,
+   "y": -378.26
+  },
+  {
+   "a": "voi/1995#0",
+   "b": "voi/13393#1",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0479,
+   "m": 2.531,
+   "x": -725.69,
+   "y": 430.34
+  },
+  {
+   "a": "voi/5840#0",
+   "b": "voi/13032#1",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0451,
+   "m": 8.117,
+   "x": 775.85,
+   "y": -335.44
+  },
+  {
+   "a": "voi/1361#0",
+   "b": "voi/10480#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.041,
+   "m": 2.787,
+   "x": -975.59,
+   "y": -812.15
+  },
+  {
+   "a": "voi/6360#0",
+   "b": "voi/15043#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.04,
+   "m": 5.971,
+   "x": 1007.99,
+   "y": 482.67
+  },
+  {
+   "a": "voi/6360#0",
+   "b": "voi/15218#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.04,
+   "m": 7.697,
+   "x": 1004.12,
+   "y": 476.87
+  },
+  {
+   "a": "voi/6360#0",
+   "b": "voi/15047#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.04,
+   "m": 7.64,
+   "x": 1004.12,
+   "y": 487.39
+  },
+  {
+   "a": "voi/6068#0",
+   "b": "voi/11918#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0394,
+   "m": 7.17,
+   "x": 874.64,
+   "y": -636.64
+  },
+  {
+   "a": "voi/5970#0",
+   "b": "voi/11540#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0381,
+   "m": 2.55,
+   "x": 822.06,
+   "y": -494.63
+  },
+  {
+   "a": "voi/5514#0",
+   "b": "voi/13034#1",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.038,
+   "m": 2.788,
+   "x": 679.64,
+   "y": -765.57
+  },
+  {
+   "a": "voi/3133#0",
+   "b": "voi/12842#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.035,
+   "m": 14.131,
+   "x": -226.64,
+   "y": -592.04
+  },
+  {
+   "a": "voi/1890#0",
+   "b": "voi/13897#2",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0349,
+   "m": 1.734,
+   "x": -767.75,
+   "y": 407.63
+  },
+  {
+   "a": "voi/271#0",
+   "b": "voi/7321#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0329,
+   "m": 12.921,
+   "x": -1435.8,
+   "y": 1249.7
+  },
+  {
+   "a": "voi/1878#0",
+   "b": "voi/10873#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0322,
+   "m": 3.646,
+   "x": -774.08,
+   "y": 651.63
+  },
+  {
+   "a": "voi/3100#0",
+   "b": "voi/7851#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.032,
+   "m": 15.739,
+   "x": -231.69,
+   "y": 1145.08
+  },
+  {
+   "a": "voi/5958#0",
+   "b": "voi/13635#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0292,
+   "m": 8.855,
+   "x": 818.83,
+   "y": 534.11
+  },
+  {
+   "a": "voi/1977#0",
+   "b": "voi/11513#2",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0286,
+   "m": 5.911,
+   "x": -735.1,
+   "y": -732.89
+  },
+  {
+   "a": "voi/743#0",
+   "b": "voi/9330#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0283,
+   "m": 6.256,
+   "x": -1232.23,
+   "y": -982.07
+  },
+  {
+   "a": "voi/7043#0",
+   "b": "voi/15132#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.025,
+   "m": 3.018,
+   "x": 1458.53,
+   "y": -549.32
+  },
+  {
+   "a": "voi/3302#0",
+   "b": "voi/10431#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0238,
+   "m": 15.087,
+   "x": -158.87,
+   "y": 489.04
+  },
+  {
+   "a": "voi/1556#0",
+   "b": "voi/12596#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0235,
+   "m": 3.117,
+   "x": -909.83,
+   "y": -155.33
+  },
+  {
+   "a": "voi/3382#0",
+   "b": "voi/8334#0",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0228,
+   "m": 5.037,
+   "x": -130.68,
+   "y": 1015.79
+  },
+  {
+   "a": "voi/6921#0",
+   "b": "voi/15018#1",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.022,
+   "m": 7.957,
+   "x": 1393.09,
+   "y": 37.46
+  },
+  {
+   "a": "voi/4863#0",
+   "b": "voi/10367#1",
+   "case": "chaussee x carrefour",
+   "dz_m": 0.0212,
+   "m": 6.183,
+   "x": 447.85,
+   "y": 535.97
+  },
+  {
+   "a": "voi/15085#5",
+   "b": "zon/391#2",
+   "case": "chaussee x sol_vegetal",
+   "dz_m": 12.5328,
+   "m": 5.996,
+   "x": 1264.16,
+   "y": -919.63
+  }
+ ],
+ "seuils": {
+  "BORDURE_MAX_M": 0.2,
+  "RESSAUT_MAX_M": 0.02
+ }
+}

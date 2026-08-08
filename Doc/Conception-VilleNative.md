@@ -161,6 +161,31 @@ construction.
 fidélité devraient en résoudre l'essentiel — le reste en A/B) · ③ verdict berge /
 escaliers Saint-Pierre (assiettes) · ④ statuts de la table de recensement.
 
+## ✅ ÉTAT AU 2026-08-08 SOIR — ÉTAPES 0 ET 1 LIVRÉES, MAQUETTE EN REVUE UTILISATEUR
+
+**Tout l'arc L0→L1c est FAIT** (~10 lots, une journée) : recensement 569 natures
+100 % statuées · matrice 28 familles / 406 cases 0 sans statut, **113 vertes /
+2 rouges justifiés cas par cas** · registre 24 règles parti de VIDE (réel 15 /
+donnée 6 / arbitrage 3), EXPORTÉ AU CONTRAT · solveur global (assiettes 25 090,
+terrassements 31 004 dont remblais de rampe, dalots CONTINUS dZ médian 0,0000,
+intrados en long) · contrat `fd01cf3ccf8376bc00b95fefca72e26d` (247 fichiers,
+408 Mo, idempotent, se suffit à lui-même — `--contrat-seul` PASSE à 0 pièce
+perdue) · **MAQUETTE BLANCHE 3D** : `work/PLAN/maquette/web/index.html`
+(WebGL2 maison, 3,84 M tri, 340-500 fps, 7 couches, carte des marches 3D,
+tournée 282 signets) + `mq_maquette.blend` (Blender secours, comptes identiques).
+Dégagements mesurés à l'aplomb : **5 ponts bas RÉELS confirmés par la donnée**
+(2 rail 2,60/2,98 m, 3 eau) → signets. Trous d'écran élucidés (domaine fini,
+pavage du contrat prouvé 100,00 %) → socle hors-comptes.
+**RÉSIDUS OUVERTS (dossier de revue)** : écart de comptage dalots 75 interfaces
+vs 130 pièces (deux unités, à réconcilier) · 7 cases dégagement structurellement
+sans verdict (tabliers longeants) · constantes de méthode maquette (APLOMB_TOL
+1 m, EAU_RECHERCHE 30 m) non balayées · préséance intra-ouvrage (le bloc berge
+absorbe l'emprise des tabliers) nommée non corrigée · 322 px de fond expliqués
+par construction · 2 rouges matrice (73 chaussée|carrefour nommés + 1 hors-
+catalogue 6 m). Leçons majeures : lecture déchirée pendant re-export (garde
+fichier-par-fichier contre l'index) ; un scalaire ne code pas un profil
+(intrados en long) ; les instruments doivent partager leurs unités de compte.
+
 ## Ordre des lots (chacun avec critère d'arrêt, jugés un par un)
 - **L0 — RECENSEMENT** (compilateur, zéro Unreal) : la table nature→mécanique→
   statut sur l'agglo + grille des milieux → TA revue en une passe.

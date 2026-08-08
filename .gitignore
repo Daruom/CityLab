@@ -39,3 +39,5 @@ SourceData/*.avant_interstices.json
 SourceData/PlanVille/data/plan_qui_*.json
 SourceData/PlanVille/data/plan_interfaces_*.json
 SourceData/PlanVille/data/plan_semis_*.json
+SourceData/PlanVille/data/plan_assiettes_*.json
+SourceData/PlanVille/data/plan_terrassements_*.json

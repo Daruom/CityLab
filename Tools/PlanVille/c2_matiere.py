@@ -180,7 +180,8 @@ def matiere(p, EAU, M):
     f, n = fraction_vegetal(g, M)
     out["px"] = n
     out["veg_pc"] = None if f is None else round(100.0 * f, 3)
-    if prop in ("ouvrage", "voirie", "batiment"):
+    if prop in ("ouvrage", "voirie", "batiment", "voie_ferree",
+                "surface_reglee"):
         out["regle"] = "M1"
         return "mineral", out
     if f is None:
@@ -226,7 +227,8 @@ def main():
             a_sans_masque += p["geom"].area
         # CONFLITS donnee / visible — comptes, jamais resolus en silence
         if info["veg_pc"] is not None:
-            if p["proprietaire"] in ("voirie", "batiment", "ouvrage") \
+            if p["proprietaire"] in ("voirie", "batiment", "ouvrage",
+                                     "voie_ferree", "surface_reglee") \
                     and info["veg_pc"] >= 100.0 * SEUIL_VEG:
                 conflits["dur_peint_vegetal"].append(
                     (p["geom"].area, p["id"], info["veg_pc"]))
@@ -295,7 +297,7 @@ def main():
     rep = {"couche": "MATIERE",
            "regles": {"M0": "eau : >= %.0f %% de l'aire dans une surface d'eau"
                             % (100 * SEUIL_EAU),
-                      "M1": "mineral : ouvrage / voirie / batiment",
+                      "M1": "mineral : ouvrage / voie ferree / voirie / batiment / surface reglee (le canal releve de M0 par son eau)",
                       "M2": "vegetal : zone ou organique, >= %.0f %% de pixels "
                             "de masque R < %d" % (100 * SEUIL_VEG, SEUIL_R),
                       "M3": "mineral : zone ou organique sinon",

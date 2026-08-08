@@ -35,6 +35,12 @@ from c0_socle import SRC, charge_json, jalon
 SNAP_NOEUD_M = 0.10           # deux points a moins de 10 cm = UN noeud
 MARGE_CARREFOUR_M = 0.50      # marge du plateau au-dela de la demi-largeur
 SEUIL_DENIVELE_M = 2.50       # au-dela, le croisement est un FRANCHISSEMENT
+MIN_RAMPE_M = 2.00            # entre deux carrefours DISTINCTS il faut la place
+#                               d'une rampe ; sans cette place, ce n'est pas
+#                               deux carrefours mais un seul (mesure : deux
+#                               plateaux dont les bords se touchaient a 5 cm
+#                               obligeaient le profil a franchir 1,11 m sur
+#                               0,048 m, soit 2 306 % de pente)
 PART_PLATEAU_MAX = 0.25       # un plateau ne mange jamais plus d'un quart
 #                               du troncon a chaque bout
 TOL_PONT_M = 3.00             # distance a un axe de pont declare
@@ -164,24 +170,65 @@ def reseau(axes, sol, journal=True):
         NY.append(float(np.mean([q[1] for q in L2])))
     NX, NY = np.asarray(NX), np.asarray(NY)
 
-    # ---- rayon de plateau et troncons incidents ------------------------------
-    TN = STRtree([Point(x, y) for x, y in zip(NX, NY)])
-    RN = np.zeros(len(NX))
-    INC = {}
-    for k, l in enumerate(LS):
-        w = float(axes[cles[k]].get("w") or 6.0)
-        for j in TN.query(l.buffer(SNAP_NOEUD_M)):
+    # ---- FUSION DES CARREFOURS QUI SE RECOUVRENT ---------------------------
+    # (rayon provisoire, puis fusion, puis rayon definitif)
+    def _rayons(NX, NY):
+        TN = STRtree([Point(x, y) for x, y in zip(NX, NY)])
+        RN = np.zeros(len(NX))
+        INC = {}
+        for k, l in enumerate(LS):
+            w = float(axes[cles[k]].get("w") or 6.0)
+            for j in TN.query(l.buffer(SNAP_NOEUD_M)):
+                j = int(j)
+                if l.distance(Point(NX[j], NY[j])) > SNAP_NOEUD_M:
+                    continue
+                INC.setdefault(j, set()).add(cles[k])
+                RN[j] = max(RN[j], 0.5 * w + MARGE_CARREFOUR_M)
+        for j in range(len(RN)):
+            if len(INC.get(j, ())) < 2:
+                RN[j] = 0.0
+        return TN, RN, INC
+
+    TN, RN, INC = _rayons(NX, NY)
+    par = {k: k for k in range(len(NX))}
+
+    def _rac(k):
+        while par[k] != k:
+            par[k] = par[par[k]]
+            k = par[k]
+        return k
+
+    n_fus = 0
+    for i in range(len(NX)):
+        if RN[i] <= 0:
+            continue
+        for j in TN.query(Point(NX[i], NY[i]).buffer(float(RN[i]))):
             j = int(j)
-            if l.distance(Point(NX[j], NY[j])) > SNAP_NOEUD_M:
+            if j <= i or RN[j] <= 0:
                 continue
-            INC.setdefault(j, set()).add(cles[k])
-            RN[j] = max(RN[j], 0.5 * w + MARGE_CARREFOUR_M)
-    n_vrai = 0
-    for j in range(len(RN)):
-        if len(INC.get(j, ())) < 2:
-            RN[j] = 0.0           # cul-de-sac ou bord : pas de carrefour
-        else:
-            n_vrai += 1
+            d = math.dist((NX[i], NY[i]), (NX[j], NY[j]))
+            if d < RN[i] + RN[j] + MIN_RAMPE_M:
+                ri, rj = _rac(i), _rac(j)
+                if ri != rj:
+                    par[max(ri, rj)] = min(ri, rj)
+                    n_fus += 1
+    grp = {}
+    for k in range(len(NX)):
+        grp.setdefault(_rac(k), []).append(k)
+    if n_fus:
+        NX2, NY2 = [], []
+        for r in sorted(grp):
+            ks = grp[r]
+            NX2.append(float(np.mean([NX[k] for k in ks])))
+            NY2.append(float(np.mean([NY[k] for k in ks])))
+        NX, NY = np.asarray(NX2), np.asarray(NY2)
+    TN, RN, INC = _rayons(NX, NY)
+    if journal:
+        jalon("RESEAU/FUSION DES CARREFOURS : %d fusions — deux intersections "
+              "dont les disques se recouvrent ne sont pas deux carrefours mais "
+              "UN seul, et un carrefour est UN plateau ; %d noeuds apres "
+              "fusion" % (n_fus, len(NX)))
+    n_vrai = int(sum(1 for j in range(len(RN)) if RN[j] > 0))
 
     # ---- LE RAYON EFFECTIF, partage entre C1 et C3 --------------------------
     # r_eff(troncon, noeud) : le rayon que le PROFIL pourra reellement aplatir,
@@ -204,11 +251,17 @@ def reseau(axes, sol, journal=True):
         for n, (s0, j) in enumerate(js):
             if RN[j] <= 0.0:
                 continue
+            # ⚠️ DEUX PLATEAUX VOISINS LAISSENT LA PLACE D'UNE RAMPE ENTRE EUX.
+            # En s'arretant a la MOITIE de l'ecart, ils se touchaient exactement
+            # au milieu : deux bords a cote l'un de l'autre, cotes differentes,
+            # donc une falaise dans le profil (mesure : 0,69 m d'ecart pour
+            # 0,267 m de denivele, et jusqu'a 2 306 % de pente). On retranche la
+            # rampe de l'ecart avant de le partager.
             r = min(float(RN[j]), PART_PLATEAU_MAX * Lg)
             if n > 0:
-                r = min(r, 0.5 * (s0 - js[n - 1][0]))
+                r = min(r, 0.5 * max(0.0, s0 - js[n - 1][0] - MIN_RAMPE_M))
             if n < len(js) - 1:
-                r = min(r, 0.5 * (js[n + 1][0] - s0))
+                r = min(r, 0.5 * max(0.0, js[n + 1][0] - s0 - MIN_RAMPE_M))
             r = max(r, 0.0)
             REFF[(cles[k], j)] = r
     for j in range(len(NX)):
@@ -223,6 +276,7 @@ def reseau(axes, sol, journal=True):
           "deniveles_par_ouvrage": n_den_ouv,
           "deniveles_par_ecart_z": n_den_z,
           "noeuds": int(len(NX)), "carrefours": n_vrai,
+          "fusions_de_carrefour": n_fus,
           "axes_portes_par_un_ouvrage": int(sum(porte)),
           "SEUIL_DENIVELE_M": SEUIL_DENIVELE_M,
           "SNAP_NOEUD_M": SNAP_NOEUD_M,

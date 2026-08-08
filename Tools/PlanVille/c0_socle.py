@@ -45,7 +45,11 @@ sys.path.insert(0, r"C:\LidarPoC\work\BERGES")
 sys.path.insert(0, r"C:\LidarPoC\work\DISCONT")
 
 CELL_M = 500.0
-PROPS = ["ouvrage", "voirie", "batiment", "zone", "organique"]
+# reel : plus petit gabarit de passage du registre (cheminement pieton,
+# arrete du 15/01/2007). En dessous, rien ne passe : l'ouvrage est AFFLEURANT.
+SEUIL_OUVRAGE_AFFLEURANT_M = 2.20
+PROPS = ["ouvrage", "voie_ferree", "canal", "voirie", "batiment",
+         "surface_reglee", "zone", "organique"]
 
 _T0 = time.time()
 

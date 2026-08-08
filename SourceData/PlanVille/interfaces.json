@@ -2,173 +2,23 @@
  "arbitrage": {
   "cas": [
    {
-    "a": "ouv/28#0",
-    "b": "org/662#0",
-    "dz_m": 14.12,
-    "dz_max_m": 14.12,
-    "longueur_m": 45.957,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 14.12 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -731.69,
-    "y": 138.32
-   },
-   {
-    "a": "voi/17999#0",
-    "b": "org/662#0",
-    "dz_m": 13.8577,
-    "dz_max_m": 14.0885,
-    "longueur_m": 16.624,
-    "mat": [
-     "eau",
-     "eau"
-    ],
-    "motif": "dZ = 13.86 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -798.65,
-    "y": 93.57
-   },
-   {
-    "a": "ouv/27#0",
-    "b": "org/662#0",
-    "dz_m": 13.5,
-    "dz_max_m": 13.5,
-    "longueur_m": 18.12,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 13.50 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -943.65,
-    "y": 1.42
-   },
-   {
-    "a": "ouv/107#0",
-    "b": "ouv/108#0",
-    "dz_m": 12.96,
-    "dz_max_m": 12.96,
-    "longueur_m": 3.5,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.96 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -809.4,
-    "y": 361.67
-   },
-   {
-    "a": "voi/20020#5",
+    "a": "voi/15085#5",
     "b": "zon/391#2",
-    "dz_m": 12.6579,
-    "dz_max_m": 12.9697,
+    "dz_m": 12.5328,
+    "dz_max_m": 12.9222,
     "longueur_m": 5.996,
     "mat": [
      "mineral",
      "vegetal"
     ],
-    "motif": "dZ = 12.66 m au-dessus du plafond de mur (12.0 m)",
+    "motif": "dZ = 12.53 m au-dessus du plafond de mur (12.0 m)",
     "type": null,
     "x": 1264.16,
     "y": -919.63
-   },
-   {
-    "a": "ouv/14#0",
-    "b": "zon/634#0",
-    "dz_m": 12.58,
-    "dz_max_m": 12.58,
-    "longueur_m": 37.755,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -1343.55,
-    "y": 232.18
-   },
-   {
-    "a": "ouv/14#0",
-    "b": "ouv/129#0",
-    "dz_m": 12.58,
-    "dz_max_m": 12.58,
-    "longueur_m": 4.968,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -1322.68,
-    "y": 238.32
-   },
-   {
-    "a": "ouv/14#0",
-    "b": "ouv/131#0",
-    "dz_m": 12.58,
-    "dz_max_m": 12.58,
-    "longueur_m": 12.167,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -1312.92,
-    "y": 239.99
-   },
-   {
-    "a": "ouv/14#0",
-    "b": "ouv/134#0",
-    "dz_m": 12.58,
-    "dz_max_m": 12.58,
-    "longueur_m": 20.467,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -1303.19,
-    "y": 241.87
-   },
-   {
-    "a": "ouv/14#0",
-    "b": "org/662#0",
-    "dz_m": 12.58,
-    "dz_max_m": 12.58,
-    "longueur_m": 105.566,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.58 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -1254.01,
-    "y": 264.13
-   },
-   {
-    "a": "ouv/30#0",
-    "b": "org/1152#0",
-    "dz_m": 12.21,
-    "dz_max_m": 12.21,
-    "longueur_m": 106.753,
-    "mat": [
-     "mineral",
-     "eau"
-    ],
-    "motif": "dZ = 12.21 m au-dessus du plafond de mur (12.0 m)",
-    "type": null,
-    "x": -540.8,
-    "y": 534.31
    }
   ],
-  "m": 377.9,
-  "n": 11
+  "m": 6.0,
+  "n": 1
  },
  "bornes_m": {
   "AFFLEUREMENT_M": 0.02,
@@ -186,56 +36,74 @@
   "mur"
  ],
  "couche": "INTERFACES",
- "frontieres_n": 127011,
+ "frontieres_n": 117645,
  "invariants": {
   "dz_hors_bornes_n": 0,
   "mineral_sur_vegetal_vegetal_n": 0,
   "sans_resolution_ni_arbitrage_n": 0
  },
- "lineaire_m": 1467536.0,
+ "lineaire_m": 1468286.7,
  "murs_par_couple_de_proprietaires": {
-  "bat|bat": 6343,
-  "bat|bnd": 2307,
-  "bat|org": 5127,
+  "bat|bat": 5454,
+  "bat|bnd": 2147,
+  "bat|fer": 2,
+  "bat|org": 6092,
   "bat|ouv": 113,
-  "bat|tro": 1,
-  "bat|voi": 1531,
-  "bat|zon": 739,
-  "bnd|ouv": 103,
-  "bnd|tro": 1,
-  "bnd|voi": 972,
-  "bnd|zon": 751,
-  "org|ouv": 175,
-  "org|voi": 1050,
-  "org|zon": 825,
-  "ouv|ouv": 94,
-  "ouv|tro": 1,
-  "ouv|voi": 916,
-  "ouv|zon": 281,
-  "voi|voi": 1556,
-  "voi|zon": 1831,
-  "zon|zon": 13
+  "bat|sur": 8,
+  "bat|voi": 1600,
+  "bat|zon": 742,
+  "bnd|fer": 19,
+  "bnd|ouv": 131,
+  "bnd|sur": 16,
+  "bnd|voi": 974,
+  "bnd|zon": 768,
+  "can|fer": 1,
+  "can|org": 13,
+  "can|ouv": 6,
+  "can|voi": 10,
+  "fer|fer": 6,
+  "fer|org": 48,
+  "fer|ouv": 47,
+  "fer|sur": 4,
+  "fer|voi": 36,
+  "fer|zon": 1,
+  "org|ouv": 224,
+  "org|sur": 30,
+  "org|tro": 2,
+  "org|voi": 791,
+  "org|zon": 789,
+  "ouv|ouv": 176,
+  "ouv|voi": 784,
+  "ouv|zon": 278,
+  "sur|sur": 2,
+  "sur|voi": 111,
+  "sur|zon": 12,
+  "tro|voi": 4,
+  "tro|zon": 2,
+  "voi|voi": 641,
+  "voi|zon": 1593,
+  "zon|zon": 10
  },
  "par_type": {
   "affleurement": {
-   "m": 275672.9,
-   "n": 39162
+   "m": 314849.2,
+   "n": 46129
   },
   "bordure": {
-   "m": 804201.6,
-   "n": 62435
+   "m": 752209.9,
+   "n": 47148
   },
   "emmarchement": {
-   "m": 836.8,
-   "n": 204
+   "m": 845.9,
+   "n": 209
   },
   "mur": {
-   "m": 374267.7,
-   "n": 24730
+   "m": 388108.6,
+   "n": 23687
   },
   "rien": {
-   "m": 12078.2,
-   "n": 465
+   "m": 12166.0,
+   "n": 467
   },
   "talus": {
    "m": 101.0,

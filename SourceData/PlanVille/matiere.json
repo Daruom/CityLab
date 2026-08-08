@@ -1,120 +1,120 @@
 {
  "aires_m2": {
-  "eau": 775267.8,
-  "mineral": 10437232.8,
-  "vegetal": 1037499.4
+  "eau": 797408.5,
+  "mineral": 10423697.3,
+  "vegetal": 1028894.2
  },
  "biefs_n": 52,
  "conflits_donnee_visible": {
   "dur_peint_vegetal": {
-   "m2": 113108.1,
-   "parcelles": 2653,
+   "m2": 121119.5,
+   "parcelles": 2434,
    "pires": [
     {
-     "id": "voi/12316#0",
+     "id": "sur/14#10",
+     "m2": 1595.2,
+     "vegetal_pc": 100.0
+    },
+    {
+     "id": "voi/7940#0",
+     "m2": 1486.5,
+     "vegetal_pc": 92.946
+    },
+    {
+     "id": "voi/7381#0",
      "m2": 1478.3,
      "vegetal_pc": 100.0
     },
     {
-     "id": "voi/12875#0",
-     "m2": 1473.9,
-     "vegetal_pc": 93.24
-    },
-    {
-     "id": "voi/13069#9",
+     "id": "voi/8134#7",
      "m2": 1389.4,
      "vegetal_pc": 66.815
     },
     {
-     "id": "voi/13069#8",
-     "m2": 1254.1,
-     "vegetal_pc": 92.322
+     "id": "voi/8134#6",
+     "m2": 1262.3,
+     "vegetal_pc": 92.239
     },
     {
-     "id": "voi/19055#0",
-     "m2": 883.2,
-     "vegetal_pc": 59.276
+     "id": "sur/14#8",
+     "m2": 1128.3,
+     "vegetal_pc": 100.0
     },
     {
-     "id": "voi/20741#0",
+     "id": "sur/14#5",
+     "m2": 1052.7,
+     "vegetal_pc": 90.407
+    },
+    {
+     "id": "voi/9112#0",
+     "m2": 1035.4,
+     "vegetal_pc": 75.615
+    },
+    {
+     "id": "voi/16271#5",
+     "m2": 900.3,
+     "vegetal_pc": 56.837
+    },
+    {
+     "id": "voi/9066#8",
+     "m2": 856.7,
+     "vegetal_pc": 100.0
+    },
+    {
+     "id": "sur/14#6",
+     "m2": 837.9,
+     "vegetal_pc": 86.707
+    },
+    {
+     "id": "voi/15806#0",
      "m2": 830.3,
      "vegetal_pc": 99.425
     },
     {
-     "id": "voi/13467#0",
+     "id": "voi/8532#0",
      "m2": 799.1,
      "vegetal_pc": 100.0
     },
     {
-     "id": "voi/20711#0",
-     "m2": 746.3,
-     "vegetal_pc": 96.455
+     "id": "voi/14120#0",
+     "m2": 769.2,
+     "vegetal_pc": 56.612
     },
     {
-     "id": "voi/12913#0",
-     "m2": 737.0,
-     "vegetal_pc": 83.834
+     "id": "voi/15776#0",
+     "m2": 746.7,
+     "vegetal_pc": 96.456
     },
     {
-     "id": "voi/13859#0",
+     "id": "voi/7978#0",
+     "m2": 740.5,
+     "vegetal_pc": 83.403
+    },
+    {
+     "id": "voi/8924#0",
      "m2": 672.0,
      "vegetal_pc": 100.0
     },
     {
-     "id": "voi/14047#0",
+     "id": "voi/15776#1",
+     "m2": 666.6,
+     "vegetal_pc": 100.0
+    },
+    {
+     "id": "voi/8847#0",
      "m2": 644.5,
-     "vegetal_pc": 65.493
+     "vegetal_pc": 59.794
     },
     {
-     "id": "voi/13112#0",
-     "m2": 618.9,
-     "vegetal_pc": 90.691
-    },
-    {
-     "id": "voi/20711#2",
-     "m2": 585.2,
-     "vegetal_pc": 100.0
-    },
-    {
-     "id": "voi/13069#10",
-     "m2": 580.8,
-     "vegetal_pc": 70.924
-    },
-    {
-     "id": "voi/13426#0",
-     "m2": 576.7,
-     "vegetal_pc": 99.339
-    },
-    {
-     "id": "voi/14001#8",
-     "m2": 564.5,
-     "vegetal_pc": 100.0
-    },
-    {
-     "id": "voi/13739#0",
-     "m2": 504.5,
-     "vegetal_pc": 55.881
-    },
-    {
-     "id": "voi/20332#0",
-     "m2": 492.4,
-     "vegetal_pc": 65.228
-    },
-    {
-     "id": "voi/19524#0",
-     "m2": 489.7,
-     "vegetal_pc": 56.843
-    },
-    {
-     "id": "voi/13017#4",
-     "m2": 484.9,
-     "vegetal_pc": 70.889
+     "id": "voi/8177#0",
+     "m2": 623.5,
+     "vegetal_pc": 90.794
     }
    ]
   },
   "zone_verte_minerale": {
-   "m2": 936.0,
-   "parcelles": 132,
+   "m2": 939.3,
+   "parcelles": 133,
    "pires": [
     {
      "id": "zon/598#1",
@@ -162,12 +162,12 @@
      "vegetal_pc": 0.0
     },
     {
-     "id": "zon/636#36",
+     "id": "zon/636#35",
      "m2": 23.3,
      "vegetal_pc": 0.0
     },
     {
-     "id": "bnd/39#0",
+     "id": "bnd/41#0",
      "m2": 22.8,
      "vegetal_pc": 5.263
     },
@@ -197,7 +197,7 @@
      "vegetal_pc": 0.0
     },
     {
-     "id": "zon/51#1",
+     "id": "zon/51#0",
      "m2": 12.9,
      "vegetal_pc": 0.0
     },
@@ -223,27 +223,27 @@
  "hors_masque": {
   "cellules_masque": 36,
   "cellules_plan": 49,
-  "m2": 615898.3,
-  "parcelles": 344
+  "m2": 616932.7,
+  "parcelles": 352
  },
  "parcelles": {
-  "eau": 704,
-  "mineral": 58367,
-  "vegetal": 1898
+  "eau": 803,
+  "mineral": 53428,
+  "vegetal": 1907
  },
  "regles": {
   "M0": "eau : >= 50 % de l'aire dans une surface d'eau",
-  "M1": "mineral : ouvrage / voirie / batiment",
+  "M1": "mineral : ouvrage / voie ferree / voirie / batiment / surface reglee (le canal releve de M0 par son eau)",
   "M2": "vegetal : zone ou organique, >= 50 % de pixels de masque R < 128",
   "M3": "mineral : zone ou organique sinon",
   "M4": "hors emprise des masques : classe de la donnee"
  },
  "regles_appliquees": {
-  "M0": 704,
-  "M1": 53341,
-  "M2": 1650,
-  "M3": 4930,
-  "M4": 344
+  "M0": 803,
+  "M1": 48360,
+  "M2": 1659,
+  "M3": 4964,
+  "M4": 352
  },
  "tolerance_raster_vecteur_m": 0.48828
 }
