@@ -1216,6 +1216,15 @@ namespace
 		// aucune bande consultee (comportement historique, bit pour bit).
 		float CelluleCm = 0.f;
 
+		/**
+		 * ⭐ LE SOL DU PLAN, quand il fait foi (mode `bPlan`). Meme raison que la
+		 * bande de berge juste au-dessus : le sol n'est plus la grille drapee, et
+		 * ce qui se pose dessus doit lire LA VRAIE SURFACE, sinon il flotte ou
+		 * s'enfonce (verdict utilisateur du 08/08 sur les murets herites).
+		 * Nul = comportement historique, bit pour bit.
+		 */
+		const FPlanZ* PlanZ = nullptr;
+
 		void Init(const FDrapeContext& InDrape, int32 GroundGridN, float CellCm)
 		{
 			Drape = &InDrape;
@@ -1252,6 +1261,19 @@ namespace
 				if (ZB > TNumericLimits<float>::Lowest())
 				{
 					return ZB;
+				}
+			}
+			// ⭐ LE SOL DU PLAN passe AVANT la grille drapee, mais APRES la bande
+			// de berge : les OUVRAGES deja batis gardent l'autorite sur leur
+			// emprise (doctrine « ouvrages intouches »), le plan repond partout
+			// ailleurs. Hors de toute parcelle, `At` rend false et l'on retombe
+			// exactement sur le comportement d'avant.
+			if (PlanZ)
+			{
+				float ZPlan = 0.f;
+				if (PlanZ->At(Xcm, Ycm, ZPlan))
+				{
+					return ZPlan;
 				}
 			}
 			if (!IsDiscretized())
@@ -12091,6 +12113,111 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 		LogSink(TEXT("bordurette d'herbe"), SinkGrass, GGrassCurbHeightCm);
 	}
 
+	// =========================================================================
+	// LE PLAN DE VILLE — OUVERT UNE SEULE FOIS, AVANT TOUT CE QUI EN DEPEND.
+	//
+	// `Doc/Chantier-Plan-de-Ville.md` S8. Le plan etait ouvert plus bas, juste
+	// pour les dalles. Il l'est desormais ICI, en amont : la passe Murs (juste
+	// dessous) doit lire LE SOL DU PLAN, pas le drape analytique du MNT — sans
+	// quoi les murets herites se posent sur un terrain qui n'existe plus
+	// (verdict utilisateur du 08/08 : ils flottent ou s'enfoncent).
+	//
+	// Les cellules sont chargees UNE fois et partagees par les deux passes : le
+	// cache borne aussi la memoire au CellFilter, jamais au monde entier.
+	//
+	// Le plan FAIT FOI : rien n'est infere ici. Un plan absent, incomplet ou a
+	// l'empreinte fausse ARRETE la passe (garde E2-0), il ne la degrade pas.
+	// =========================================================================
+	FPlanVille Plan;
+	bool bPlanActif = false;
+	if (Gen.bPlan)
+	{
+		FPlanRapport R;
+		if (!Plan.Ouvrir(FPlanVille::DossierParDefaut(), R))
+		{
+			RaiseError(FString::Printf(
+				TEXT("bPlan=true mais le plan de ville est REFUSE : %s"), *R.Texte(8)));
+			return Summary;
+		}
+		bPlanActif = true;
+		UE_LOG(LogCityImport, Display,
+			TEXT("PLAN : sol construit DEPUIS LE PLAN (%d cellules au domaine, ")
+			TEXT("%d parcelles distinctes au manifeste) ; jupes de perimetre %.2f m."),
+			Plan.Index().Cellules.Num(), Plan.Index().ParcellesDistinctes,
+			GPlanJupeProfondeurCm * 0.01);
+	}
+	// Cellule du plan -> son contenu ; nul = cellule NON CONSTRUCTIBLE (arbitrage
+	// en attente) ou refusee par le lecteur. La distinction est portee par
+	// `bConstructible`, jamais par une absence silencieuse.
+	TMap<FIntPoint, TSharedPtr<FPlanCellule>> CellulesPlan;
+	TMap<FIntPoint, TSharedPtr<FPlanZ>> ZPlanParCellule;
+	bool bPlanEnErreur = false;
+	FString PlanErreur;
+	// ⛔ LE DOMAINE DU PLAN N'EST PAS LE MONDE. Le compilateur a ecarte les
+	// cellules hors carte v2.1 (S12 : « les 3 cellules disque hors carte
+	// ecartees et chiffrees »). Une cellule que le plan ne revendique PAS n'est
+	// pas une erreur de plan : elle garde simplement son sol d'aujourd'hui. La
+	// confondre avec un refus ferait echouer toute generalisation.
+	TSet<FIntPoint> DomainePlan;
+	if (bPlanActif)
+	{
+		for (const FIntPoint& C : Plan.Index().Cellules)
+		{
+			DomainePlan.Add(C);
+		}
+	}
+	auto ZDrapeMonde = [&Drape](double Xcm, double Ycm) -> float
+	{
+		return Drape.GroundZ(Xcm, Ycm);
+	};
+	auto CellulePlanPour = [&](const FIntPoint& Key) -> TSharedPtr<FPlanCellule>
+	{
+		if (!bPlanActif || bPlanEnErreur || !DomainePlan.Contains(Key))
+		{
+			return nullptr;
+		}
+		if (TSharedPtr<FPlanCellule>* Trouve = CellulesPlan.Find(Key))
+		{
+			return *Trouve;
+		}
+		TSharedPtr<FPlanCellule> PC = MakeShared<FPlanCellule>();
+		FPlanRapport RC;
+		if (!Plan.ChargerCellule(Key, *PC, RC))
+		{
+			bPlanEnErreur = true;
+			PlanErreur = FString::Printf(
+				TEXT("bPlan=true : la cellule (%d, %d) est REFUSEE par le plan — %s"),
+				Key.X, Key.Y, *RC.Texte(8));
+			CellulesPlan.Add(Key, nullptr);
+			return nullptr;
+		}
+		CellulesPlan.Add(Key, PC);
+		return PC;
+	};
+	// L'index de Z d'une cellule, construit a la demande sur la cellule deja lue.
+	auto ZPlanPour = [&](const FIntPoint& Key) -> const FPlanZ*
+	{
+		if (TSharedPtr<FPlanZ>* Trouve = ZPlanParCellule.Find(Key))
+		{
+			return Trouve->Get();
+		}
+		TSharedPtr<FPlanCellule> PC = CellulePlanPour(Key);
+		if (!PC.IsValid() || !PC->bConstructible)
+		{
+			ZPlanParCellule.Add(Key, nullptr);
+			return nullptr;
+		}
+		TSharedPtr<FPlanZ> Z = MakeShared<FPlanZ>();
+		Z->Construire(*PC, Drape.IsActive() ? Drape.AltCapCm : 0.f, ZDrapeMonde);
+		if (!Z->EstConstruit())
+		{
+			ZPlanParCellule.Add(Key, nullptr);
+			return nullptr;
+		}
+		ZPlanParCellule.Add(Key, Z);
+		return Z.Get();
+	};
+
 	// --- C1 « DISCONTINUITES » : LES MURS DE SOUTENEMENT.
 	// Passe INDEPENDANTE de la maquette du sol (une berge de canal n'a pas besoin
 	// d'un masque de chaussee), mais elle exige le DRAPE : sans relief, il n'y a
@@ -12154,6 +12281,15 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			}
 			++CellsWithWalls;
 			const FIntPoint CelluleMur(FCString::Atoi(*Sx), FCString::Atoi(*Sy));
+			// ⭐ LE MURET SE POSE SUR LE SOL DU PLAN des que sa cellule y est
+			// passee. Hors mode plan, ou sur une cellule non constructible,
+			// `ZPlanPour` rend nul et la passe garde le drape : comportement
+			// historique, bit pour bit.
+			WallRGZ.PlanZ = ZPlanPour(CelluleMur);
+			if (WallRGZ.PlanZ)
+			{
+				++Summary.PlanMuretsCellules;
+			}
 			// FINITION QUAIS : les EMPRISES de gradins de CETTE cellule. Contrat des
 			// autres side-cars : dossier absent ou cellule sans fichier = aucune
 			// emprise, sans erreur — et alors pas un gradin nulle part.
@@ -12857,24 +12993,15 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 	//
 	// Le plan FAIT FOI : rien n'est infere ici. Un plan absent, incomplet ou a
 	// l'empreinte fausse ARRETE la passe (garde E2-0), il ne la degrade pas.
+	//
+	// ⚠️ Le plan est desormais OUVERT PLUS HAUT (avant la passe Murs, qui en a
+	// besoin elle aussi). Ici on ne fait plus que CONSTRUIRE.
 	// =========================================================================
-	FPlanVille Plan;
-	bool bPlanActif = false;
 	FPlanSolStats PlanTotal;
-	if (Gen.bPlan)
+	if (bPlanEnErreur)
 	{
-		FPlanRapport R;
-		if (!Plan.Ouvrir(FPlanVille::DossierParDefaut(), R))
-		{
-			RaiseError(FString::Printf(
-				TEXT("bPlan=true mais le plan de ville est REFUSE : %s"), *R.Texte(8)));
-			return Summary;
-		}
-		bPlanActif = true;
-		UE_LOG(LogCityImport, Display,
-			TEXT("PLAN : sol du district construit DEPUIS LE PLAN (%d cellules au domaine, ")
-			TEXT("%d parcelles distinctes au manifeste)."),
-			Plan.Index().Cellules.Num(), Plan.Index().ParcellesDistinctes);
+		RaiseError(PlanErreur);
+		return Summary;
 	}
 	// LES TROIS SOLS — ceux qui existent deja, aucun de plus. La MATIERE du plan
 	// choisit le revetement ; l'OUVRAGE garde la PIERRE DE QUAI, exactement la
@@ -12929,15 +13056,25 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			for (const FPlanSolTri& T : Lot.Tris)
 			{
 				const FVector3f P3[3] = { T.A, T.B, T.C };
+				// Meme langue que la dalle actuelle : UV0 en METRES MONDE des que
+				// le revetement est resolu, sinon l'echelle historique.
+				const float Echelle = Surf ? 0.01f : 0.0025f;
+				// ⭐ LA JUPE EST VERTICALE : la projeter en (X, Y) comme une dalle
+				// ecraserait sa texture en une seule ligne de texels. On la
+				// deroule donc dans SON plan : u = l'abscisse le long de la face,
+				// v = l'altitude. Meme metrique (metres monde) que le sol, donc
+				// aucune rupture d'echelle de texture au raccord.
+				const bool bHorizontale = FMath::Abs(T.Normale.Z) >= 0.5f;
+				const FVector2f Tangente(-T.Normale.Y, T.Normale.X);
 				FVector2f UV[3];
 				for (int32 i = 0; i < 3; ++i)
 				{
-					// Meme langue que la dalle actuelle : UV0 en METRES MONDE des
-					// que le revetement est resolu, sinon l'echelle historique.
-					UV[i] = Surf ? FVector2f(P3[i].X * 0.01f, P3[i].Y * 0.01f)
-								 : FVector2f(P3[i].X * 0.0025f, P3[i].Y * 0.0025f);
+					UV[i] = bHorizontale
+						? FVector2f(P3[i].X * Echelle, P3[i].Y * Echelle)
+						: FVector2f((P3[i].X * Tangente.X + P3[i].Y * Tangente.Y) * Echelle,
+									P3[i].Z * Echelle);
 				}
-				Builder.AddPoly(Group, P3, 3, FVector3f(0, 0, 1), UV, Col);
+				Builder.AddPoly(Group, P3, 3, T.Normale, UV, Col);
 			}
 		}
 	};
@@ -12969,17 +13106,29 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 			}
 		}
 		bool bSolDuPlan = false;
-		if (bPlanActif)
+		if (bPlanActif && !DomainePlan.Contains(Key))
 		{
-			FPlanCellule PC;
-			FPlanRapport RC;
-			if (!Plan.ChargerCellule(Key, PC, RC))
+			// HORS DOMAINE : le plan ne revendique pas cette cellule. Elle garde
+			// son sol d'aujourd'hui, et on le DIT (ce n'est ni un refus, ni un
+			// oubli — c'est la carte qui borne).
+			++Summary.PlanCellulesHorsDomaine;
+			UE_LOG(LogCityImport, Display,
+				TEXT("PLAN : cellule (%d, %d) HORS DOMAINE du plan — son sol reste ")
+				TEXT("celui d'aujourd'hui."), Key.X, Key.Y);
+		}
+		else if (bPlanActif)
+		{
+			// La cellule a peut-etre deja ete lue par la passe Murs : le cache la
+			// rend telle quelle, on ne relit jamais deux fois le meme side-car.
+			TSharedPtr<FPlanCellule> CellulePtr = CellulePlanPour(Key);
+			if (bPlanEnErreur || !CellulePtr.IsValid())
 			{
-				RaiseError(FString::Printf(
-					TEXT("bPlan=true : la cellule (%d, %d) est REFUSEE par le plan — %s"),
-					Key.X, Key.Y, *RC.Texte(8)));
+				RaiseError(PlanErreur.IsEmpty()
+					? FString::Printf(TEXT("bPlan=true : cellule (%d, %d) illisible."), Key.X, Key.Y)
+					: PlanErreur);
 				return Summary;
 			}
+			const FPlanCellule& PC = *CellulePtr;
 			if (!PC.bConstructible)
 			{
 				// SECTEUR NON TRANCHE (S12) : on ne batit pas a la place de
@@ -13020,6 +13169,10 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 				Summary.PlanOuvrage += St.ParProprio[(int32)EPlanProprio::Ouvrage];
 				Summary.PlanTrous += St.AvecTrous;
 				Summary.PlanRefusees += St.Refusees;
+				Summary.PlanJupeAretes += St.JupeAretes;
+				Summary.PlanJupeTriangles += St.JupeTriangles;
+				Summary.PlanRemplissageSolide += St.RemplissageSolide;
+				Summary.PlanRemplissageGeneralise += St.RemplissageGeneralise;
 
 				// COPLANARITE : l'ecart entre le Z du plan et la surface RENDUE
 				// d'aujourd'hui, agrege par proprietaire. C'est la mesure du risque
@@ -13039,6 +13192,13 @@ FCityStreamedSummary UCityImportTools::ImportCityStreamed(const FString& JsonFil
 						TEXT("PLAN : cellule (%d, %d) — parcelle NON CONSTRUITE : %s"),
 						Key.X, Key.Y, *D);
 				}
+				UE_LOG(LogCityImport, Display,
+					TEXT("PLAN JUPES cellule (%d, %d) : %d aretes de perimetre habillees, ")
+					TEXT("%d triangles (profondeur %.2f m) ; replis de remplissage : ")
+					TEXT("%d solides, %d generalises (anneaux auto-intersectes)."),
+					Key.X, Key.Y, St.JupeAretes, St.JupeTriangles,
+					GPlanJupeProfondeurCm * 0.01, St.RemplissageSolide,
+					St.RemplissageGeneralise);
 				UE_LOG(LogCityImport, Display,
 					TEXT("PLAN : cellule (%d, %d) — %d parcelles (%d const / %d profil / %d drapage ; ")
 					TEXT("voirie %d, zone %d, organique %d, batiment %d, ouvrage %d), %d trous, ")

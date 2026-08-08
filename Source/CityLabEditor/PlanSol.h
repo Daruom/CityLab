@@ -29,12 +29,44 @@
  * Z deja rebase sur le Capitole comme tout le reste du moteur.
  */
 
+/**
+ * ⭐ LA PROFONDEUR DE JUPE — CONSTANTE NATIONALE, CHOISIE SUR MESURE.
+ *
+ * Chaque plaque de parcelle emet, sur TOUT son perimetre, une face verticale qui
+ * descend de cette profondeur sous la cote locale. Sans elle, deux plaques a des
+ * cotes differentes laissent voir LE CIEL entre elles : ce ne sont pas des faces
+ * mal eclairees, ce sont des OUVERTURES REELLES (verdict utilisateur du 08/08).
+ * Loi de composition du Playbook S13.2 : LE RECOUVREMENT EST BENIN, LE VIDE EST
+ * FATAL — on prefere donc une jupe trop longue a une jupe trop courte.
+ *
+ * MESURE qui fixe la valeur (`work/E2/py/jupes_mesure.py`, les 117 929 interfaces
+ * des 45 cellules CONSTRUCTIBLES) : la marche a fermer vaut p50 = 7,1 cm,
+ * p90 = 42,1 cm, p99 = 2,72 m, p99,9 = 7,79 m, et son MAXIMUM national = 11,70 m.
+ * Une jupe de 3 m laisserait encore 0,84 % des interfaces ouvertes ; 12,00 m
+ * n'en laisse AUCUNE.
+ *
+ * Pourquoi ne pas etre plus econome : la profondeur ne coute AUCUN triangle (2
+ * triangles par arete, quelle que soit sa hauteur), et partout ou il existe une
+ * plaque voisine, le bas de la jupe est OCCULTE par cette voisine — seule la
+ * hauteur de la marche est reellement visible. La profondeur ne se voit donc
+ * qu'aux BORDS du monde construit et la ou il n'y a pas de voisine.
+ */
+constexpr double GPlanJupeProfondeurCm = 1200.0;
+
 /** Un triangle du sol, en cm monde, Z rebase Capitole. */
 struct FPlanSolTri
 {
 	FVector3f A;
 	FVector3f B;
 	FVector3f C;
+
+	/**
+	 * La normale SORTANTE de la face. `FCityMeshBuilder::AddPoly` s'en sert pour
+	 * ORIENTER le polygone lui-meme (il retourne le winding si besoin) : donner
+	 * la bonne normale suffit, il n'y a pas d'ordre de sommets a deviner.
+	 * (0,0,1) = une plaque de sol ; horizontale = une jupe.
+	 */
+	FVector3f Normale = FVector3f(0.f, 0.f, 1.f);
 };
 
 /**
@@ -82,6 +114,22 @@ struct FPlanSolStats
 	/** Sommets FONDUS parce que le plan ne les distingue pas (< 1 mm, sa propre
 	 *  precision declaree). Compte, jamais tu. */
 	int32 PointsFondus = 0;
+
+	/** LES JUPES : aretes de perimetre habillees et triangles qu'elles ont coute
+	 *  (2 par arete). Tous les anneaux comptent, TROUS COMPRIS — le bord d'un
+	 *  trou est une fente comme une autre. */
+	int32 JupeAretes = 0;
+	int32 JupeTriangles = 0;
+
+	/**
+	 * ⛔ LES REPLIS DE REMPLISSAGE, comptes SEPAREMENT — un repli n'est jamais
+	 * silencieux. `Solide` = le remplissage par nombre de tours a echoue (anneaux
+	 * qui se touchent). `Generalise` = les aretes contraintes se CROISENT et le
+	 * moteur n'a pas pu toutes les poser ; c'est le cas des anneaux qui
+	 * s'auto-intersectent.
+	 */
+	int32 RemplissageSolide = 0;
+	int32 RemplissageGeneralise = 0;
 
 
 	/**
@@ -156,3 +204,60 @@ bool ConstruirePlanSol(
 	TFunctionRef<int32(const FPlanParcelle&)> ClasseDe,
 	TArray<FPlanSolLot>& OutLots,
 	FPlanSolStats& Stats);
+
+/**
+ * =============================================================================
+ * LE Z DU SOL DU PLAN, INTERROGEABLE EN UN POINT (lot JUPES, chantier 3)
+ * =============================================================================
+ *
+ * POURQUOI. Les murets herites (passe Murs, breaklines `SourceData/Murs`) lisent
+ * leur Z sur `FRenderedGroundZ`, c'est-a-dire sur le DRAPE ANALYTIQUE du MNT.
+ * Tant que le sol ETAIT ce drape, c'etait juste. Depuis que le sol vient du
+ * plan, ce n'est plus le meme terrain : les murets flottent ou s'enfoncent
+ * (verdict utilisateur du 08/08). Ils ne sont pas mal poses — ils sont poses sur
+ * un sol qui n'existe plus.
+ *
+ * CE QUE C'EST. Un index spatial des parcelles d'UNE cellule qui repond : « en
+ * (x, y), quelle parcelle, et a quelle cote SA loi la met ». C'est la MEME loi
+ * de Z que `ConstruirePlanSol` applique — donc, par construction, le meme sol,
+ * pas une approximation de celui-ci.
+ *
+ * ⛔ Il ne DEVINE jamais : hors de toute parcelle (bord de cellule, trou du
+ * contrat), il rend false et l'appelant garde son comportement d'avant.
+ */
+class FPlanZ
+{
+public:
+	/** Indexe les parcelles de la cellule. `AltCapCm` = le zero moteur. */
+	void Construire(const FPlanCellule& Cellule, float AltCapCm,
+		TFunctionRef<float(double, double)> ZDrapageCm);
+
+	/** (Xcm, Ycm) monde -> Z moteur en cm. false = aucune parcelle ici. */
+	bool At(double Xcm, double Ycm, float& OutZCm) const;
+
+	bool EstConstruit() const { return bConstruit; }
+	int32 Parcelles() const { return Sacs.Num(); }
+
+private:
+	/** Une parcelle reduite a ce qu'il faut pour repondre : ses anneaux et sa loi. */
+	struct FSac
+	{
+		TArray<TArray<FVector2D>> Anneaux;   // metres, [0] = exterieur
+		const FPlanLoiZ* Loi = nullptr;
+		FVector2D Min = FVector2D::ZeroVector;
+		FVector2D Max = FVector2D::ZeroVector;
+		TArray<double> S;                    // abscisses cumulees de l'axe
+	};
+
+	TArray<FSac> Sacs;
+	/** Grille reguliere : chaque case liste les parcelles dont la boite la touche. */
+	TArray<TArray<int32>> Cases;
+	FVector2D Origine = FVector2D::ZeroVector;
+	double PasCaseM = 5.0;
+	int32 NCases = 0;
+	float AltCap = 0.f;
+	/** COPIE de la fonction de drapage : la loi `drapage` doit rester lisible
+	 *  apres la construction (la passe Murs interroge plus tard). */
+	TFunction<float(double, double)> Drapage;
+	bool bConstruit = false;
+};

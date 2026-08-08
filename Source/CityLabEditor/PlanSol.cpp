@@ -46,6 +46,16 @@ namespace
 		/** Abscisses cumulees de l'axe, precalculees une fois par parcelle. */
 		TArray<double> S;
 
+		/**
+		 * Abscisses PRECALCULEES AILLEURS (`FPlanZ` les garde une fois pour
+		 * toutes). Non nul = on les lit sans les recopier a chaque question.
+		 * UNE seule loi de Z dans tout le module : c'est la meme fonction qui
+		 * construit le sol et qui repond aux murets.
+		 */
+		const TArray<double>* SExt = nullptr;
+
+		const TArray<double>& Abscisses() const { return SExt ? *SExt : S; }
+
 		void Prepare()
 		{
 			S.Reset();
@@ -101,7 +111,7 @@ namespace
 					if (Dist2 < MeilleureD2)
 					{
 						MeilleureD2 = Dist2;
-						MeilleureS = S[i] + T * FMath::Sqrt(L2);
+						MeilleureS = Abscisses()[i] + T * FMath::Sqrt(L2);
 					}
 				}
 				return (float)(ZDuProfil(MeilleureS) * 100.0) - AltCapCm;
@@ -332,6 +342,39 @@ bool ConstruirePlanSol(
 				Tris = MoveTemp(Repli);
 				bOk = true;
 				++NbRemplissageSolide;
+				++Stats.RemplissageSolide;
+			}
+		}
+		if (!bOk || Tris.Num() == 0)
+		{
+			// ⭐ TROISIEME REPLI — L'ANNEAU QUI S'AUTO-INTERSECTE.
+			//
+			// MESURE (work/E2/py/refus_sonde.py, les 18 parcelles refusees du
+			// district v2) : les 18 sont des anneaux NON SIMPLES — ils se croisent
+			// eux-memes (shapely : `anneau_simple` faux 18 fois sur 18, avec la
+			// coordonnee du croisement). Le moteur ne peut alors pas poser toutes
+			// les aretes contraintes (`EResult::MissingEdges`), et les deux
+			// remplissages precedents, qui supposent un contour ferme, ne rendent
+			// rien.
+			//
+			// La reponse du moteur a EXACTEMENT ce cas est
+			// `GetFilledTrianglesGeneralizedWinding`, documente pour « les
+			// triangulations dont les aretes ne formaient pas une forme fermee,
+			// par construction ou par des intersections non resolues ».
+			//
+			// ⛔ Ce n'est pas une invention de geometrie : le PLAN LUI-MEME
+			// declare, pour ces parcelles, l'aire du polygone REPARE (mesure :
+			// voi/16283#0 annonce 223,497 m2, la reparation en rend 223,4978 ;
+			// voi/15145#0 37,637 contre 37,6336). On retrouve donc l'entite que le
+			// compilateur a mesuree, on n'en fabrique pas une autre.
+			TArray<FIndex3i> Gen;
+			if (Delaunay.GetFilledTrianglesGeneralizedWinding(
+					Gen, Sommets, Aretes, FDelaunay2::EFillMode::PositiveWinding)
+				&& Gen.Num() > 0)
+			{
+				Tris = MoveTemp(Gen);
+				bOk = true;
+				++Stats.RemplissageGeneralise;
 			}
 		}
 		if (!bOk || Tris.Num() == 0)
@@ -456,6 +499,58 @@ bool ConstruirePlanSol(
 			Lot.Tris.Add(Out);
 		}
 
+		// --- 5. LA JUPE PERIMETRIQUE — CE QUI FERME LES FENTES ----------------
+		// Chaque arete d'anneau — l'EXTERIEUR ET LES TROUS — porte une face
+		// verticale qui descend de `GPlanJupeProfondeurCm` sous la cote locale.
+		// Sans elle, la plaque est une feuille de papier sans tranche : entre deux
+		// plaques a des cotes differentes, on voit le CIEL (verdict utilisateur).
+		//
+		// ⭐ L'ORIENTATION NE SE DEVINE PAS. Les anneaux ont deja ete normalises
+		// plus haut (exterieur CCW, trous CW) : en parcourant une arete A->B, la
+		// matiere de la parcelle est donc TOUJOURS A GAUCHE, et la normale
+		// SORTANTE est la droite de la marche, soit (dy, -dx). La meme formule
+		// vaut pour un trou — la jupe y regarde l'interieur du trou, ce qui est
+		// exactement ce qu'on veut. Le winding, lui, n'est pas notre affaire :
+		// `AddPoly` oriente le polygone d'apres la normale qu'on lui donne.
+		{
+			const float JupeCm = (float)GPlanJupeProfondeurCm;
+			for (const FIndex2i& E : Aretes)
+			{
+				if (!Sommets.IsValidIndex(E.A) || !Sommets.IsValidIndex(E.B))
+				{
+					continue;
+				}
+				const FVec2d& Q0 = Sommets[E.A];
+				const FVec2d& Q1 = Sommets[E.B];
+				const double dx = Q1.X - Q0.X;
+				const double dy = Q1.Y - Q0.Y;
+				const double L = FMath::Sqrt(dx * dx + dy * dy);
+				if (L < 1e-9)
+				{
+					continue;   // une arete de longueur nulle n'a pas de tranche
+				}
+				const FVector3f N((float)(dy / L), (float)(-dx / L), 0.f);
+				// Le HAUT de la jupe est le sommet de la plaque lui-meme : meme
+				// point, meme loi, meme Z — aucune fente ne peut naitre entre les
+				// deux. (On appelle la loi directement, et non le lambda `Sommet`,
+				// pour ne pas compter deux fois la mesure de coplanarite.)
+				const float Z0 = Loi.At(Q0.X, Q0.Y);
+				const float Z1 = Loi.At(Q1.X, Q1.Y);
+				const FVector3f H0((float)(Q0.X * 100.0), (float)(Q0.Y * 100.0), Z0);
+				const FVector3f H1((float)(Q1.X * 100.0), (float)(Q1.Y * 100.0), Z1);
+				const FVector3f B0(H0.X, H0.Y, Z0 - JupeCm);
+				const FVector3f B1(H1.X, H1.Y, Z1 - JupeCm);
+				FPlanSolTri T1;
+				T1.A = H0; T1.B = H1; T1.C = B1; T1.Normale = N;
+				FPlanSolTri T2;
+				T2.A = H0; T2.B = B1; T2.C = B0; T2.Normale = N;
+				Lot.Tris.Add(T1);
+				Lot.Tris.Add(T2);
+				++Stats.JupeAretes;
+				Stats.JupeTriangles += 2;
+			}
+		}
+
 		Stats.Triangles += Lot.Tris.Num() - TrisAvant;
 		++Stats.Parcelles;
 		if (IdxProprio >= 0 && IdxProprio < 6) { ++Stats.ParProprio[IdxProprio]; }
@@ -475,5 +570,179 @@ bool ConstruirePlanSol(
 			TEXT("(le remplissage par nombre de tours avait echoue sur leurs anneaux)."),
 			NbRemplissageSolide);
 	}
+	if (Stats.RemplissageGeneralise > 0)
+	{
+		UE_LOG(LogPlanVille, Display,
+			TEXT("PLAN SOL : %d parcelle(s) rendue(s) par le remplissage GENERALISE ")
+			TEXT("(anneau qui s'auto-intersecte : le moteur n'a pas pu poser toutes les ")
+			TEXT("aretes contraintes). Le contour reste celui du plan, sommet pour sommet."),
+			Stats.RemplissageGeneralise);
+	}
+	if (Stats.JupeAretes > 0)
+	{
+		UE_LOG(LogPlanVille, Display,
+			TEXT("PLAN SOL : JUPES — %d aretes de perimetre habillees, %d triangles, ")
+			TEXT("profondeur nationale %.2f m."),
+			Stats.JupeAretes, Stats.JupeTriangles, GPlanJupeProfondeurCm * 0.01);
+	}
 	return Stats.Refusees == 0;
+}
+
+// =============================================================================
+// FPlanZ — le Z du sol du plan, interrogeable en un point (chantier 3 : murets)
+// =============================================================================
+
+void FPlanZ::Construire(const FPlanCellule& Cellule, float AltCapCm,
+	TFunctionRef<float(double, double)> ZDrapageCm)
+{
+	Sacs.Reset();
+	Cases.Reset();
+	AltCap = AltCapCm;
+	// La fonction de drapage doit survivre a cet appel : les murets interrogeront
+	// plus tard. On en garde une COPIE, pas une reference.
+	Drapage = [ZDrapageCm](double Xcm, double Ycm) -> float
+	{
+		return ZDrapageCm(Xcm, Ycm);
+	};
+
+	Sacs.Reserve(Cellule.Parcelles.Num());
+	FVector2D MinTout(TNumericLimits<double>::Max(), TNumericLimits<double>::Max());
+	FVector2D MaxTout(-TNumericLimits<double>::Max(), -TNumericLimits<double>::Max());
+	for (const FPlanParcelle& P : Cellule.Parcelles)
+	{
+		if (P.Anneaux.Num() == 0 || P.Anneaux[0].Num() < 3
+			|| P.Loi.Forme == EPlanForme::Inconnue)
+		{
+			continue;   // rien a dire sur une parcelle que le sol ne construit pas
+		}
+		FSac Sac;
+		Sac.Anneaux = P.Anneaux;
+		Sac.Loi = &P.Loi;
+		Sac.Min = FVector2D(TNumericLimits<double>::Max(), TNumericLimits<double>::Max());
+		Sac.Max = FVector2D(-TNumericLimits<double>::Max(), -TNumericLimits<double>::Max());
+		for (const FVector2D& Q : Sac.Anneaux[0])
+		{
+			Sac.Min.X = FMath::Min(Sac.Min.X, Q.X);
+			Sac.Min.Y = FMath::Min(Sac.Min.Y, Q.Y);
+			Sac.Max.X = FMath::Max(Sac.Max.X, Q.X);
+			Sac.Max.Y = FMath::Max(Sac.Max.Y, Q.Y);
+		}
+		if (P.Loi.Forme == EPlanForme::ProfilTroncon && P.Loi.Axe.Num() >= 2)
+		{
+			Sac.S.Reserve(P.Loi.Axe.Num());
+			double Cumul = 0.0;
+			Sac.S.Add(0.0);
+			for (int32 i = 1; i < P.Loi.Axe.Num(); ++i)
+			{
+				Cumul += (P.Loi.Axe[i] - P.Loi.Axe[i - 1]).Size();
+				Sac.S.Add(Cumul);
+			}
+		}
+		MinTout.X = FMath::Min(MinTout.X, Sac.Min.X);
+		MinTout.Y = FMath::Min(MinTout.Y, Sac.Min.Y);
+		MaxTout.X = FMath::Max(MaxTout.X, Sac.Max.X);
+		MaxTout.Y = FMath::Max(MaxTout.Y, Sac.Max.Y);
+		Sacs.Add(MoveTemp(Sac));
+	}
+	if (Sacs.Num() == 0)
+	{
+		bConstruit = false;
+		return;
+	}
+
+	// Grille reguliere calee sur l'etendue reelle des parcelles. Le pas vient de la
+	// taille de cellule declaree par le side-car : aucune constante inventee.
+	const double CoteM = (Cellule.CelluleM > 1.0) ? Cellule.CelluleM : 500.0;
+	NCases = FMath::Clamp((int32)FMath::RoundToInt(CoteM / 5.0), 8, 256);
+	Origine = MinTout;
+	const double LargeurX = FMath::Max(MaxTout.X - MinTout.X, 1.0);
+	const double LargeurY = FMath::Max(MaxTout.Y - MinTout.Y, 1.0);
+	PasCaseM = FMath::Max(LargeurX, LargeurY) / (double)NCases;
+	Cases.SetNum(NCases * NCases);
+	for (int32 i = 0; i < Sacs.Num(); ++i)
+	{
+		const FSac& Sac = Sacs[i];
+		const int32 X0 = FMath::Clamp((int32)FMath::FloorToDouble((Sac.Min.X - Origine.X) / PasCaseM), 0, NCases - 1);
+		const int32 X1 = FMath::Clamp((int32)FMath::FloorToDouble((Sac.Max.X - Origine.X) / PasCaseM), 0, NCases - 1);
+		const int32 Y0 = FMath::Clamp((int32)FMath::FloorToDouble((Sac.Min.Y - Origine.Y) / PasCaseM), 0, NCases - 1);
+		const int32 Y1 = FMath::Clamp((int32)FMath::FloorToDouble((Sac.Max.Y - Origine.Y) / PasCaseM), 0, NCases - 1);
+		for (int32 Y = Y0; Y <= Y1; ++Y)
+		{
+			for (int32 X = X0; X <= X1; ++X)
+			{
+				Cases[Y * NCases + X].Add(i);
+			}
+		}
+	}
+	bConstruit = true;
+}
+
+namespace
+{
+	/** Point dans un anneau, par lancer de rayon (regle pair/impair). */
+	bool DansAnneau(const TArray<FVector2D>& A, double X, double Y)
+	{
+		bool bDedans = false;
+		const int32 N = A.Num();
+		for (int32 i = 0, j = N - 1; i < N; j = i++)
+		{
+			const FVector2D& Pi = A[i];
+			const FVector2D& Pj = A[j];
+			if (((Pi.Y > Y) != (Pj.Y > Y))
+				&& (X < (Pj.X - Pi.X) * (Y - Pi.Y) / (Pj.Y - Pi.Y) + Pi.X))
+			{
+				bDedans = !bDedans;
+			}
+		}
+		return bDedans;
+	}
+}
+
+bool FPlanZ::At(double Xcm, double Ycm, float& OutZCm) const
+{
+	if (!bConstruit)
+	{
+		return false;
+	}
+	const double Xm = Xcm * 0.01;
+	const double Ym = Ycm * 0.01;
+	const int32 CX = (int32)FMath::FloorToDouble((Xm - Origine.X) / PasCaseM);
+	const int32 CY = (int32)FMath::FloorToDouble((Ym - Origine.Y) / PasCaseM);
+	if (CX < 0 || CY < 0 || CX >= NCases || CY >= NCases)
+	{
+		return false;
+	}
+	for (int32 Idx : Cases[CY * NCases + CX])
+	{
+		const FSac& Sac = Sacs[Idx];
+		if (Xm < Sac.Min.X || Xm > Sac.Max.X || Ym < Sac.Min.Y || Ym > Sac.Max.Y)
+		{
+			continue;
+		}
+		if (!DansAnneau(Sac.Anneaux[0], Xm, Ym))
+		{
+			continue;
+		}
+		bool bDansUnTrou = false;
+		for (int32 R = 1; R < Sac.Anneaux.Num(); ++R)
+		{
+			if (DansAnneau(Sac.Anneaux[R], Xm, Ym))
+			{
+				bDansUnTrou = true;
+				break;
+			}
+		}
+		if (bDansUnTrou)
+		{
+			continue;   // le trou appartient a une AUTRE parcelle : qu'elle reponde
+		}
+		// LA MEME loi de Z que celle qui a construit la plaque — pas une copie
+		// de sa formule, la fonction elle-meme.
+		TFunctionRef<float(double, double)> Ref(Drapage);
+		FLoiZ Loi{ Sac.Loi, AltCap, &Ref };
+		Loi.SExt = &Sac.S;
+		OutZCm = Loi.At(Xm, Ym);
+		return true;
+	}
+	return false;
 }

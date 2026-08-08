@@ -1077,6 +1077,35 @@ struct FCityStreamedSummary
 	/** Sommets FONDUS a la lecture parce que le plan ne les distingue pas
 	 *  (moins d'un millimetre, sa propre precision declaree). */
 	UPROPERTY() int32 PlanPointsFondus = 0;
+
+	/**
+	 * LES JUPES PERIMETRIQUES : aretes d'anneau habillees d'une face verticale et
+	 * triangles qu'elles ont coute (2 par arete). Sans elles, une plaque est une
+	 * feuille sans tranche et l'on voit le CIEL entre deux plaques a des cotes
+	 * differentes. Tous les anneaux comptent, TROUS COMPRIS.
+	 */
+	UPROPERTY() int32 PlanJupeAretes = 0;
+	UPROPERTY() int32 PlanJupeTriangles = 0;
+
+	/** Parcelles rendues par un REPLI de remplissage, comptees separement : le
+	 *  remplissage `Solide` (anneaux qui se touchent) et le remplissage
+	 *  GENERALISE (anneau qui s'auto-intersecte). Jamais silencieux. */
+	UPROPERTY() int32 PlanRemplissageSolide = 0;
+	UPROPERTY() int32 PlanRemplissageGeneralise = 0;
+
+	/**
+	 * MURETS HERITES REPOSES SUR LE SOL DU PLAN. `PlanMuretsCellules` = cellules
+	 * ou la passe Murs a lu le Z DU PLAN au lieu du drape analytique du MNT.
+	 * Avant ce lot, les murets se posaient sur un terrain qui n'existait plus.
+	 */
+	UPROPERTY() int32 PlanMuretsCellules = 0;
+
+	/**
+	 * Cellules VISEES que le plan ne revendique PAS (hors carte v2.1, S12). Elles
+	 * gardent leur sol d'aujourd'hui. Ce n'est ni un refus ni un oubli : c'est la
+	 * carte qui borne le domaine.
+	 */
+	UPROPERTY() int32 PlanCellulesHorsDomaine = 0;
 };
 
 /** Counts of what GenerateBuildingCollisionCell produced for one cell. */
