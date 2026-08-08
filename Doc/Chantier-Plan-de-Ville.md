@@ -274,9 +274,37 @@ au vert (couverture 100,000000 %, interstices 0, recouvrements 0, résolutions 1
   convention (porteuse sans pièce, `bnd/11487#0`) → juge compilateur ajouté
   (`porteuse_sans_piece_n = 0`, comptabilité fermée 60 969 = 60 835 émises + 134
   lamelles exclues) — la garde ne doit jamais être la première à voir.
-- **Prochaines étapes** : verdicts utilisateur ①②③ → É2-2 (pièces d'interface :
-  bordures/murs/emmarchements — habiller les marches déclarées) → É2-3 semis
-  exécutant → É2-4 généralisation.
+- **08/08 après-midi — VERDICT UTILISATEUR SUR LE MONDE GÉNÉRALISÉ : RÉGRESSION
+  GLOBALE**, et critique juste de MES annonces (je certifiais les critères de lot,
+  pas l'échelle du jugement — trois livraisons de suite). Diagnostic unifié : **le
+  plan gouvernait le SOL mais pas les OBJETS posés dessus** (bâtiments/dalles
+  historiques, gradins, transitions berge, tous construits POUR l'ancienne nappe
+  continue). Symptômes = un seul défaut : z-fighting dalles bâtiments↔pads du plan
+  (le « 13,6 % sous 2 cm » le contenait, mal interprété), bâtiments sans contrat
+  d'ancrage à leur parcelle, jonction ouvrage↔pelouse détruite/non reconstruite,
+  marches déclarées sans pièces (jupes sombres), chaussées flottantes du coteau
+  (pas de terrassements).
+- **⛔ RÈGLE D'OR UTILISATEUR (non négociable, systématique)** : « ON VEUT LA
+  COHÉRENCE GLOBALE — on ne se perd pas dans les détails, on prend à chaque fois
+  du recul pour comprendre POURQUOI on a une anomalie et on corrige À LA SOURCE. »
+  Opérationnalisée : ① cause STRUCTURELLE avant tout lot (chercher LE défaut commun
+  derrière les symptômes) ; ② toute livraison = A/B contre la RÉFÉRENCE aux mêmes
+  poses + verdict visuel GLOBAL écrit du coordinateur (y compris « moins bien ») —
+  jamais de ✅ sur critère interne de lot ; ③ mesures d'agents confrontées avant
+  relais.
+- **PIVOT ARBITRÉ (utilisateur, 08/08) : VILLE PLAN-NATIVE (option b).** La
+  cohérence naît de l'ORDRE DE CONSTRUCTION, pas de greffes sur l'existant : une
+  map de construction où TOUTES les passes s'exécutent dans l'ordre du plan — sol
+  du plan d'abord, puis bâtiments RE-POSÉS par la recette E2 sur les pads du plan
+  (ancrage par construction, UNE dalle = une vérité), ouvrages raccordés à leurs
+  cotes déclarées, pièces d'interface par-dessus. `L_ProtoSols_E2_Sol2` est
+  RESTAURÉE en ancien monde complet (mode A) : elle redevient LA référence à battre
+  aux mêmes poses — le monde du plan ne la remplacera que sur verdict utilisateur.
+- **Prochaines étapes** : restauration Sol2 mode A (vérifiée) → conception du
+  chantier VILLE PLAN-NATIVE (ordre des passes + contrats d'ancrage : bâtiment↔pad,
+  ouvrage↔voisinage, une-seule-vérité par surface) → exécution par lots sous la
+  règle d'or → arbitrages restants (12 frontières dont mur de quai, aplanir-vs-
+  draper des communautés à fort relief) en 3D sur la map native.
 
 ## 13. Références
 
