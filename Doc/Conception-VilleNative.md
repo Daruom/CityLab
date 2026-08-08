@@ -161,6 +161,16 @@ construction.
 fidélité devraient en résoudre l'essentiel — le reste en A/B) · ③ verdict berge /
 escaliers Saint-Pierre (assiettes) · ④ statuts de la table de recensement.
 
+## ⚠️ BOUCLE D'ITÉRATION OBLIGATOIRE (verdict utilisateur 08/08 soir — la leçon
+## district d'Unreal s'applique au pipeline plan)
+Un ESSAI = correction → compile/export d'UNE CELLULE témoin (~30-60 s ; le
+solveur global à 30 s reste global) → régé maquette d'UNE cellule (6 s) →
+capture AU POINT EXACT du défaut → itérer. **~1-2 min par hypothèse.**
+La chaîne COMPLÈTE + idempotence ×2 (le plancher ~15-20 min) se paie UNE FOIS
+par lot, à la fin, quand le correctif est vérifié localement — JAMAIS par essai.
+Payer la chaîne entière par hypothèse est un défaut de logique, pas un coût
+inévitable.
+
 ## ✅ ÉTAT AU 2026-08-08 SOIR — ÉTAPES 0 ET 1 LIVRÉES, MAQUETTE EN REVUE UTILISATEUR
 
 **Tout l'arc L0→L1c est FAIT** (~10 lots, une journée) : recensement 569 natures
