@@ -142,16 +142,27 @@ def retenues(rec, X, Y, P, mat):
     return vit
 
 
-def main():
+def main(cellules_filtre=None):
+    """`cellules_filtre` = liste de noms de cellule (« -1_0 ») : mode ITERATION.
+    On n'ecrit alors QUE ces cellules et un index PARTIEL ; ni plan_index.json
+    ni plan.json ne sont touches, pour qu'une iteration ne puisse jamais se
+    faire passer pour une passe complete."""
     t0 = time.time()
     if not os.path.isdir(DATA):
         os.makedirs(DATA)
     with open(os.path.join(CACHE, "parcelles.pkl"), "rb") as f:
         D = pickle.load(f)
     P = D["parcelles"]
+    EMP_OBJ = D.get("emprises_objet") or {}
     for p in P:
         p["geom"] = shapely.from_wkb(p["geom"])
     cells = [tuple(c) for c in D["cells"]]
+    if cellules_filtre:
+        cells = [c for c in cells if "%d_%d" % c in set(cellules_filtre)]
+        jalon("C8/MODE ITERATION : export limite a %d cellule(s) %s ; la "
+              "porteuse est calculee sur ces seules cellules et l'index est "
+              "PARTIEL — ni plan_index.json ni plan.json ne sont touches"
+              % (len(cells), sorted(cellules_filtre)))
     with open(os.path.join(CACHE, "matiere.pkl"), "rb") as f:
         mat = pickle.load(f)["matiere"]
     with open(os.path.join(CACHE, "niveaux.pkl"), "rb") as f:
@@ -210,17 +221,24 @@ def main():
     chrono("C8/porteuse", time.time() - tA,
            "%d parcelles situees, %d sans piece" % (len(porteuse),
                                                     len(sans_piece)))
-    jalon("C8/PORTEUSE : la cellule porteuse est desormais celle ou la piece a "
-          "la PLUS GRANDE AIRE (a egalite, le plus petit nom de cellule) — plus "
-          "le point representatif. %d parcelles situees ; %d parcelles n'ont "
-          "AUCUNE piece emise (lamelles que la deduplication a %.0f mm reduit a "
-          "moins de 4 sommets ; aires de %.2e a %.2e m2) et sont exclues du "
-          "contrat, comptees ici."
-          % (len(porteuse), len(sans_piece), 1.0,
-             min([P[i]["geom"].area for i in range(len(P))
-                  if P[i]["id"] in set(sans_piece)] or [0.0]),
-             max([P[i]["geom"].area for i in range(len(P))
-                  if P[i]["id"] in set(sans_piece)] or [0.0])))
+    if cellules_filtre:
+        jalon("C8/PORTEUSE (iteration) : %d parcelles situees dans la ou les "
+              "cellules demandees ; le compte des parcelles « sans piece » n'a "
+              "PAS de sens ici (il vaudrait « hors cellule ») et n'est donc pas "
+              "produit — seule la passe complete le mesure." % len(porteuse))
+    else:
+        # ⚠️ le set doit etre hisse : dans la comprehension il etait reconstruit
+        # a chaque tour (quadratique des que la liste grossit).
+        _aires_sp = [P[i]["geom"].area for i in range(len(P))
+                     if P[i]["id"] in SANS_PIECE] or [0.0]
+        jalon("C8/PORTEUSE : la cellule porteuse est desormais celle ou la "
+              "piece a la PLUS GRANDE AIRE (a egalite, le plus petit nom de "
+              "cellule) — plus le point representatif. %d parcelles situees ; "
+              "%d parcelles n'ont AUCUNE piece emise (lamelles que la "
+              "deduplication a %.0f mm reduit a moins de 4 sommets ; aires de "
+              "%.2e a %.2e m2) et sont exclues du contrat, comptees ici."
+              % (len(porteuse), len(sans_piece), 1.0,
+                 min(_aires_sp), max(_aires_sp)))
     # geometries de frontiere, calculees UNE fois
     t1 = time.time()
     fgeom = []
@@ -309,6 +327,38 @@ def main():
             # se tait jamais : la maquette doit pouvoir lire un champ, pas
             # deviner une absence.
             if p["proprietaire"] == "ouvrage":
+                # l'emprise COMPLETE declaree par le side-car, non rognee par
+                # la preseance : le bloc de berge absorbe la part de sol des
+                # tabliers (ouv/107#0 : 66 m2 gagnes pour 238,6 m de portee),
+                # mais la forme que la donnee declare, elle, est entiere.
+                try:
+                    _i = int(p["id"].split("/")[1].split("#")[0])
+                    _w = EMP_OBJ.get(_i)
+                except Exception:
+                    _w = None
+                _an = None
+                if _w is not None:
+                    _g = shapely.from_wkb(_w)
+                    _an = coords(_g)
+                if _an:
+                    r["emprise_objet"] = _an
+                    r["emprise_objet_m2"] = round(_g.area, 3)
+                    r["emprise_objet_note"] = (
+                        "emprise COMPLETE declaree par le side-car, non "
+                        "rognee par la preseance ; `anneaux` reste la part "
+                        "de sol que l'ouvrage a gagnee dans la partition. "
+                        "Champ porte par l'OBJET : quand la partition le "
+                        "fragmente (ouv/220#1 et #2), chaque fragment porte "
+                        "la meme emprise — ne pas sommer emprise_objet_m2, "
+                        "regrouper par identifiant avant le #")
+                else:
+                    # bande annexee ou bouchon de trou : du sol attribue a
+                    # l'ouvrage, sans objet declare derriere. On le DIT.
+                    r["emprise_objet"] = "sans_objet"
+                    r["emprise_objet_note"] = (
+                        "parcelle de sol attribuee a l'ouvrage par la "
+                        "partition (bande annexee ou bouchon de trou) : "
+                        "aucun objet n'est declare pour elle en side-car")
                 if loi.get("cote_intrados_m") is not None:
                     r["intrados"] = loi["cote_intrados_m"]
                     r["intrados_nature"] = "cote d'intrados de tablier"
@@ -442,6 +492,22 @@ def main():
                   % (n + 1, len(cells), time.time() - t2))
     chrono("C8/export", time.time() - t2, "%d fichiers" % len(fichiers))
 
+    if cellules_filtre:
+        tot = sum(v["octets"] for v in fichiers.values())
+        with io.open(os.path.join(DATA, "plan_index_partiel.json"), "w",
+                     encoding="utf-8", newline="\n") as f:
+            f.write(json.dumps({
+                "mode": "iteration",
+                "avertissement": "index PARTIEL : la cellule porteuse et les "
+                                 "comptes ne valent que pour les cellules "
+                                 "listees ; seule une passe complete fait foi",
+                "cellules": sorted(cellules_filtre),
+                "fichiers": fichiers}, indent=1, sort_keys=True))
+        jalon("C8/ITERATION terminee : %d fichiers, %.2f Mo, index PARTIEL "
+              "ecrit (plan_index.json inchange)" % (len(fichiers), tot / 1e6))
+        chrono("C8 iteration", time.time() - t0, "%d cellules" % len(cells))
+        return fichiers, None
+
     # ---- LE REGISTRE DES REGLES ENTRE AU CONTRAT ---------------------------
     # Une mesure de conformite doit etre rejouable depuis le SEUL contrat :
     # sans le registre, le lecteur connait les valeurs mais pas les regles.
@@ -535,6 +601,13 @@ def main():
             "n": len(sans_piece), "ids": sans_piece,
             "cause": "lamelle reduite a moins de 4 sommets par la "
                      "deduplication a 1 mm"},
+        "champs_ajoutes_L1b9": [
+            "emprise_objet (+ emprise_objet_m2) : la forme entiere que le "
+            "side-car declare pour l'ouvrage, non rognee par la preseance ; "
+            "vaut la chaine \"sans_objet\" pour les parcelles de sol "
+            "attribuees a un ouvrage sans objet declare (bandes bnd/, "
+            "bouchons tro/)",
+            "assiettes : cote synchronisee avec la loi (une seule verite)"],
         "champs_ajoutes_L1b4": [
             "famille (famille de matrice, 19 peuplees)",
             "hauteur_m (bati, de la donnee attestee par empreintes_sources)",
@@ -597,4 +670,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys as _s
+    # ⚠️ un nom de cellule commence souvent par un moins : ce sont des noms,
+    # pas des options.
+    _f = [a for a in _s.argv[1:] if a and "_" in a]
+    main(_f or None)

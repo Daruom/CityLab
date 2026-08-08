@@ -2,8 +2,10 @@
  "assiettes": {
   "cote_calculee": 24881,
   "cote_declaree": 175,
+  "juge_cote_unique": 0,
   "marge_seuil_batiment_m": 0.05,
-  "n": 25056
+  "n": 25056,
+  "resynchronisees_apres_solveur": 15079
  },
  "couche": "SOLVEUR",
  "fidelite_au_releve": {

@@ -34,7 +34,7 @@ from shapely.strtree import STRtree
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mq_lib import (CAT_ID, CATALOGUE, Contrat, FAM_ID, FAMILLES, MQ, PARAMS,
                     Registre, Tampon, ZEval, b64, chrono, jalon, polygone,
-                    prisme, quad_strip, trianguler)
+                    prisme, quad_strip, trianguler, volume_marches)
 
 WEB = os.path.join(MQ, "web")
 CELLS = os.path.join(WEB, "cells")
@@ -150,6 +150,29 @@ def construire_cellule(ct, ze, cle, stats):
         fams[p["id"]] = ct.famille(p)
     assiettes = ct.assiettes(cle)
 
+    # --- DE QUELLE HAUTEUR MONTE UN ESCALIER ? -----------------------------
+    # Le contrat donne aux escaliers et aux gradins une loi CONSTANTE : leur
+    # emprise est plate, la volee n'a pas de hauteur propre. Mais un escalier
+    # RACCORDE deux cotes : sa montee est le denivele de ses VOISINS, que le
+    # contrat porte sur les frontieres. On releve donc, par piece d'ouvrage,
+    # la cote la plus basse et la plus haute rencontrees au contact.
+    vois_z = {}
+    for i in it["interfaces"]:
+        for u, w in ((i["a"], i["b"]), (i["b"], i["a"])):
+            if fams.get(u) not in ("escalier", "gradins"):
+                continue
+            for pl in (i.get("polylignes") or [])[:1]:
+                xy = np.asarray(pl, dtype=np.float64)
+                if len(xy) < 2:
+                    continue
+                zv = ze.z(w, xy[:, 0], xy[:, 1])
+                if zv is None:
+                    continue
+                m = float(np.median(zv))
+                e = vois_z.setdefault(u, [m, m])
+                e[0] = min(e[0], m)
+                e[1] = max(e[1], m)
+
     table = {}
     T_sol = Tampon(table)
     T_eau = Tampon(table)
@@ -217,8 +240,45 @@ def construire_cellule(ct, ze, cle, stats):
             else:
                 zi_f = zi
             intrados[pid] = zi
+
+            # ---- OUVRAGES QUI PARLENT ------------------------------------
+            # Un escalier ou des gradins rendus en PRISME sont une masse
+            # muette (grief utilisateur sur Saint-Pierre). On les rend en
+            # MARCHES REELLES : l'emprise est tranchee perpendiculairement a
+            # son axe, chaque bande montant d'une marche. Le NOMBRE de marches
+            # vient de la borne du registre (geometrie_marche), pas de moi.
+            if fam in ("escalier", "gradins"):
+                zb2, zh = float(np.min(z)), float(np.max(z))
+                vz = vois_z.get(pid)
+                if vz and (vz[1] - vz[0]) > (zh - zb2):
+                    # la volee raccorde ses voisins : c'est CE denivele
+                    zb2, zh = vz[0], vz[1]
+                    stats["volee_calee_sur_les_voisins"] += 1
+                if zh - zb2 < 0.05:      # aucun denivele lisible : jupe
+                    zb2, zh = zi, zt
+                    stats["volee_sans_denivele_au_contrat"] += 1
+                V, TT, nm, hm = volume_marches(
+                    g, zb2, zh, PARAMS["MARCHE_H_MAX_M"],
+                    PARAMS["JUPE_OUVRAGE_MIN_M"])
+                if V is not None:
+                    T_ouv.ajouter(V, TT, fid, pid)
+                    stats["ouvrages_en_marches"] += 1
+                    stats["marches_d_ouvrage"] += nm
+                    stats["ouvrages"] += 1
+                    continue
+                stats["ouvrage_marches_impossible"] += 1
+
+            # L'EMPRISE COMPLETE DE L'OUVRAGE quand le contrat la porte.
+            # `anneaux` est l'emprise ROGNEE par le decoupage en parcelles :
+            # un tablier y arrive en morceaux, d'ou les ponts fragmentaires de
+            # Saint-Pierre. `emprise_objet` est l'emprise entiere de l'objet.
+            # Le lecteur est cable des maintenant : il s'activera tout seul a
+            # la re-export, sans nouvelle passe de code.
+            anneaux_ouv = p.get("emprise_objet") or p["anneaux"]
+            if p.get("emprise_objet"):
+                stats["ouvrages_emprise_objet"] += 1
             n0 = T_ouv.nt
-            for anneau in p["anneaux"]:
+            for anneau in anneaux_ouv:
                 V, TT = prisme(anneau, zi_f, zt)
                 if V is None:
                     ct.saut("anneau d'ouvrage non extrudable "

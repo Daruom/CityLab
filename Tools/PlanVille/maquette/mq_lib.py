@@ -765,6 +765,70 @@ def quad_strip(xy, za, zb):
     return V, T
 
 
+def volume_marches(g, z_bas, z_haut, h_max, jupe=0.30):
+    """Une emprise d'ESCALIER ou de GRADINS rendue en MARCHES REELLES.
+
+    L'emprise est tranchee en bandes perpendiculaires a son axe long, et
+    chaque bande est extrudee jusqu'a SA propre cote : on obtient un volume
+    etage qui se LIT comme un escalier, au lieu de la masse muette qu'etait le
+    simple prisme (grief utilisateur sur Saint-Pierre). Le nombre de marches
+    vient de la hauteur a franchir et de la borne du REGISTRE
+    (`geometrie_marche`, h <= h_max) : rien n'est choisi ici.
+
+    Renvoie (sommets, triangles, nombre de marches, hauteur de marche)."""
+    if g is None or g.is_empty or g.area <= 0:
+        return None, None, 0, 0.0
+    dz = float(z_haut - z_bas)
+    if abs(dz) < 1e-6:
+        return None, None, 0, 0.0
+    co = shapely.get_coordinates(g)
+    c = co.mean(axis=0)
+    d = co - c
+    try:
+        _, _, vt = np.linalg.svd(d, full_matrices=False)
+        ax = vt[0] / (np.linalg.norm(vt[0]) or 1.0)
+    except Exception:
+        ax = np.array([1.0, 0.0])
+    nr = np.array([-ax[1], ax[0]])
+    u = d @ ax
+    u0, u1 = float(u.min()), float(u.max())
+    vv = d @ nr
+    v0, v1 = float(vv.min()) - 1.0, float(vv.max()) + 1.0
+    if u1 - u0 < 1e-6:
+        return None, None, 0, 0.0
+    n = int(np.ceil(abs(dz) / float(h_max)))
+    n = max(1, min(n, 60))                 # garde-fou : pas de volee infinie
+    h = dz / n
+    zsol = min(z_bas, z_haut) - jupe
+    V, T = [], []
+    base = 0
+    for k in range(n):
+        ua = u0 + (u1 - u0) * k / n
+        ub = u0 + (u1 - u0) * (k + 1) / n
+        coins = np.array([[ua, v0], [ub, v0], [ub, v1], [ua, v1]])
+        monde = c + coins[:, :1] * ax + coins[:, 1:2] * nr
+        try:
+            bande = g.intersection(Polygon(monde))
+        except Exception:
+            continue
+        if bande.is_empty or bande.area <= 0:
+            continue
+        z_k = z_bas + h * (k + 1)          # nez de la marche k
+        parts = list(bande.geoms) if hasattr(bande, "geoms") else [bande]
+        for q in parts:
+            if q.is_empty or q.area <= 0 or not hasattr(q, "exterior"):
+                continue
+            Vk, Tk = prisme(np.asarray(q.exterior.coords), zsol, z_k)
+            if Vk is None:
+                continue
+            V.append(Vk)
+            T.append(np.asarray(Tk) + base)
+            base += len(Vk)
+    if not V:
+        return None, None, 0, 0.0
+    return np.concatenate(V), np.concatenate(T), n, abs(h)
+
+
 def prisme(anneau_xy, z_bas, z_haut):
     """Volume extrude : murs + toit plat. `anneau_xy` ferme ou non.
 

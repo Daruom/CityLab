@@ -28,6 +28,23 @@ var PAL = {
   terrain_naturel:[0.76,0.80,0.70], semis:[0.55,0.70,0.50],
   breakline:[0.70,0.66,0.60], sous_sol:[0.50,0.50,0.52]
 };
+/* PIECES DU CATALOGUE — leur propre palette.
+   DEFAUT CORRIGE (retour utilisateur « fentes en pied de batiment ») : les
+   faces d'interface etaient peintes avec l'identifiant du CATALOGUE
+   reinterprete comme index de FAMILLE. Un `mur` (cid 4) prenait la teinte de
+   `canal` (bleu), une `bordure` (cid 2) celle de `carrefour`. Ce liseré faux,
+   sous un eclairement rasant, se lisait comme une FENTE au pied du mur.
+   Les pieces ont maintenant leurs teintes, volontairement PROCHES du bati et
+   du sol pour que le raccord se lise ferme. Ordre = mq_lib.CATALOGUE. */
+var CATPAL = [
+  [0.87,0.86,0.84],   // rien (jamais dessine)
+  [0.89,0.88,0.86],   // affleurement — quasi le sol
+  [0.86,0.84,0.81],   // bordure — plinthe claire
+  [0.88,0.85,0.80],   // emmarchement
+  [0.90,0.89,0.87],   // mur — plinthe de batiment, ton du bati
+  [0.82,0.78,0.70],   // talus
+  [0.95,0.55,0.35]    // arbitrage_demande — doit sauter aux yeux
+];
 /* classes de dZ pour la CARTE DES MARCHES (bornes du registre : ressaut 2 cm,
    bordure <= 20 cm) */
 var DZC = [
@@ -67,7 +84,7 @@ layout(location=2) in uint a_h;      // 1 = sommet de l'arete HAUTE
 uniform mat4 u_vp; uniform vec3 u_lo, u_span; uniform float u_fin;
 uniform int u_mode;                  // 0 famille, 1 dZ, 2 blanc
 uniform int u_itf;                   // 1 si la couche est celle des interfaces
-uniform vec3 u_pal[40];
+uniform vec3 u_pal[48];              // 0-31 familles | 32-39 dZ | 40-46 catalogue
 out vec3 v_w; flat out vec3 v_c;
 void main(){
   vec3 w = u_lo + a_p * u_span;
@@ -81,6 +98,10 @@ void main(){
     v_c = (u_itf == 1)                   // faces d'interface portent la classe
         ? u_pal[32 + min(int(a_c.y), 7)] //  de dZ ; le reste s'efface
         : vec3(0.84,0.84,0.85);
+  /* une piece d'interface porte un identifiant de CATALOGUE, pas de famille :
+     elle se lit dans la plage 40-46, sinon on peignait un mur en canal.
+     (pas d'accent grave ici : on est dans un litteral de gabarit) */
+  else if (u_itf == 1)                   v_c = u_pal[40 + min(int(a_c.x), 6)];
   else                                   v_c = u_pal[min(int(a_c.x), 31)];
   gl_Position = u_vp * vec4(w.x, w.z, w.y, 1.0);
 }`;
@@ -170,7 +191,17 @@ void main(){
   float g2 = dot(g, g);
   vec3 n = (g2 > 1e-16) ? g * inversesqrt(g2) : vec3(0.0, 0.0, 1.0);
   vec3 L = normalize(vec3(0.42, 0.30, 0.86));   // soleil de maquette
-  float d = clamp(AMB + (1.0 - AMB) * abs(dot(n, L)), AMB, 1.0);
+  /* CIEL HEMISPHERIQUE — sans lui, toute face VERTICALE tombait pile sur le
+     plancher d'ambiance (0,42) alors que le sol montait a 0,95 : au pied d'un
+     mur, la plinthe de 20 cm devenait un trait noir qui se lit comme une
+     FENTE (retour utilisateur). Le ciel eclaire selon l'orientation : plein
+     au zenith, moitie a la verticale. La plinthe passe de 0,42 a ~0,55 et le
+     raccord batiment-sol se lit continu. */
+  /* valeur absolue : la normale d'ecran a un signe arbitraire selon
+     l'enroulement du triangle ; seule l'INCLINAISON compte ici. */
+  float ciel = 0.5 + 0.5 * abs(n.z);
+  float d = clamp(AMB + (1.0 - AMB) * (0.55 * abs(dot(n, L)) + 0.45 * ciel),
+                  AMB, 1.0);
   float f = clamp(length(v_w - u_cam) / 5200.0, 0.0, 1.0);
   vec3 c = mix(v_c * d, vec3(0.09,0.11,0.14), f * f * 0.85);
   /* filet de securite : quoi qu'il arrive en amont (NaN compris), une face
@@ -217,12 +248,15 @@ var U = {}, UP = {}, UV = {};
   UP[k] = gl.getUniformLocation(PP, k); });
 ['u_vp','u_cam'].forEach(function(k){ UV[k] = gl.getUniformLocation(PV, k); });
 
-var PALV = new Float32Array(40 * 3);
+var PALV = new Float32Array(48 * 3);
 (function(){ var F = MQ_INDEX.familles;
   for (var i = 0; i < F.length && i < 32; i++){ var c = PAL[F[i]] || [0.85,0.85,0.85];
     PALV[i*3] = c[0]; PALV[i*3+1] = c[1]; PALV[i*3+2] = c[2]; }
   for (var j = 0; j < 8; j++){ var d = DZC[Math.min(j, DZC.length - 1)].c;
     PALV[(32+j)*3] = d[0]; PALV[(32+j)*3+1] = d[1]; PALV[(32+j)*3+2] = d[2]; }
+  var CAT = MQ_INDEX.catalogue || [];
+  for (var k = 0; k < 7; k++){ var e = CATPAL[Math.min(k, CATPAL.length - 1)];
+    PALV[(40+k)*3] = e[0]; PALV[(40+k)*3+1] = e[1]; PALV[(40+k)*3+2] = e[2]; }
 })();
 
 /* --------------------------------------------------------- LES DONNEES ---- */

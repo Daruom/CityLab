@@ -696,8 +696,12 @@ def main():
                            "IDENTIQUE" if v[2] else "DIVERGENT")
                         for k, v in acc.items())))
 
+    # l'emprise COMPLETE que le side-car declare pour chaque ouvrage, avant
+    # tout rognage par la preseance : le contrat la portera a cote de la part
+    # de sol reellement gagnee.
+    emp_obj = {i: shapely.to_wkb(g) for i, (g, _m) in enumerate(src["ouvrage"])}
     with open(os.path.join(CACHE, "parcelles.pkl"), "wb") as f:
-        pickle.dump({"cells": cells,
+        pickle.dump({"cells": cells, "emprises_objet": emp_obj,
                      "dom": shapely.to_wkb(DOM),
                      "parcelles": [{"id": p["id"],
                                     "proprietaire": p["proprietaire"],
