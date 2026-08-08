@@ -133,7 +133,16 @@ mesuré, pas sur l'optimisme).
 accessibilité) / `donnée` / `arbitrage utilisateur` (tracé) / `héritée` (ancien
 pipeline). Le registre des règles affiche la provenance ; une règle `héritée` ne
 peut entrer dans la ville native SANS re-dérivation justifiée dans la nouvelle
-architecture — sinon elle est supprimée. Déjà tranché : le p50 par parcelle
+architecture — sinon elle est supprimée.
+**⭐ TABLE RASE (arbitrage utilisateur 08/08) : le registre part VIDE.** Aucune
+règle n'entre par défaut ou par habitude — une règle n'entre que TIRÉE PAR UN
+BESOIN (une case de la matrice qui exige un contrat, une mécanique qui exige un
+gabarit), son contenu cherché dans l'ordre : le RÉEL (normes) → la DONNÉE →
+sinon ARBITRAGE explicite. « On avait cette règle » n'est jamais une
+justification. Ce qu'on garde n'est pas des règles mais de la CONNAISSANCE :
+les faits mesurés (parité moteur, qualité des sources), les pièges techniques
+(annexe consultable, jamais source de règles), et les verdicts visuels
+utilisateur comme CIBLES D'ACCEPTATION (« au moins aussi bon ICI »). Déjà tranché : le p50 par parcelle
 indépendante est MORT (remplacé par solveur+communautés+fidélité) ; le « plafond
 de mur 12 m » ne survit que comme seuil de DÉTECTION, plus comme règle de
 construction.
