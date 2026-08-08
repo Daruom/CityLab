@@ -142,7 +142,15 @@ sinon ARBITRAGE explicite. « On avait cette règle » n'est jamais une
 justification. Ce qu'on garde n'est pas des règles mais de la CONNAISSANCE :
 les faits mesurés (parité moteur, qualité des sources), les pièges techniques
 (annexe consultable, jamais source de règles), et les verdicts visuels
-utilisateur comme CIBLES D'ACCEPTATION (« au moins aussi bon ICI »). Déjà tranché : le p50 par parcelle
+utilisateur comme CIBLES D'ACCEPTATION (« au moins aussi bon ICI »).
+**Discipline de BRIEF (le vecteur de contamination, c'est le coordinateur)** :
+les briefs livrent des EXIGENCES (invariants, cases de matrice, cibles), JAMAIS
+des solutions de construction ; la connaissance voyage en annexe séparée
+étiquetée « FAITS & PIÈGES — ceci n'est pas une règle » ; interdiction explicite
+d'importer une règle de l'ancien pipeline même trouvée dans le code/les docs
+(la re-dériver et la proposer, pas l'appliquer) ; le coordinateur relit le
+REGISTRE (provenance par provenance) à chaque livraison — règle sans provenance
+ou héritée sans re-dérivation = livraison refusée. Déjà tranché : le p50 par parcelle
 indépendante est MORT (remplacé par solveur+communautés+fidélité) ; le « plafond
 de mur 12 m » ne survit que comme seuil de DÉTECTION, plus comme règle de
 construction.
