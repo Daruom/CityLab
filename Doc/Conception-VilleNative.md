@@ -126,6 +126,18 @@ jupes, matériaux mesurés, re-pose murets, exécuteur de semis.
 poses avec verdict global écrit · fourchettes honnêtes (calibrées sur l'historique
 mesuré, pas sur l'optimisme).
 
+## ⚠️ PROVENANCE OBLIGATOIRE DES RÈGLES (garde-fou utilisateur 08/08)
+« National » = une exigence de FORME (règle générique, zéro cas particulier local
+— c'est la règle d'or elle-même), PAS un blanc-seing pour le contenu hérité.
+**Toute règle du compilateur porte sa PROVENANCE** : `réel` (norme BTP/CEREMA/
+accessibilité) / `donnée` / `arbitrage utilisateur` (tracé) / `héritée` (ancien
+pipeline). Le registre des règles affiche la provenance ; une règle `héritée` ne
+peut entrer dans la ville native SANS re-dérivation justifiée dans la nouvelle
+architecture — sinon elle est supprimée. Déjà tranché : le p50 par parcelle
+indépendante est MORT (remplacé par solveur+communautés+fidélité) ; le « plafond
+de mur 12 m » ne survit que comme seuil de DÉTECTION, plus comme règle de
+construction.
+
 ## Arbitrages utilisateur en attente (tous en 3D, sur place, sur la map native)
 ① mur de quai (résout 11/12 arbitrages — pièce à valider visuellement) ·
 ② aplanir-vs-épouser les grandes communautés en relief (le solveur + la borne de
