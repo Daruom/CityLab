@@ -1,5 +1,11 @@
 # Chantier PLAN DE VILLE — le document maître
 
+> **⚠️ 2026-08-08 : LE point d'entrée du chantier en cours est désormais
+> `Doc/Conception-VilleNative.md`** (règle d'or, étape 0 recensement, solveur
+> d'harmonisation/assiettes/terrassements, construction sur `L_PlanVille_A`).
+> Ce document reste la référence de l'architecture du plan et l'historique
+> détaillé des étages 1 et 2 (dont le post-mortem « greffe sur l'existant », §12).
+
 > **Statut : ARBITRÉ, prêt à exécuter (étage 1). Rédigé le 2026-08-07** après la journée
 > partition (voir `Chantier-Partition-Sol.md`, désormais ABSORBÉ par ce chantier).
 > **LE point d'entrée du travail en cours.** Objectif produit inchangé : *un rendu sans
