@@ -621,14 +621,14 @@
    "octets": 3242972
   },
   "plan_qui_-1_3.json": {
-   "md5_logique": "f5491d3aca273162cef4f38e13d0e958",
-   "md5_octets": "f5491d3aca273162cef4f38e13d0e958",
-   "octets": 438793
+   "md5_logique": "4e118c673461418d5fb5161c3a5c63b8",
+   "md5_octets": "4e118c673461418d5fb5161c3a5c63b8",
+   "octets": 408890
   },
   "plan_qui_-2_-1.json": {
-   "md5_logique": "b6d66fdbf4e65ffd3a4a3d3404133e9c",
-   "md5_octets": "b6d66fdbf4e65ffd3a4a3d3404133e9c",
-   "octets": 2914743
+   "md5_logique": "03afa1f14b9e3fd81208546f41596258",
+   "md5_octets": "03afa1f14b9e3fd81208546f41596258",
+   "octets": 2912902
   },
   "plan_qui_-2_-2.json": {
    "md5_logique": "aaf979424502780c992de6a3719a4ae5",
@@ -661,9 +661,9 @@
    "octets": 321799
   },
   "plan_qui_-3_-1.json": {
-   "md5_logique": "a100f5c96f422cdd264ee225e9b709db",
-   "md5_octets": "a100f5c96f422cdd264ee225e9b709db",
-   "octets": 3716566
+   "md5_logique": "7c3d66ad821113d97165f9055db1797e",
+   "md5_octets": "7c3d66ad821113d97165f9055db1797e",
+   "octets": 3704267
   },
   "plan_qui_-3_-2.json": {
    "md5_logique": "8e33a15af4809044ed3575d7b911528a",
@@ -676,9 +676,9 @@
    "octets": 1720001
   },
   "plan_qui_-3_0.json": {
-   "md5_logique": "6c599acb3d3dfab4e36f744ffd50206e",
-   "md5_octets": "6c599acb3d3dfab4e36f744ffd50206e",
-   "octets": 1981669
+   "md5_logique": "0df639ea8ae140da979409d0fe0a90a2",
+   "md5_octets": "0df639ea8ae140da979409d0fe0a90a2",
+   "octets": 1973571
   },
   "plan_qui_-3_1.json": {
    "md5_logique": "66e5d6af3139d7efbd02130d4e67472f",
@@ -781,9 +781,9 @@
    "octets": 2694654
   },
   "plan_qui_2_-3.json": {
-   "md5_logique": "d68a966eda1668848a15a0865f983a35",
-   "md5_octets": "d68a966eda1668848a15a0865f983a35",
-   "octets": 2376007
+   "md5_logique": "b4921cee7dc6b222b0a68abf2ee722f2",
+   "md5_octets": "b4921cee7dc6b222b0a68abf2ee722f2",
+   "octets": 2374861
   },
   "plan_qui_2_0.json": {
    "md5_logique": "a610dde7e2f36b503698008610678abc",
@@ -801,9 +801,9 @@
    "octets": 2069354
   },
   "plan_qui_2_3.json": {
-   "md5_logique": "68f2dee66e7e7055e6455ba3f90f685d",
-   "md5_octets": "68f2dee66e7e7055e6455ba3f90f685d",
-   "octets": 409834
+   "md5_logique": "deffe79ed13b56ad2d5b9ceb96634aed",
+   "md5_octets": "deffe79ed13b56ad2d5b9ceb96634aed",
+   "octets": 407542
   },
   "plan_qui_3_-1.json": {
    "md5_logique": "d91294178368737f52834cc711717621",
@@ -1848,7 +1848,7 @@
    "fichiers": 49
   },
   "qui": {
-   "Mo": 106.84,
+   "Mo": 106.785,
    "fichiers": 49
   },
   "registre": {

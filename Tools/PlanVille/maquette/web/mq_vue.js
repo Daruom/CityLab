@@ -45,6 +45,23 @@ var CATPAL = [
   [0.82,0.78,0.70],   // talus
   [0.95,0.55,0.35]    // arbitrage_demande — doit sauter aux yeux
 ];
+/* LA TEINTE NEUTRE DES PIECES DE JONCTION (retour utilisateur « patches
+   jaune/marron » au pied des batiments, vue du Capitole).
+   MESURE QUI COMMANDE CE CHOIX — comptage des pixels chauds (r-b >= 18 et
+   r > g > b) sur la vue exacte du grief : TOUT 17591 · sans la couche `terr`
+   0 · couche `itf` SEULE 0. Le sable ne venait donc PAS de la palette du
+   catalogue (plage 40-46, deja quasi blanche) mais de la couche des
+   TERRASSEMENTS, peinte avec la teinte de FAMILLE `terrassement`
+   [0.80,0.74,0.64] — un sable franc, sur des bandes de 0,15 m de large en
+   moyenne courant tout le long des murs.
+   Une maquette blanche n'a pas a signaler ses pieces de jonction en couleur :
+   elles se lisent au RELIEF. Les teintes parlantes (catalogue et famille) ne
+   servent qu'a la LECTURE TECHNIQUE, et vivent donc dans leurs propres modes
+   (carte des marches, pieces d'interface). Ici : un gris discret, plus clair
+   que le trottoir, plus sourd que le sol mineral, et de teinte NULLE
+   (r - b = 0.005, soit 1 sur 255 : hors de portee de l'oeil comme du
+   comptage). */
+var NEUTRE = [0.855,0.855,0.850];
 /* classes de dZ pour la CARTE DES MARCHES (bornes du registre : ressaut 2 cm,
    bordure <= 20 cm) */
 var DZC = [
@@ -82,8 +99,9 @@ layout(location=0) in vec3 a_p;      // position quantifiee [0,1]
 layout(location=1) in uvec2 a_c;     // (famille, classe de dZ)
 layout(location=2) in uint a_h;      // 1 = sommet de l'arete HAUTE
 uniform mat4 u_vp; uniform vec3 u_lo, u_span; uniform float u_fin;
-uniform int u_mode;                  // 0 famille, 1 dZ, 2 blanc
-uniform int u_itf;                   // 1 si la couche est celle des interfaces
+uniform int u_mode;                  // 0 famille, 1 dZ, 2 blanc, 3 pieces
+uniform int u_piece;                 // 0 surface | 1 interface | 2 terrassement
+uniform vec3 u_neutre;               // teinte des pieces de jonction, hors mode 3
 uniform vec3 u_pal[48];              // 0-31 familles | 32-39 dZ | 40-46 catalogue
 out vec3 v_w; flat out vec3 v_c;
 void main(){
@@ -95,13 +113,31 @@ void main(){
   v_w = w;
   if (u_mode == 2)                       v_c = vec3(0.90,0.89,0.87);
   else if (u_mode == 1)                  // CARTE DES MARCHES : seules les
-    v_c = (u_itf == 1)                   // faces d'interface portent la classe
+    v_c = (u_piece == 1)                 // faces d'interface portent la classe
         ? u_pal[32 + min(int(a_c.y), 7)] //  de dZ ; le reste s'efface
         : vec3(0.84,0.84,0.85);
-  /* une piece d'interface porte un identifiant de CATALOGUE, pas de famille :
-     elle se lit dans la plage 40-46, sinon on peignait un mur en canal.
-     (pas d'accent grave ici : on est dans un litteral de gabarit) */
-  else if (u_itf == 1)                   v_c = u_pal[40 + min(int(a_c.x), 6)];
+  /* MODE 3 — LECTURE DES PIECES : c'est LE mode ou les teintes parlantes
+     s'affichent, et le seul. Une piece d'interface porte un identifiant de
+     CATALOGUE, pas de famille : elle se lit dans la plage 40-46, sinon on
+     peignait un mur en canal. Un terrassement, lui, garde sa teinte de
+     famille. (pas d'accent grave ici : on est dans un litteral de gabarit) */
+  else if (u_mode == 3)
+    v_c = (u_piece == 1) ? u_pal[40 + min(int(a_c.x), 6)]
+        : ((u_piece == 2) ? u_pal[min(int(a_c.x), 31)] : vec3(0.90,0.90,0.91));
+  /* UNE SEULE EXCEPTION, et elle n'est pas decorative : arbitrage_demande
+     (identifiant 6) n'est pas une teinte de lecture, c'est une ALARME — le
+     plan dit qu'il ne sait pas resoudre ce contact ; le domaine en porte 2.
+     La rendre neutre en coloration famille reviendrait a cacher un manque du
+     plan derriere le correctif d'un defaut de rendu. Elle reste donc visible
+     ici. (La maquette blanche, elle, est traitee plus haut et reste blanche :
+     c'est une maquette, pas un tableau de bord.)
+     PAS D'ACCENT GRAVE DANS CE COMMENTAIRE : on est dans un litteral de
+     gabarit, un seul accent grave termine le shader. */
+  else if (u_piece == 1 && int(a_c.x) == 6)  v_c = u_pal[46];
+  /* FAMILLE DU PLAN — la maquette blanche reste blanche : les pieces de
+     jonction (interfaces ET terrassements) prennent la teinte NEUTRE et se
+     lisent au relief, pas a la couleur. */
+  else if (u_piece != 0)                 v_c = u_neutre;
   else                                   v_c = u_pal[min(int(a_c.x), 31)];
   gl_Position = u_vp * vec4(w.x, w.z, w.y, 1.0);
 }`;
@@ -242,7 +278,8 @@ void main(){
 
 var P = prog(VS, FS), PP = prog(VSP, FSP), PV = prog(VSV, FS);
 var U = {}, UP = {}, UV = {};
-['u_vp','u_lo','u_span','u_mode','u_itf','u_pal','u_cam','u_fin'].forEach(function(k){
+['u_vp','u_lo','u_span','u_mode','u_piece','u_neutre','u_pal','u_cam',
+ 'u_fin'].forEach(function(k){
   U[k] = gl.getUniformLocation(P, k); });
 ['u_vp','u_lo','u_span','u_tag'].forEach(function(k){
   UP[k] = gl.getUniformLocation(PP, k); });
@@ -492,7 +529,7 @@ var FIN_M = 2.5;   // hauteur d'ailette de la carte des marches (AFFICHAGE seul)
     d.appendChild(l);
   });
   document.getElementById('mode').onchange = function(){
-    mode = {fam:0, dz:1, blanc:2}[this.value]; legende(); };
+    mode = {fam:0, dz:1, blanc:2, pieces:3}[this.value]; legende(); };
   document.getElementById('rayon').oninput = function(){
     rayon = +this.value; document.getElementById('rv').textContent = rayon; };
   document.getElementById('dens').oninput = function(){
@@ -544,10 +581,20 @@ function legende(){
       Math.round(c[0]*255)+','+Math.round(c[1]*255)+','+Math.round(c[2]*255)+
       ')"></span>' + t; d.appendChild(e); }
   if (mode === 1){ DZC.forEach(function(k){ ligne(k.c, k.t); }); }
+  else if (mode === 3){
+    /* LE mode de lecture technique : c'est ici, et NULLE PART AILLEURS, que
+       les pieces portent leurs teintes parlantes. */
+    (MQ_INDEX.catalogue || []).forEach(function(c, i){
+      if (c !== 'rien') ligne(CATPAL[Math.min(i, CATPAL.length-1)], c); });
+    ligne(PAL.terrassement, 'terrassement (talus, soutenement)');
+  }
   else if (mode === 0){
     ['batiment','chaussee','trottoir','carrefour','sol_mineral','sol_vegetal',
-     'eau_surface','pont','dalot','mur_sout','escalier','voie_ferree','canal',
-     'terrassement'].forEach(function(f){ ligne(PAL[f], f); });
+     'eau_surface','pont','dalot','mur_sout','escalier','voie_ferree',
+     'canal'].forEach(function(f){ ligne(PAL[f], f); });
+    /* la legende ne doit pas annoncer une teinte que la vue n'affiche plus :
+       en famille, les pieces de jonction sont NEUTRES. */
+    ligne(NEUTRE, 'pièces de jonction (neutres — voir mode « pièces »)');
   }
 }
 
@@ -782,6 +829,7 @@ function rendre(w, h){
   gl.uniformMatrix4fv(U.u_vp, false, M);
   gl.uniform1i(U.u_mode, mode);
   gl.uniform3fv(U.u_pal, PALV);
+  gl.uniform3f(U.u_neutre, NEUTRE[0], NEUTRE[1], NEUTRE[2]);
   gl.uniform3f(U.u_cam, cam.x, cam.z, cam.y);
   dessines = 0;
   var vegs = [];
@@ -789,7 +837,9 @@ function rendre(w, h){
     if (!C || C.vide || !C.bbox || !visible(pl, C.bbox)) continue;
     for (var nom in C.couches){ if (!actif[nom]) continue;
       var L = C.couches[nom];
-      gl.uniform1i(U.u_itf, nom === 'itf' ? 1 : 0);
+      /* les DEUX couches de jonction : `itf` (faces d'interface, identifiant
+         de catalogue) et `terr` (terrassements, identifiant de famille) */
+      gl.uniform1i(U.u_piece, nom === 'itf' ? 1 : (nom === 'terr' ? 2 : 0));
       gl.uniform1f(U.u_fin, (mode === 1 && nom === 'itf') ? FIN_M : 0.0);
       for (var i = 0; i < L.length; i++){ var k = L[i];
         gl.uniform3fv(U.u_lo, k.lo); gl.uniform3fv(U.u_span, k.span);

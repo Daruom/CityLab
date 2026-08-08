@@ -37,6 +37,10 @@ PAL = {
     "terrain_sport": (0.74, 0.82, 0.70), "batiment": (0.93, 0.92, 0.90),
     "terrassement": (0.80, 0.74, 0.64), "terrain_naturel": (0.76, 0.80, 0.70),
     "semis": (0.55, 0.70, 0.50),
+    # LA TEINTE NEUTRE DES PIECES DE JONCTION — meme valeur que `NEUTRE` de
+    # web/mq_vue.js. Les deux supports doivent montrer la MEME chose : c'est la
+    # condition pour que leur comparaison ait un sens.
+    "_neutre": (0.855, 0.855, 0.850),
 }
 COUCHES = ["sol", "eau", "ouvr", "bati", "itf", "terr"]
 
@@ -119,12 +123,27 @@ def main():
                 me.from_pydata([tuple(v) for v in P], [],
                                [tuple(t) for t in I])
                 me.validate(verbose=False)
-                # une teinte par famille : on prend la famille MAJORITAIRE du
-                # troncon (la maquette est plate, pas un rendu)
-                rf = unb64(k["rf"], np.uint8)
-                fam = FAM[int(np.bincount(rf).argmax())] if len(rf) else "sol_mineral"
+                # LES DEUX COUCHES DE JONCTION prennent la teinte NEUTRE, comme
+                # la page en coloration famille. Deux raisons, et la seconde
+                # etait un vrai faux :
+                #  * une maquette blanche ne signale pas ses pieces de jonction
+                #    en couleur (retour utilisateur « patches jaune/marron ») ;
+                #  * sur la couche `itf`, `rf` porte un identifiant de
+                #    CATALOGUE, pas de famille : FAM[cid] peignait un `mur`
+                #    (cid 4) en `canal`, c'est-a-dire en BLEU. Le .blend
+                #    portait donc encore, seul, le defaut que la page a corrige
+                #    au lot precedent.
+                # Ailleurs : une teinte par famille, celle qui est MAJORITAIRE
+                # sur le troncon (la maquette est plate, pas un rendu).
+                if nom in ("itf", "terr"):
+                    mat = mats["_neutre"]
+                else:
+                    rf = unb64(k["rf"], np.uint8)
+                    fam = (FAM[int(np.bincount(rf).argmax())] if len(rf)
+                           else "sol_mineral")
+                    mat = mats.get(fam, mats["sol_mineral"])
                 ob = bpy.data.objects.new(me.name, me)
-                ob.data.materials.append(mats.get(fam, mats["sol_mineral"]))
+                ob.data.materials.append(mat)
                 cols[nom].objects.link(ob)
                 n_tri += len(I)
                 n_som += len(P)

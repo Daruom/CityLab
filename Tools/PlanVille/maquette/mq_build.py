@@ -109,6 +109,112 @@ def normale_moyenne(xy):
 
 LIGNES = {}
 
+# ---------------------------------------------------------------------------
+# LE RACCORD EN ONGLET (miter), detail de jonction standard du BTP.
+#
+# MESURE QUI COMMANDE CE CODE (mq_sonde_onglet.py, cellule 0_0) : les 24 721
+# polylignes de contact de la cellule ont TOUTES exactement 2 sommets. Une
+# bande de talus n'est donc pas une longue bande qui suit un mur : c'est une
+# MOSAIQUE de quadrilateres independants, un par segment de frontiere. Chacun
+# etait decale par SA propre normale (`xy + nrm * larg`) — d'ou, a chaque
+# sommet partage par deux segments qui ne sont pas colineaires :
+#   * un RECOUVREMENT du cote convexe (les deux bandes se croisent),
+#   * une LACUNE du cote concave (un coin non rempli),
+# soit exactement le grief de l'utilisateur a l'angle des batiments. 3 896
+# sommets partages dans la seule cellule 0_0, dont 3 168 (81 %) entre segments
+# de MEME largeur, ou l'onglet ferme le coin exactement.
+#
+# L'onglet : au sommet ou deux segments de normales n1 et n2 se rejoignent, le
+# sommet decale n'est pas p + n1*w mais p + w*(n1+n2)/(1+n1.n2). Ce vecteur a
+# pour direction la BISSECTRICE et pour longueur w/cos(demi-angle) : il tombe
+# donc pile a l'intersection des deux bords decales, a distance w de CHACUN
+# des deux segments. Ni recouvrement, ni lacune.
+# ---------------------------------------------------------------------------
+BOUTS = {}
+ONGLET_LIMITE = 3.0        # bornage du dard sur les angles tres fermes
+
+
+def _cle_bout(p):
+    return (round(float(p[0]), 2), round(float(p[1]), 2))
+
+
+def index_bouts():
+    """Index des EXTREMITES : point de contact -> directions des segments qui
+    en PARTENT. C'est ce qui donne, a chaque sommet, le segment voisin avec
+    lequel faire l'onglet. Global comme LIGNES : deux bandes qui se rejoignent
+    a l'angle d'un batiment peuvent appartenir a deux couples differents."""
+    t = time.time()
+    BOUTS.clear()
+    vus = set()
+    for pls in LIGNES.values():
+        for pl in pls:
+            xy = np.asarray(pl, dtype=np.float64)
+            if len(xy) < 2:
+                continue
+            for p, q in ((xy[0], xy[1]), (xy[-1], xy[-2])):
+                d = q - p
+                L = float(np.hypot(d[0], d[1]))
+                if L < 1e-9:
+                    continue
+                d = d / L
+                c = _cle_bout(p)
+                # un meme segment est indexe sous LES DEUX ordres du couple :
+                # on ne le compte qu'une fois, sinon il serait son propre voisin
+                s = (c, round(float(d[0]), 3), round(float(d[1]), 3))
+                if s in vus:
+                    continue
+                vus.add(s)
+                BOUTS.setdefault(c, []).append(d)
+    chrono("index des extremites (onglet)", time.time() - t,
+           "%d sommets, %d partages par au moins 2 segments"
+           % (len(BOUTS), sum(1 for v in BOUTS.values() if len(v) >= 2)))
+    return BOUTS
+
+
+def onglet(xy, nrm, larg):
+    """Vecteur de decalage a CHAQUE sommet de `xy`, en ONGLET quand un segment
+    voisin partage l'extremite. Renvoie un tableau (n, 2).
+
+    Repli explicite sur le decalage droit (`nrm * larg`) dans les trois cas ou
+    l'onglet n'a pas de sens : aucun voisin, voisin colineaire (l'onglet serait
+    l'identite), angle trop ferme (le dard depasserait ONGLET_LIMITE fois la
+    largeur — on ne fabrique pas une pointe qui n'existe pas sur le terrain)."""
+    n = len(xy)
+    D = np.tile(np.asarray(nrm, dtype=np.float64) * larg, (n, 1))
+    if n < 2:
+        return D
+    for i in (0, n - 1):
+        p = xy[i]
+        q = xy[1] if i == 0 else xy[-2]
+        d = q - p
+        L = float(np.hypot(d[0], d[1]))
+        if L < 1e-9:
+            continue
+        d = d / L
+        cands = BOUTS.get(_cle_bout(p))
+        if not cands or len(cands) < 2:
+            continue
+        best, aligne = None, -1.0
+        for e in cands:
+            if abs(float(e[0] * d[0] + e[1] * d[1])) > 0.999:
+                continue                     # mon propre segment, ou colineaire
+            m = np.array([-e[1], e[0]])      # normale du voisin, ramenee de MON
+            if float(m[0] * nrm[0] + m[1] * nrm[1]) < 0:
+                m = -m                       # cote (la bande est d'un seul cote)
+            v = float(m[0] * nrm[0] + m[1] * nrm[1])
+            if v > aligne:                   # le voisin le plus dans MON axe :
+                aligne, best = v, m          # c'est lui qui prolonge la bande
+        if best is None:
+            continue
+        s = 1.0 + float(best[0] * nrm[0] + best[1] * nrm[1])
+        if s < 1e-6:
+            continue                         # normales opposees : pas d'onglet
+        v = (np.asarray(nrm, dtype=np.float64) + best) / s
+        if float(np.hypot(v[0], v[1])) > ONGLET_LIMITE:
+            continue
+        D[i] = v * larg
+    return D
+
 
 def index_lignes(ct, cells):
     """Index GLOBAL couple -> polylignes de contact, pour les terrassements.
@@ -130,6 +236,7 @@ def index_lignes(ct, cells):
                     n += 1
     chrono("index des lignes de contact", time.time() - t,
            "%d couples demandes, %d pieces trouvees" % (len(besoin) // 2, n))
+    index_bouts()
     return LIGNES
 
 
@@ -274,8 +381,25 @@ def construire_cellule(ct, ze, cle, stats):
             # Saint-Pierre. `emprise_objet` est l'emprise entiere de l'objet.
             # Le lecteur est cable des maintenant : il s'activera tout seul a
             # la re-export, sans nouvelle passe de code.
-            anneaux_ouv = p.get("emprise_objet") or p["anneaux"]
-            if p.get("emprise_objet"):
+            # LECTURE DU MOT `sans_objet`, vocabulaire du contrat pour une
+            # absence MOTIVEE — la meme convention que `intrados: sans_objet`,
+            # deja lue par Contrat.cote_intrados. Le contrat re-exporte le
+            # 08/08 a 20:41 porte desormais ce mot sur 332 ouvrages : ils n'ont
+            # pas d'emprise d'objet entiere, on retombe sur leurs anneaux.
+            # Sans cette lecture, la CHAINE — qui est vraie en Python — passait
+            # le test `or` et etait iteree CARACTERE par caractere : `s`
+            # partait dans prisme() et la construction levait une exception.
+            emp = p.get("emprise_objet")
+            if isinstance(emp, str):
+                if emp == "sans_objet":
+                    stats["ouvrages_emprise_sans_objet"] += 1
+                else:
+                    # un mot que je ne sais pas lire : je ne le devine pas
+                    ct.saut("emprise_objet porte un mot inconnu du lecteur "
+                            "(%r) — repli sur les anneaux" % emp, pid)
+                emp = None
+            anneaux_ouv = emp or p["anneaux"]
+            if emp:
                 stats["ouvrages_emprise_objet"] += 1
             n0 = T_ouv.nt
             for anneau in anneaux_ouv:
@@ -444,7 +568,10 @@ def construire_cellule(ct, ze, cle, stats):
             if piece == "talus" and larg > 0.01:
                 nrm = cote_bas(geoms.get(tr["terrain"]), xy,
                                normale_moyenne(xy))
-                xy2 = xy + nrm * larg
+                # RACCORD EN ONGLET aux extremites partagees avec le segment
+                # voisin : sans lui, deux bandes voisines se recouvrent d'un
+                # cote et laissent une lacune de l'autre a l'angle du bati.
+                xy2 = xy + onglet(xy, nrm, larg)
                 # le PIED du talus suit la loi du terrain a SA position
                 zt2 = ze.z(tr["terrain"], xy2[:, 0], xy2[:, 1])
                 if zt2 is None:

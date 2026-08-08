@@ -42,6 +42,28 @@ class H(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(("%s %d octets" % (p, len(data))).encode())
 
+    def end_headers(self):
+        # JAMAIS DE CACHE — c'est un serveur de MISE AU POINT.
+        # Piege paye le 08/08 : apres correction de mq_vue.js, le navigateur a
+        # resservi la version d'AVANT depuis son cache (la balise <script src>
+        # n'a pas de version, et un rechargement force ne l'a pas emporte). La
+        # page affichait donc l'ancien code pendant que le disque portait le
+        # nouveau : une verification qui porte sur les mauvais octets ne vaut
+        # rien, et rien dans la page ne le signale.
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        super().end_headers()
+
+    def send_head(self):
+        # neutralise la revalidation 304 : avec un cache interdit, une reponse
+        # « non modifie » ferait rentrer l'ancien fichier par la fenetre
+        self.headers.replace_header("If-Modified-Since", "") \
+            if self.headers.get("If-Modified-Since") else None
+        if self.headers.get("If-None-Match"):
+            del self.headers["If-None-Match"]
+        return super().send_head()
+
     def log_message(self, *a):
         pass
 

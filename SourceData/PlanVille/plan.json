@@ -162,9 +162,9 @@
  "index_donnees": {
   "convention_decoupe": "parcelle et frontiere DECOUPEES PAR CELLULE",
   "fichier": "data/plan_index.json",
-  "md5_logique": "c697491cb1e4e03b3b06527bac8704d5",
-  "md5_octets": "c697491cb1e4e03b3b06527bac8704d5",
-  "octets": 52600,
+  "md5_logique": "33964da4a96277cadb816dd1751f42b0",
+  "md5_octets": "33964da4a96277cadb816dd1751f42b0",
+  "octets": 52601,
   "totaux": {
    "instances": 981560,
    "interfaces_distinctes": 117645,
