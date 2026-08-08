@@ -56,7 +56,30 @@ des MILIEUX nationale. Rien ne peut être ignoré silencieusement.
 + transversales : **TERRASSEMENT** (raccordement au terrain : talus normalisés /
 soutènements calculés) · **règle du SOUS-SOL** (n'existe que par ses émergences).
 
-### ÉTAPE 1 — LE PLAN (enrichi : le nivellement en connaissance de cause)
+### ÉTAPE 1 — LE PLAN (enrichi : le nivellement en connaissance de cause
+### + LA MATRICE DE COHÉRENCE)
+
+**⭐ LA MATRICE DE COHÉRENCE (exigence utilisateur 08/08 : « on veut savoir la
+cohérence entre TOUS les éléments — absolument tout »)** : les familles issues du
+recensement (L0) croisées TOUTES CONTRE TOUTES. Chaque case = la relation entre
+deux familles, avec obligatoirement : un CONTRAT déclaré (ancrage, exclusion,
+appui, dégagement, pièce de jonction) + un INVARIANT chiffré cible 0, mesuré par
+le compilateur + ses pires cas dans la tournée — OU un statut explicite (« aucune
+interaction possible » justifié / « NON COUVERT » en liste bornée d'arbitrage).
+**Une paire sans statut = compilation refusée.** Exemples : bâtiment×sol (0 base
+hors pad, 0 double dalle) · mur×sol (0 flottement) · pont×terrain (0 vide de
+culée) · pont×dessous (0 violation de gabarit/tirant d'air) · escalier×terrain
+(0 vide sous volée) · arbre×bâti (0 collision) · semis×dur (0 — existe déjà).
+Les invariants d'intégration historiques étaient des cases isolées de cette
+matrice ; chaque surprise passée venait d'une case manquante. **Voir n'est pas
+savoir : la maquette 3D échantillonne pour l'œil, la matrice PROUVE pour tout.**
+
+**LA MAQUETTE BLANCHE 3D (organe de revue humain de l'étape 1)** : maquette
+d'urbanisme générée du plan — terrain harmonisé + gabarits + volumes bâtis +
+ouvrages en masses — dans le NAVIGATEUR (three.js dans le visualiseur : tournée
+des pires cas EN 3D, fiches, chargement par cellule) ; export Blender (.blend,
+bpy — Blender 5.2 headless dispo) en appoint pour inspection fine. L'utilisateur
+survole la ville harmonisée avant tout triangle Unreal.
 
 Acquis conservés : QUI (partition 100 %) · MATIÈRE · INTERFACES (catalogue fermé)
 · semis · juges/empreintes/idempotence · contrat par cellule · visualiseur.
