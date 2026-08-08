@@ -536,7 +536,13 @@ function pickInit(){
 function designer(ev){
   if (!FBO) pickInit();
   var w = CV.width, h = CV.height;
-  var px = ev.clientX * devicePixelRatio, py = h - ev.clientY * devicePixelRatio;
+  /* la designation doit suivre LA MEME echelle que le rendu : on prend le
+     rapport tampon/boite affichee, et non `devicePixelRatio` en dur (le
+     tampon peut etre borne par MAX_VIEWPORT_DIMS, et la boite peut etre
+     decalee). */
+  var r = CV.getBoundingClientRect();
+  var sx = w / (r.width || w), sy = h / (r.height || h);
+  var px = (ev.clientX - r.left) * sx, py = h - (ev.clientY - r.top) * sy;
   if (capt){ px = w/2; py = h/2; }
   gl.bindFramebuffer(gl.FRAMEBUFFER, FBO);
   gl.viewport(0, 0, 1, 1);
@@ -658,6 +664,50 @@ function majHud(){
     + (mesure ? '<br><span class="warn">' + mesure + '</span>' : '');
 }
 
+/* DIMENSIONNEMENT DE LA VUE — le defaut remonte par l'utilisateur.
+   Le tampon de rendu (`width`/`height` de l'element) doit valoir la taille
+   AFFICHEE en pixels CSS multipliee par le devicePixelRatio, sinon l'image
+   est soit floue, soit confinee dans un coin. Trois precautions :
+     * on mesure la boite REELLE (getBoundingClientRect, qui donne des
+       fractions — clientWidth arrondit), avec repli sur la fenetre si la
+       mise en page ne donne encore aucune taille ;
+     * on suit le devicePixelRatio, qui change quand la fenetre passe d'un
+       ecran a l'autre ou quand l'utilisateur zoome ;
+     * on borne au maximum de texture du pilote, sinon un grand ecran en DPR 2
+       depasse silencieusement et le rendu tombe.
+   `gl.viewport` et la matrice de projection sont recalcules sur CES valEURS :
+   `rendre(w, h)` les recoit, et `matVP(w, h)` en tire le rapport d'image. */
+var MAXVP = null;
+function dimensionner(){
+  var r = CV.getBoundingClientRect();
+  var cw = r.width || CV.clientWidth || window.innerWidth || 1600;
+  var ch = r.height || CV.clientHeight || window.innerHeight || 900;
+  var dpr = window.devicePixelRatio || 1;
+  if (MAXVP === null){
+    var v = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+    MAXVP = Math.min(v[0], v[1], gl.getParameter(gl.MAX_TEXTURE_SIZE)) || 8192;
+  }
+  var w = Math.max(1, Math.min(MAXVP, Math.round(cw * dpr)));
+  var h = Math.max(1, Math.min(MAXVP, Math.round(ch * dpr)));
+  if (CV.width !== w || CV.height !== h){ CV.width = w; CV.height = h; }
+  return [w, h];
+}
+window.addEventListener('resize', dimensionner);
+/* un changement d'ecran change le DPR sans declencher `resize` */
+if (window.matchMedia){
+  var mq = window.matchMedia('(resolution: 1dppx)');
+  if (mq.addEventListener) mq.addEventListener('change', dimensionner);
+}
+window.MQ_TAILLE = function(){
+  var r = CV.getBoundingClientRect();
+  return { css: [Math.round(r.width), Math.round(r.height)],
+           tampon: [CV.width, CV.height],
+           dpr: window.devicePixelRatio || 1,
+           fenetre: [window.innerWidth, window.innerHeight],
+           remplit: (Math.abs(r.width - window.innerWidth) <= 1 &&
+                     Math.abs(r.height - window.innerHeight) <= 1) };
+};
+
 function boucle(){
   var t = performance.now(), dt = Math.min(0.1, (t - tPrec)/1000); tPrec = t;
   acc += dt; cadres++;
@@ -671,10 +721,8 @@ function boucle(){
       if (CINFO[k] && !CELLS[k] && !CELLS['~'+k] && enCours < 3) charger(k);
     }
   }
-  var w = CV.clientWidth * devicePixelRatio | 0, h = CV.clientHeight * devicePixelRatio | 0;
-  if (!w || !h){ w = 1600; h = 900; }
-  if (CV.width !== w || CV.height !== h){ CV.width = w; CV.height = h; }
-  rendre(w, h);
+  var d = dimensionner();
+  rendre(d[0], d[1]);
   if (banc.actif) bancPas(t);
   requestAnimationFrame(boucle);
 }

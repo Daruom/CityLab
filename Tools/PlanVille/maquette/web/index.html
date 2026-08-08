@@ -6,7 +6,13 @@
 <style>
  html,body{margin:0;height:100%;overflow:hidden;background:#0e1013;color:#e8e8ea;
    font:13px/1.45 system-ui,Segoe UI,Roboto,sans-serif}
- canvas{position:absolute;inset:0;display:block;cursor:crosshair}
+ /* ATTENTION — `inset:0` NE SUFFIT PAS sur un <canvas>. Un canvas est un
+    element REMPLACE : avec width:auto, sa largeur resout a sa dimension
+    INTRINSEQUE (300x150) et le `right` sur-contraint est ignore. La vue
+    restait donc un rectangle de 300x150 en haut a gauche. Il faut des
+    dimensions EXPLICITES. */
+ canvas{position:absolute;left:0;top:0;width:100%;height:100%;
+   display:block;cursor:crosshair}
  .panel{position:absolute;background:rgba(16,18,22,.94);border:1px solid #2c313a;
    border-radius:8px;padding:10px 12px;backdrop-filter:blur(5px);
    box-shadow:0 8px 28px rgba(0,0,0,.5)}
